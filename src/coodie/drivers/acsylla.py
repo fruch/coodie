@@ -7,7 +7,52 @@ from coodie.drivers.base import AbstractDriver
 
 
 class AcsyllaDriver(AbstractDriver):
-    """Driver backed by the acsylla async-native library (optional dependency)."""
+    """Driver backed by the `acsylla <https://github.com/acsylla/acsylla>`_ async-native library.
+
+    ``acsylla`` is an **optional** dependency — install it separately::
+
+        pip install acsylla
+
+    **Typical async usage** (FastAPI / asyncio application):
+
+    .. code-block:: python
+
+        import acsylla
+        from coodie.aio import Document, init_coodie
+        from coodie.drivers import register_driver
+        from coodie.drivers.acsylla import AcsyllaDriver
+        from coodie import PrimaryKey
+        from typing import Annotated
+        from uuid import UUID, uuid4
+        from pydantic import Field
+
+        class Product(Document):
+            id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+            name: str
+
+            class Settings:
+                name = "products"
+                keyspace = "catalog"
+
+        # Build an acsylla session, then wrap it in AcsyllaDriver
+        cluster = await acsylla.create_cluster(["127.0.0.1"])
+        session = await cluster.create_session(keyspace="catalog")
+
+        driver = AcsyllaDriver(session=session, default_keyspace="catalog")
+        register_driver("default", driver, default=True)
+
+        await Product.sync_table()
+
+        product = Product(name="Widget")
+        await product.save()
+
+        results = await Product.find(name="Widget").all()
+
+    **Sync bridge** — ``execute()``, ``sync_table()``, and ``close()`` wrap the
+    async methods via :func:`asyncio.run` and therefore **must only be called
+    from non-async contexts** (scripts, CLI tools, Django/Flask views).  Calling
+    them from inside a running event loop will raise ``RuntimeError``.
+    """
 
     def __init__(self, session: Any, default_keyspace: str | None = None) -> None:
         try:
@@ -70,13 +115,14 @@ class AcsyllaDriver(AbstractDriver):
         await self._session.close()
 
     # ------------------------------------------------------------------
-    # Synchronous interface (run_until_complete bridge)
+    # Synchronous interface (asyncio.run bridge)
+    # Note: these methods must only be called from non-async contexts.
+    # Calling them from within a running event loop will raise RuntimeError.
+    # For async contexts, use the *_async variants directly.
     # ------------------------------------------------------------------
 
     def execute(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
-        return asyncio.get_event_loop().run_until_complete(
-            self.execute_async(stmt, params)
-        )
+        return asyncio.run(self.execute_async(stmt, params))
 
     def sync_table(
         self,
@@ -84,9 +130,7 @@ class AcsyllaDriver(AbstractDriver):
         keyspace: str,
         cols: list[Any],
     ) -> None:
-        asyncio.get_event_loop().run_until_complete(
-            self.sync_table_async(table, keyspace, cols)
-        )
+        asyncio.run(self.sync_table_async(table, keyspace, cols))
 
     def close(self) -> None:
-        asyncio.get_event_loop().run_until_complete(self.close_async())
+        asyncio.run(self.close_async())

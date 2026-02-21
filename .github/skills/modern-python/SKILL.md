@@ -1,5 +1,6 @@
 ---
-applyTo: "**/*.py"
+name: modern-python
+description: Configures Python projects with modern tooling (uv, ruff, ty). Use when creating projects, writing standalone scripts, or migrating from pip/Poetry/mypy/black.
 ---
 
 # Modern Python
@@ -46,7 +47,7 @@ Guide for modern Python tooling and best practices, based on [trailofbits/cookie
 What are you doing?
 │
 ├─ Single-file script with dependencies?
-│   └─ Use PEP 723 inline metadata (references/pep723-scripts.instructions.md)
+│   └─ Use PEP 723 inline metadata (./references/pep723-scripts.md)
 │
 ├─ New multi-file project (not distributed)?
 │   └─ Minimal uv setup (see Quick Start below)
@@ -66,7 +67,7 @@ What are you doing?
 | **ruff** | Linting AND formatting | flake8, black, isort, pyupgrade, pydocstyle |
 | **ty** | Type checking | mypy, pyright (faster alternative) |
 | **pytest** | Testing with coverage | unittest |
-| **prek** | Pre-commit hooks ([setup](references/prek.instructions.md)) | pre-commit (faster, Rust-native) |
+| **prek** | Pre-commit hooks ([setup](./references/prek.md)) | pre-commit (faster, Rust-native) |
 
 ### Security Tools
 
@@ -79,7 +80,7 @@ What are you doing?
 | **pip-audit** | Dependency vulnerability scanning | CI, manual |
 | **Dependabot** | Automated dependency updates | scheduled |
 
-See [security-setup.instructions.md](references/security-setup.instructions.md) for configuration and usage.
+See [security-setup.md](./references/security-setup.md) for configuration and usage.
 
 ## Quick Start: Minimal Project
 
@@ -131,7 +132,7 @@ myproject/
 
 ### 2. Configure pyproject.toml
 
-See [pyproject.instructions.md](references/pyproject.instructions.md) for complete configuration reference.
+See [pyproject.md](./references/pyproject.md) for complete configuration reference.
 
 Key sections:
 ```toml
@@ -209,7 +210,7 @@ When a user requests migration from legacy tooling:
 
 First, determine the nature of the code:
 
-**For standalone scripts**: Convert to PEP 723 inline metadata (see [pep723-scripts.instructions.md](references/pep723-scripts.instructions.md))
+**For standalone scripts**: Convert to PEP 723 inline metadata (see [pep723-scripts.md](./references/pep723-scripts.md))
 
 **For projects**:
 ```bash
@@ -246,7 +247,7 @@ Then:
 1. Remove flake8, black, isort via `uv remove`
 2. Delete `.flake8`, `pyproject.toml [tool.black]`, `[tool.isort]` configs
 3. Add ruff: `uv add --group dev ruff`
-4. Add ruff configuration (see [ruff-config.instructions.md](references/ruff-config.instructions.md))
+4. Add ruff configuration (see [ruff-config.md](./references/ruff-config.md))
 5. Run `uv run ruff check --fix .` to apply fixes
 6. Run `uv run ruff format .` to format
 
@@ -295,7 +296,7 @@ uv run --with httpx pytest  # project deps + httpx
 - `uv add`: Package is a project dependency (goes in pyproject.toml/uv.lock)
 - `--with`: One-off usage, testing, or scripts outside a project context
 
-See [uv-commands.instructions.md](references/uv-commands.instructions.md) for complete reference.
+See [uv-commands.md](./references/uv-commands.md) for complete reference.
 
 ## Quick Reference: Dependency Groups
 
@@ -321,12 +322,12 @@ Install with: `uv sync --group dev --group test`
 
 ## Read Next
 
-- [migration-checklist.instructions.md](references/migration-checklist.instructions.md) - Step-by-step migration cleanup
-- [pyproject.instructions.md](references/pyproject.instructions.md) - Complete pyproject.toml reference
-- [uv-commands.instructions.md](references/uv-commands.instructions.md) - uv command reference
-- [ruff-config.instructions.md](references/ruff-config.instructions.md) - Ruff linting/formatting configuration
-- [testing.instructions.md](references/testing.instructions.md) - pytest and coverage setup
-- [pep723-scripts.instructions.md](references/pep723-scripts.instructions.md) - PEP 723 inline script metadata
-- [prek.instructions.md](references/prek.instructions.md) - Fast pre-commit hooks with prek
-- [security-setup.instructions.md](references/security-setup.instructions.md) - Security hooks and dependency scanning
-- [dependabot.instructions.md](references/dependabot.instructions.md) - Automated dependency updates
+- [migration-checklist.md](./references/migration-checklist.md) - Step-by-step migration cleanup
+- [pyproject.md](./references/pyproject.md) - Complete pyproject.toml reference
+- [uv-commands.md](./references/uv-commands.md) - uv command reference
+- [ruff-config.md](./references/ruff-config.md) - Ruff linting/formatting configuration
+- [testing.md](./references/testing.md) - pytest and coverage setup
+- [pep723-scripts.md](./references/pep723-scripts.md) - PEP 723 inline script metadata
+- [prek.md](./references/prek.md) - Fast pre-commit hooks with prek
+- [security-setup.md](./references/security-setup.md) - Security hooks and dependency scanning
+- [dependabot.md](./references/dependabot.md) - Automated dependency updates

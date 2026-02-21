@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # Security Setup
 
 Security tooling for Python projects: pre-commit hooks, CI auditing, and dependency scanning.
@@ -56,7 +52,7 @@ actionlint .github/workflows/
 zizmor .github/workflows/
 ```
 
-See [../../skill-templates/pre-commit-config.yaml](../../skill-templates/pre-commit-config.yaml) for a complete hook configuration.
+See [../templates/pre-commit-config.yaml](../templates/pre-commit-config.yaml) for a complete hook configuration.
 
 ## Tool Matrix
 
@@ -240,7 +236,7 @@ uv run pip-audit --fix
 
 Automatically creates PRs for outdated dependencies.
 
-Copy [../../skill-templates/dependabot.yml](../../skill-templates/dependabot.yml) to `.github/dependabot.yml`.
+Copy [../templates/dependabot.yml](../templates/dependabot.yml) to `.github/dependabot.yml`.
 
 **How pip-audit and Dependabot work together:**
 
@@ -254,6 +250,6 @@ Copy [../../skill-templates/dependabot.yml](../../skill-templates/dependabot.yml
 
 The 7-day cooldown protects against attackers publishing malicious updates and hoping for quick adoption before detection.
 
-See [dependabot.instructions.md](dependabot.instructions.md) for advanced configuration.
+See [dependabot.md](./dependabot.md) for advanced configuration.
 
-See [prek.instructions.md](prek.instructions.md) for complete pre-commit hook configuration including security hooks.
+See [prek.md](./prek.md) for complete pre-commit hook configuration including security hooks.

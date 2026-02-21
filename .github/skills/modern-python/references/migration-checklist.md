@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # Migration Checklist
 
 Comprehensive checklist for migrating Python projects to modern tooling.
@@ -82,7 +78,7 @@ uv run ruff check --select=ERA --fix .
 - [ ] Remove scheduled CI triggers (activity without progress is theater)
 - [ ] Update CI to use `uv sync` and `uv run`
 - [ ] Pin GitHub Actions to SHA hashes
-- [ ] Set up security tooling (see [security-setup.instructions.md](security-setup.instructions.md))
+- [ ] Set up security tooling (see [security-setup.md](./security-setup.md))
 
 ## Gradual ty Adoption
 
@@ -117,7 +113,7 @@ uv run ty check src/ 2>&1 | grep -c "error"
 - [ ] Configure Dependabot with 7-day cooldown
 - [ ] Pin exact versions in production (`==` not `>=`)
 
-See [security-setup.instructions.md](security-setup.instructions.md) for pip-audit and Dependabot configuration.
+See [security-setup.md](./security-setup.md) for pip-audit and Dependabot configuration.
 
 ## Verification
 

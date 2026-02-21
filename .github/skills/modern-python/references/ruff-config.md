@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # Ruff Configuration Reference
 
 Ruff is an extremely fast Python linter and formatter written in Rust. It replaces flake8, black, isort, pyupgrade, pydocstyle, and many other tools.

@@ -15,10 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
         with:
-          python-version: "3.9"
-      - uses: pre-commit/action@v3
+          python-version: "3.12"
+      - name: Install Dependencies
+        run: uv sync --all-groups
+      - name: Run pre-commit
+        run: uv run pre-commit run --all-files
 
   # Make sure commit messages follow the conventional commits convention:
   # https://www.conventionalcommits.org

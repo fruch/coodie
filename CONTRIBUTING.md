@@ -112,6 +112,33 @@ $ pytest tests
 
 ## Making a new release
 
-The deployment should be automated and can be triggered from the Semantic Release workflow in GitHub. The next version will be based on [the commit logs](https://python-semantic-release.readthedocs.io/en/latest/commit-log-parsing.html#commit-log-parsing). This is done by [python-semantic-release](https://python-semantic-release.readthedocs.io/en/latest/index.html) via a GitHub action.
+Publishing to PyPI is triggered automatically whenever a tag matching `v<major>.<minor>.<patch>` (e.g. `v1.0.0`) is pushed to the repository. The [Publish to PyPI](.github/workflows/publish.yml) GitHub Actions workflow will build the package and publish it using [Trusted Publishing](#setting-up-trusted-publishing-on-pypi) — no API tokens or credentials are stored in GitHub secrets.
+
+### Setting up Trusted Publishing on PyPI
+
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/) lets PyPI verify GitHub Actions runs via OpenID Connect (OIDC), so you never have to create or rotate a PyPI API token.
+
+**One-time setup steps (done once per PyPI project):**
+
+1. Go to <https://pypi.org> and log in.
+2. Open the project page for `coodie`, then go to **Manage → Publishing**.
+   - If the project does not exist yet, go to <https://pypi.org/manage/account/publishing/> to add a *pending* publisher before the first upload.
+3. Click **Add a new publisher** and fill in the form:
+
+   | Field | Value |
+   |---|---|
+   | Owner | `fruch` |
+   | Repository name | `coodie` |
+   | Workflow name | `publish.yml` |
+   | Environment name | `release` |
+
+4. Click **Add**.
+
+**GitHub repository setup:**
+
+1. In the repository, go to **Settings → Environments** and create an environment named **`release`**.
+2. Optionally add protection rules (e.g. require a reviewer before the publish job runs).
+
+Once this is done, pushing a version tag such as `v1.0.0` will trigger the workflow and PyPI will accept the upload without any stored credentials.
 
 [gh-issues]: https://github.com/fruch/coodie/issues

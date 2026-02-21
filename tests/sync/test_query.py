@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID, uuid4
 
-import pytest
 from pydantic import Field
 
 from coodie.fields import PrimaryKey
@@ -44,9 +43,11 @@ def test_allow_filtering_returns_new_queryset(registered_mock_driver):
 
 
 def test_all_returns_list(registered_mock_driver):
-    registered_mock_driver.set_return_rows([
-        {"id": uuid4(), "name": "A", "rating": 5},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": uuid4(), "name": "A", "rating": 5},
+        ]
+    )
     results = QuerySet(Item).all()
     assert isinstance(results, list)
     assert len(results) == 1
@@ -54,9 +55,11 @@ def test_all_returns_list(registered_mock_driver):
 
 
 def test_first_returns_single(registered_mock_driver):
-    registered_mock_driver.set_return_rows([
-        {"id": uuid4(), "name": "B", "rating": 3},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": uuid4(), "name": "B", "rating": 3},
+        ]
+    )
     result = QuerySet(Item).first()
     assert result is not None
     assert isinstance(result, Item)
@@ -80,10 +83,12 @@ def test_delete_executes(registered_mock_driver):
 
 
 def test_iter(registered_mock_driver):
-    registered_mock_driver.set_return_rows([
-        {"id": uuid4(), "name": "C", "rating": 1},
-        {"id": uuid4(), "name": "D", "rating": 2},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": uuid4(), "name": "C", "rating": 1},
+            {"id": uuid4(), "name": "D", "rating": 2},
+        ]
+    )
     items = list(QuerySet(Item))
     assert len(items) == 2
 
@@ -95,8 +100,14 @@ def test_len(registered_mock_driver):
 
 def test_chaining(registered_mock_driver):
     registered_mock_driver.set_return_rows([])
-    qs = QuerySet(Item).filter(rating__gte=3).limit(10).order_by("-rating").allow_filtering()
-    results = qs.all()
+    qs = (
+        QuerySet(Item)
+        .filter(rating__gte=3)
+        .limit(10)
+        .order_by("-rating")
+        .allow_filtering()
+    )
+    qs.all()
     stmt, params = registered_mock_driver.executed[0]
     assert "LIMIT 10" in stmt
     assert "ALLOW FILTERING" in stmt

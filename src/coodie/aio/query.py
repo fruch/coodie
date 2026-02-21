@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator, TYPE_CHECKING
 
-from coodie.cql_builder import build_select, build_count, build_delete, parse_filter_kwargs
+from coodie.cql_builder import (
+    build_select,
+    build_count,
+    build_delete,
+    parse_filter_kwargs,
+)
 from coodie.exceptions import InvalidQueryError
 from coodie.sync.query import _snake_case
 
@@ -75,6 +80,7 @@ class QuerySet:
 
     def _get_driver(self) -> Any:
         from coodie.drivers import get_driver
+
         return get_driver()
 
     def _table(self) -> str:
@@ -88,6 +94,7 @@ class QuerySet:
         if settings and hasattr(settings, "keyspace"):
             return settings.keyspace
         from coodie.drivers import get_driver
+
         driver = get_driver()
         ks = getattr(driver, "_default_keyspace", None)
         if ks:

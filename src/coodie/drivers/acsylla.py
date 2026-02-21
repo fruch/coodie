@@ -86,9 +86,7 @@ class AcsyllaDriver(AbstractDriver):
     # Asynchronous interface
     # ------------------------------------------------------------------
 
-    async def execute_async(
-        self, stmt: str, params: list[Any]
-    ) -> list[dict[str, Any]]:
+    async def execute_async(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
         prepared = await self._prepare(stmt)
         statement = prepared.bind(params)
         result = await self._session.execute(statement)

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import typing
 from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
-from coodie.cql_builder import build_insert, build_delete, parse_filter_kwargs
+from coodie.cql_builder import build_insert, build_delete
 from coodie.exceptions import DocumentNotFound, MultipleDocumentsFound
 from coodie.schema import build_schema, ColumnDefinition
 from coodie.sync.query import QuerySet, _snake_case
@@ -37,16 +36,19 @@ class Document(BaseModel):
         if settings and getattr(settings, "keyspace", None):
             return settings.keyspace
         from coodie.drivers import get_driver
+
         driver = get_driver()
         ks = getattr(driver, "_default_keyspace", None)
         if ks:
             return ks
         from coodie.exceptions import InvalidQueryError
+
         raise InvalidQueryError("No keyspace configured")
 
     @classmethod
     def _get_driver(cls) -> Any:
         from coodie.drivers import get_driver
+
         return get_driver()
 
     @classmethod
@@ -92,10 +94,7 @@ class Document(BaseModel):
         """Delete this document by its primary key."""
         schema = self.__class__._schema()
         pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
-        where = [
-            (c.name, "=", getattr(self, c.name))
-            for c in pk_cols
-        ]
+        where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
         cql, params = build_delete(
             self.__class__._get_table(),
             self.__class__._get_keyspace(),
@@ -130,9 +129,7 @@ class Document(BaseModel):
         """Return a single document; raise DocumentNotFound if missing."""
         result = cls.find_one(**kwargs)
         if result is None:
-            raise DocumentNotFound(
-                f"No {cls.__name__} found matching {kwargs}"
-            )
+            raise DocumentNotFound(f"No {cls.__name__} found matching {kwargs}")
         return result
 
     model_config = {"arbitrary_types_allowed": True}

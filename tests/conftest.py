@@ -53,6 +53,7 @@ def mock_driver() -> MockDriver:
 @pytest.fixture
 def registered_mock_driver(mock_driver: MockDriver) -> MockDriver:
     from coodie.drivers import _registry, register_driver
+
     _registry.clear()
     register_driver("default", mock_driver, default=True)
     yield mock_driver

@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # uv Command Reference
 
 `uv` is an extremely fast Python package and project manager written in Rust. It replaces pip, virtualenv, pip-tools, pipx, and pyenv.

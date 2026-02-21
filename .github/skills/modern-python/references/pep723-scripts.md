@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # PEP 723: Inline Script Metadata
 
 PEP 723 allows embedding dependency metadata directly in Python scripts, eliminating the need for separate `requirements.txt` or `pyproject.toml` files for simple scripts.

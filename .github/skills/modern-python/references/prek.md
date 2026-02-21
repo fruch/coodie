@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # prek: Fast Pre-commit Hooks
 
 [prek](https://github.com/j178/prek) is a fast, Rust-native drop-in replacement for pre-commit. It uses the same `.pre-commit-config.yaml` format and is fully compatible with existing configurations.
@@ -21,7 +17,7 @@ applyTo: "**/*.py"
 
 ## Installation
 
-See [security-setup.instructions.md](security-setup.instructions.md#tool-installation) for installation options.
+See [security-setup.md](./security-setup.md#tool-installation) for installation options.
 
 ## Quick Start
 
@@ -69,7 +65,7 @@ prek run ruff
 
 ## Configuration
 
-For a complete, copy-paste-ready configuration, see [../../skill-templates/pre-commit-config.yaml](../../skill-templates/pre-commit-config.yaml).
+For a complete, copy-paste-ready configuration, see [../templates/pre-commit-config.yaml](../templates/pre-commit-config.yaml).
 
 ### Recommended `.pre-commit-config.yaml`
 
@@ -97,7 +93,7 @@ repos:
       - id: check-yaml
       - id: check-merge-conflict
 
-  # Security hooks - see security-setup.instructions.md for detailed guidance
+  # Security hooks - see security-setup.md for detailed guidance
   # Shell script linting
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: <latest>  # https://github.com/koalaman/shellcheck-precommit/tags
@@ -126,7 +122,7 @@ repos:
         args: [--persona=regular, --min-severity=medium, --min-confidence=medium]
 ```
 
-See [security-setup.instructions.md](security-setup.instructions.md) for detailed guidance on each security hook.
+See [security-setup.md](./security-setup.md) for detailed guidance on each security hook.
 
 ### Using Built-in Hooks
 

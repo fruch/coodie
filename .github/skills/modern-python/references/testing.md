@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # Testing with pytest
 
 Configuration and best practices for pytest with coverage enforcement.

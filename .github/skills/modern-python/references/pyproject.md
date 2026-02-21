@@ -1,7 +1,3 @@
----
-applyTo: "**/*.py"
----
-
 # pyproject.toml Configuration Reference
 
 Complete reference for configuring `pyproject.toml` for modern Python projects.

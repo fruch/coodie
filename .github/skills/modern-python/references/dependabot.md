@@ -1,7 +1,3 @@
----
-applyTo: "**/.github/dependabot.yml"
----
-
 # Dependabot: Automated Dependency Updates
 
 [Dependabot](https://docs.github.com/en/code-security/dependabot) automatically creates pull requests to keep your dependencies up to date. GitHub hosts it natively—no external service required.
@@ -14,7 +10,7 @@ applyTo: "**/.github/dependabot.yml"
 
 ## Configuration
 
-Copy [skill-templates/dependabot.yml](../../skill-templates/dependabot.yml) to `.github/dependabot.yml`.
+Copy [templates/dependabot.yml](../templates/dependabot.yml) to `.github/dependabot.yml`.
 
 The template includes:
 - Weekly update schedule for pip and GitHub Actions
@@ -43,5 +39,5 @@ The `cooldown.default-days: 7` setting delays updates for newly published versio
 ## See Also
 
 - [GitHub Dependabot docs](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file)
-- [security-setup.instructions.md](security-setup.instructions.md) - Security tooling overview
-- [prek.instructions.md](prek.instructions.md) - Pre-commit hooks (complementary tool)
+- [security-setup.md](./security-setup.md) - Security tooling overview
+- [prek.md](./prek.md) - Pre-commit hooks (complementary tool)

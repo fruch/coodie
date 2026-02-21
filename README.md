@@ -1,8 +1,8 @@
 # coodie
 
 <p align="center">
-  <a href="https://github.com/fruch/coodie/actions?query=workflow%3ACI">
-    <img src="https://img.shields.io/github/workflow/status/fruch/coodie/CI/main?label=CI&logo=github&style=flat-square" alt="CI Status" >
+  <a href="https://github.com/fruch/coodie/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/fruch/coodie/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status" >
   </a>
   <a href="https://coodie.readthedocs.io">
     <img src="https://img.shields.io/readthedocs/coodie.svg?logo=read-the-docs&logoColor=fff&style=flat-square" alt="Documentation Status">
@@ -12,11 +12,11 @@
   </a>
 </p>
 <p align="center">
-  <a href="https://python-poetry.org/">
-    <img src="https://img.shields.io/badge/packaging-poetry-299bd7?style=flat-square&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAASCAYAAABrXO8xAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAJJSURBVHgBfZLPa1NBEMe/s7tNXoxW1KJQKaUHkXhQvHgW6UHQQ09CBS/6V3hKc/AP8CqCrUcpmop3Cx48eDB4yEECjVQrlZb80CRN8t6OM/teagVxYZi38+Yz853dJbzoMV3MM8cJUcLMSUKIE8AzQ2PieZzFxEJOHMOgMQQ+dUgSAckNXhapU/NMhDSWLs1B24A8sO1xrN4NECkcAC9ASkiIJc6k5TRiUDPhnyMMdhKc+Zx19l6SgyeW76BEONY9exVQMzKExGKwwPsCzza7KGSSWRWEQhyEaDXp6ZHEr416ygbiKYOd7TEWvvcQIeusHYMJGhTwF9y7sGnSwaWyFAiyoxzqW0PM/RjghPxF2pWReAowTEXnDh0xgcLs8l2YQmOrj3N7ByiqEoH0cARs4u78WgAVkoEDIDoOi3AkcLOHU60RIg5wC4ZuTC7FaHKQm8Hq1fQuSOBvX/sodmNJSB5geaF5CPIkUeecdMxieoRO5jz9bheL6/tXjrwCyX/UYBUcjCaWHljx1xiX6z9xEjkYAzbGVnB8pvLmyXm9ep+W8CmsSHQQY77Zx1zboxAV0w7ybMhQmfqdmmw3nEp1I0Z+FGO6M8LZdoyZnuzzBdjISicKRnpxzI9fPb+0oYXsNdyi+d3h9bm9MWYHFtPeIZfLwzmFDKy1ai3p+PDls1Llz4yyFpferxjnyjJDSEy9CaCx5m2cJPerq6Xm34eTrZt3PqxYO1XOwDYZrFlH1fWnpU38Y9HRze3lj0vOujZcXKuuXm3jP+s3KbZVra7y2EAAAAAASUVORK5CYII=" alt="Poetry">
+  <a href="https://github.com/astral-sh/uv">
+    <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json&style=flat-square" alt="uv">
   </a>
-  <a href="https://github.com/ambv/black">
-    <img src="https://img.shields.io/badge/code%20style-black-000000.svg?style=flat-square" alt="black">
+  <a href="https://github.com/astral-sh/ruff">
+    <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat-square" alt="Ruff">
   </a>
   <a href="https://github.com/pre-commit/pre-commit">
     <img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=flat-square" alt="pre-commit">
@@ -30,13 +30,130 @@
   <img src="https://img.shields.io/pypi/l/coodie.svg?style=flat-square" alt="License">
 </p>
 
-coodie = cassandra+beanie(hoodie)
+**coodie** = Cassandra / ScyllaDB + Beanie (hoodie) — a Pydantic-based ODM for Cassandra and ScyllaDB,
+inspired by [Beanie](https://github.com/BeanieODM/beanie). Define your data models as Python classes,
+and coodie handles schema synchronisation, serialisation, and query building.
+
+## Features
+
+- **Pydantic v2** model definitions with full type-checking support
+- **Sync and async APIs** — use `coodie.sync` for blocking code or `coodie` / `coodie.aio` for `asyncio`
+- **Declarative schema** — annotate fields with `PrimaryKey`, `ClusteringKey`, `Indexed`, or `Counter`
+- **Chainable `QuerySet`** — `.filter()`, `.limit()`, `.order_by()`, `.allow_filtering()`
+- **Automatic table management** — `sync_table()` creates or evolves the table idempotently
+- **ScyllaDB & Cassandra** — backed by `scylla-driver`
 
 ## Installation
 
 Install this via pip (or your favourite package manager):
 
-`pip install coodie`
+```bash
+pip install coodie
+```
+
+## Quickstart
+
+### Define a document
+
+```python
+from typing import Annotated
+from uuid import UUID, uuid4
+from pydantic import Field
+from coodie import Document, init_coodie, PrimaryKey, ClusteringKey, Indexed
+
+class Product(Document):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    category: Annotated[str, ClusteringKey()] = "general"
+    name: str
+    brand: Annotated[str, Indexed()] = "Unknown"
+    price: float = 0.0
+
+    class Settings:
+        name = "products"      # table name (defaults to snake_case class name)
+        keyspace = "my_ks"
+```
+
+### Async usage (`coodie` / `coodie.aio`)
+
+```python
+import asyncio
+from coodie import init_coodie
+# Product is defined in the section above
+
+async def main():
+    await init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
+
+    # Create / evolve the table
+    await Product.sync_table()
+
+    # Insert a document
+    p = Product(name="Gadget", brand="Acme", price=9.99)
+    await p.save()
+
+    # Query
+    results = await Product.find(brand="Acme").limit(10).all()
+    for product in results:
+        print(product.name, product.price)
+
+    # Fetch a single document by primary key (raises DocumentNotFound if missing)
+    gadget = await Product.get(id=p.id)
+
+    # Delete
+    await gadget.delete()
+
+asyncio.run(main())
+```
+
+### Sync usage (`coodie.sync`)
+
+```python
+from coodie.sync import Document, init_coodie
+
+class Product(Document):
+    ...  # same field definitions as above
+
+init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
+
+Product.sync_table()
+
+p = Product(name="Widget", price=4.99)
+p.save()
+
+results = Product.find(brand="Acme").allow_filtering().all()
+one = Product.find_one(name="Widget")
+```
+
+### QuerySet chaining
+
+```python
+# async
+products = (
+    await Product.find()
+    .filter(brand="Acme")
+    .order_by("price")
+    .limit(20)
+    .all()
+)
+
+# count
+n = await Product.find(brand="Acme").allow_filtering().count()
+
+# async iteration
+async for p in Product.find(brand="Acme"):
+    print(p)
+
+# delete matching rows
+await Product.find(brand="Discontinued").allow_filtering().delete()
+```
+
+### Field annotations
+
+| Annotation | Purpose |
+|---|---|
+| `PrimaryKey(partition_key_index=0)` | Partition key column (use `partition_key_index` for composite keys) |
+| `ClusteringKey(order="ASC", clustering_key_index=0)` | Clustering column |
+| `Indexed(index_name=None)` | Secondary index |
+| `Counter()` | Counter column |
 
 ## Contributors ✨
 

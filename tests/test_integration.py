@@ -1,0 +1,1129 @@
+"""Integration tests — require a real ScyllaDB instance via testcontainers.
+
+Run with:  pytest -m integration -v
+Skipped by default (addopts = "-m 'not integration'").
+"""
+
+from __future__ import annotations
+
+import asyncio
+import decimal
+import ipaddress
+import time
+from datetime import date, datetime, timezone
+from typing import Annotated, Dict, List, Optional, Set
+from uuid import UUID, uuid4
+
+import pytest
+from pydantic import Field, field_validator
+
+from coodie.aio.document import Document as AsyncDocument
+from coodie.drivers import _registry, init_coodie
+from coodie.exceptions import DocumentNotFound, MultipleDocumentsFound
+from coodie.fields import ClusteringKey, Indexed, PrimaryKey
+from coodie.sync.document import Document as SyncDocument
+
+
+# ---------------------------------------------------------------------------
+# Session-scoped fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def scylla_container():
+    """Start a ScyllaDB container once for the entire test session.
+
+    Uses DockerContainer directly to avoid ScyllaContainer._connect(), which
+    calls get_cluster() with the container's internal Docker IP but the mapped
+    host port — an incorrect combination that causes NoHostAvailable on GHA.
+    """
+    try:
+        from testcontainers.core.container import DockerContainer  # type: ignore[import-untyped]
+        from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore[import-untyped]
+    except ImportError as exc:
+        pytest.skip(f"testcontainers not installed: {exc}")
+
+    with (
+        DockerContainer("scylladb/scylla:latest")
+        .with_command(
+            "--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0"
+        )
+        .with_exposed_ports(9042) as container
+    ):
+        wait_for_logs(container, "Starting listening for CQL clients", timeout=120)
+        yield container
+
+
+class _LocalhostTranslator:
+    """Translate any discovered host address to 127.0.0.1.
+
+    When ScyllaDB runs in Docker, system.local advertises the container-internal
+    IP (e.g. 172.17.0.3) as the broadcast RPC address.  The cassandra-driver
+    replaces its host-table entry for the contact point with that internal IP and
+    then tries to reconnect there — which fails on a CI runner.
+
+    By translating every address back to 127.0.0.1 the driver always reaches the
+    node through the mapped host port, regardless of what Scylla advertises.
+    """
+
+    def translate(self, addr: str) -> str:
+        return "127.0.0.1"
+
+
+@pytest.fixture(scope="session")
+def scylla_session(scylla_container: object) -> object:
+    """Return a connected cassandra-driver Session with the test keyspace."""
+    from cassandra.cluster import Cluster, NoHostAvailable  # type: ignore[import-untyped]
+
+    port = int(scylla_container.get_exposed_port(9042))  # type: ignore[attr-defined]
+    cluster = Cluster(
+        ["127.0.0.1"],
+        port=port,
+        connect_timeout=10,
+        address_translator=_LocalhostTranslator(),
+    )
+
+    # Scylla may briefly not accept connections right after the log message.
+    for attempt in range(10):
+        try:
+            session = cluster.connect()
+            break
+        except NoHostAvailable:
+            if attempt == 9:
+                raise
+            time.sleep(2)
+
+    session.execute(
+        "CREATE KEYSPACE IF NOT EXISTS test_ks "
+        "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}"
+    )
+    yield session
+    cluster.shutdown()
+
+
+@pytest.fixture(scope="session")
+def coodie_driver(scylla_session: object) -> object:
+    """Register a CassandraDriver backed by the real ScyllaDB session."""
+    _registry.clear()
+    driver = init_coodie(session=scylla_session, keyspace="test_ks")
+    yield driver
+    _registry.clear()
+    driver.close()
+
+
+# ---------------------------------------------------------------------------
+# Shared document models
+# ---------------------------------------------------------------------------
+
+
+class SyncProduct(SyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    brand: Annotated[str, Indexed()] = "Unknown"
+    category: Annotated[str, Indexed()] = "general"
+    price: float = 0.0
+    tags: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, v: object) -> object:
+        # Cassandra/Scylla stores empty collections as NULL; coerce back to [].
+        return v if v is not None else []
+
+    class Settings:
+        name = "it_sync_products"
+        keyspace = "test_ks"
+
+
+class AsyncProduct(AsyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    brand: Annotated[str, Indexed()] = "Unknown"
+    category: Annotated[str, Indexed()] = "general"
+    price: float = 0.0
+    tags: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, v: object) -> object:
+        # Cassandra/Scylla stores empty collections as NULL; coerce back to [].
+        return v if v is not None else []
+
+    class Settings:
+        name = "it_async_products"
+        keyspace = "test_ks"
+
+
+class SyncReview(SyncDocument):
+    product_id: Annotated[UUID, PrimaryKey()]
+    created_at: Annotated[datetime, ClusteringKey(order="DESC")] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    author: str
+    rating: Annotated[int, Indexed()] = 0
+
+    class Settings:
+        name = "it_sync_reviews"
+        keyspace = "test_ks"
+
+
+class AsyncReview(AsyncDocument):
+    product_id: Annotated[UUID, PrimaryKey()]
+    created_at: Annotated[datetime, ClusteringKey(order="DESC")] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    author: str
+    rating: Annotated[int, Indexed()] = 0
+
+    class Settings:
+        name = "it_async_reviews"
+        keyspace = "test_ks"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+# ===========================================================================
+# Synchronous integration tests
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestSyncIntegration:
+    """Full CRUD tests using coodie.sync against a real ScyllaDB container."""
+
+    def test_sync_table_creates_table(self, coodie_driver: object) -> None:
+        """sync_table should create the table without raising."""
+        SyncProduct.sync_table()
+
+    def test_sync_table_idempotent(self, coodie_driver: object) -> None:
+        """Calling sync_table twice must not raise."""
+        SyncProduct.sync_table()
+        SyncProduct.sync_table()
+
+    def test_save_and_find_one(self, coodie_driver: object) -> None:
+        """save() inserts a row; find_one() retrieves it."""
+        pid = uuid4()
+        p = SyncProduct(id=pid, name="Widget", brand="Acme", price=9.99)
+        p.save()
+
+        fetched = SyncProduct.find_one(id=pid)
+        assert fetched is not None
+        assert fetched.id == pid
+        assert fetched.name == "Widget"
+        assert fetched.brand == "Acme"
+
+    def test_get_by_pk(self, coodie_driver: object) -> None:
+        """get() retrieves a document and raises DocumentNotFound when absent."""
+        pid = uuid4()
+        SyncProduct(id=pid, name="Gadget").save()
+
+        doc = SyncProduct.get(id=pid)
+        assert isinstance(doc, SyncProduct)
+
+        with pytest.raises(DocumentNotFound):
+            SyncProduct.get(id=uuid4())
+
+    def test_delete(self, coodie_driver: object) -> None:
+        """delete() removes the row; subsequent find_one returns None."""
+        pid = uuid4()
+        p = SyncProduct(id=pid, name="Temp")
+        p.save()
+        assert SyncProduct.find_one(id=pid) is not None
+
+        p.delete()
+        assert SyncProduct.find_one(id=pid) is None
+
+    def test_save_write_read_cycle(self, coodie_driver: object) -> None:
+        """Multiple saves then all() returns the correct count."""
+        ids = [uuid4() for _ in range(3)]
+        for i, pid in enumerate(ids):
+            SyncProduct(id=pid, name=f"Item{i}", brand="BrandX").save()
+
+        for pid in ids:
+            assert SyncProduct.find_one(id=pid) is not None
+
+        # cleanup
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_queryset_filtering_by_secondary_index(self, coodie_driver: object) -> None:
+        """find(brand=...) filters via the secondary index."""
+        pid = uuid4()
+        SyncProduct(id=pid, name="IndexTest", brand="AcmeFiltered").save()
+
+        results = SyncProduct.find(brand="AcmeFiltered").allow_filtering().all()
+        assert any(r.id == pid for r in results)
+
+        # cleanup
+        SyncProduct(id=pid, name="").delete()
+
+    def test_queryset_limit(self, coodie_driver: object) -> None:
+        """limit(n) restricts the number of rows returned."""
+        ids = [uuid4() for _ in range(5)]
+        for pid in ids:
+            SyncProduct(id=pid, name="LimitTest").save()
+
+        results = SyncProduct.find().limit(2).allow_filtering().all()
+        assert len(results) <= 2
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_queryset_count(self, coodie_driver: object) -> None:
+        """count() returns the correct integer."""
+        ids = [uuid4() for _ in range(3)]
+        for pid in ids:
+            SyncProduct(id=pid, name="CountTest", brand="CountBrand").save()
+
+        count = SyncProduct.find(brand="CountBrand").allow_filtering().count()
+        assert count >= 3
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_queryset_delete(self, coodie_driver: object) -> None:
+        """QuerySet.delete() removes matching rows."""
+        pid = uuid4()
+        SyncProduct(id=pid, name="ToDelete", brand="DeleteMe").save()
+        assert SyncProduct.find_one(id=pid) is not None
+
+        SyncProduct.find(id=pid).delete()
+        assert SyncProduct.find_one(id=pid) is None
+
+    def test_collections_list(self, coodie_driver: object) -> None:
+        """list[str] field round-trips correctly."""
+        pid = uuid4()
+        tags = ["alpha", "beta", "gamma"]
+        SyncProduct(id=pid, name="TagTest", tags=tags).save()
+
+        fetched = SyncProduct.find_one(id=pid)
+        assert fetched is not None
+        assert sorted(fetched.tags) == sorted(tags)
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_optional_field_none_roundtrip(self, coodie_driver: object) -> None:
+        """Optional[str] field set to None round-trips correctly."""
+        pid = uuid4()
+        SyncProduct(id=pid, name="OptNone", description=None).save()
+
+        fetched = SyncProduct.find_one(id=pid)
+        assert fetched is not None
+        assert fetched.description is None
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_optional_field_value_roundtrip(self, coodie_driver: object) -> None:
+        """Optional[str] field set to a value round-trips correctly."""
+        pid = uuid4()
+        SyncProduct(id=pid, name="OptVal", description="hello").save()
+
+        fetched = SyncProduct.find_one(id=pid)
+        assert fetched is not None
+        assert fetched.description == "hello"
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_ttl_row_expires(self, coodie_driver: object) -> None:
+        """Row inserted with ttl=2 disappears after ~2 seconds."""
+        pid = uuid4()
+        p = SyncProduct(id=pid, name="TTLTest")
+        p.save(ttl=2)
+        assert SyncProduct.find_one(id=pid) is not None
+
+        time.sleep(3)
+        assert SyncProduct.find_one(id=pid) is None
+
+    def test_clustering_key_order(self, coodie_driver: object) -> None:
+        """Reviews with DESC clustering key return newest first."""
+        SyncReview.sync_table()
+        pid = uuid4()
+        t1 = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        t2 = datetime(2024, 1, 2, 12, 0, 0, tzinfo=timezone.utc)
+
+        SyncReview(product_id=pid, created_at=t1, author="Alice", rating=3).save()
+        SyncReview(product_id=pid, created_at=t2, author="Bob", rating=5).save()
+
+        results = SyncReview.find(product_id=pid).all()
+        assert len(results) == 2
+        # DESC order: newest (t2) first
+        assert results[0].created_at.replace(tzinfo=timezone.utc) >= results[
+            1
+        ].created_at.replace(tzinfo=timezone.utc)
+
+        SyncReview.find(product_id=pid).delete()
+
+    def test_multiple_documents_found(self, coodie_driver: object) -> None:
+        """find_one raises MultipleDocumentsFound when > 1 rows match."""
+        brand = f"DupBrand_{uuid4().hex[:8]}"
+        ids = [uuid4(), uuid4()]
+        for pid in ids:
+            SyncProduct(id=pid, name="Dup", brand=brand).save()
+
+        with pytest.raises(MultipleDocumentsFound):
+            SyncProduct.find_one(brand=brand)
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_multi_model_isolation(self, coodie_driver: object) -> None:
+        """Two Document subclasses write to separate tables without cross-contamination."""
+        SyncReview.sync_table()
+        pid = uuid4()
+        SyncProduct(id=pid, name="Isolated").save()
+        SyncReview(
+            product_id=pid,
+            author="Tester",
+            rating=5,
+        ).save()
+
+        # products table has the product
+        assert SyncProduct.find_one(id=pid) is not None
+        # reviews table has the review
+        assert SyncReview.find_one(product_id=pid) is not None
+
+        SyncProduct(id=pid, name="").delete()
+        SyncReview.find(product_id=pid).delete()
+
+
+# ===========================================================================
+# Asynchronous integration tests
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestAsyncIntegration:
+    """Full CRUD tests using coodie.aio against the same ScyllaDB container."""
+
+    async def test_sync_table_creates_table(self, coodie_driver: object) -> None:
+        await AsyncProduct.sync_table()
+
+    async def test_sync_table_idempotent(self, coodie_driver: object) -> None:
+        await AsyncProduct.sync_table()
+        await AsyncProduct.sync_table()
+
+    async def test_save_and_find_one(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        p = AsyncProduct(id=pid, name="AsyncWidget", brand="AsyncAcme", price=19.99)
+        await p.save()
+
+        fetched = await AsyncProduct.find_one(id=pid)
+        assert fetched is not None
+        assert fetched.id == pid
+        assert fetched.name == "AsyncWidget"
+
+    async def test_get_by_pk(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="AsyncGadget").save()
+
+        doc = await AsyncProduct.get(id=pid)
+        assert isinstance(doc, AsyncProduct)
+
+        with pytest.raises(DocumentNotFound):
+            await AsyncProduct.get(id=uuid4())
+
+    async def test_delete(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        p = AsyncProduct(id=pid, name="AsyncTemp")
+        await p.save()
+        assert await AsyncProduct.find_one(id=pid) is not None
+
+        await p.delete()
+        assert await AsyncProduct.find_one(id=pid) is None
+
+    async def test_save_write_read_cycle(self, coodie_driver: object) -> None:
+        ids = [uuid4() for _ in range(3)]
+        for i, pid in enumerate(ids):
+            await AsyncProduct(id=pid, name=f"AsyncItem{i}", brand="AsyncBrandX").save()
+
+        for pid in ids:
+            assert await AsyncProduct.find_one(id=pid) is not None
+
+        for pid in ids:
+            await AsyncProduct(id=pid, name="").delete()
+
+    async def test_queryset_filtering(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        await AsyncProduct(
+            id=pid, name="AsyncIndexTest", brand="AsyncAcmeFiltered"
+        ).save()
+
+        from coodie.aio.query import QuerySet
+
+        results = (
+            await QuerySet(AsyncProduct)
+            .filter(brand="AsyncAcmeFiltered")
+            .allow_filtering()
+            .all()
+        )
+        assert any(r.id == pid for r in results)
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_queryset_all_first_count(self, coodie_driver: object) -> None:
+        ids = [uuid4() for _ in range(3)]
+        for pid in ids:
+            await AsyncProduct(
+                id=pid, name="AsyncCountTest", brand="AsyncCountBrand"
+            ).save()
+
+        from coodie.aio.query import QuerySet
+
+        count = (
+            await QuerySet(AsyncProduct)
+            .filter(brand="AsyncCountBrand")
+            .allow_filtering()
+            .count()
+        )
+        assert count >= 3
+
+        first = (
+            await QuerySet(AsyncProduct)
+            .filter(brand="AsyncCountBrand")
+            .allow_filtering()
+            .first()
+        )
+        assert first is not None
+
+        for pid in ids:
+            await AsyncProduct(id=pid, name="").delete()
+
+    async def test_queryset_delete(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="AsyncToDelete", brand="AsyncDeleteMe").save()
+        assert await AsyncProduct.find_one(id=pid) is not None
+
+        from coodie.aio.query import QuerySet
+
+        await QuerySet(AsyncProduct).filter(id=pid).delete()
+        assert await AsyncProduct.find_one(id=pid) is None
+
+    async def test_aiter(self, coodie_driver: object) -> None:
+        ids = [uuid4() for _ in range(2)]
+        brand = f"AiterBrand_{uuid4().hex[:8]}"
+        for pid in ids:
+            await AsyncProduct(id=pid, name="AiterTest", brand=brand).save()
+
+        from coodie.aio.query import QuerySet
+
+        collected = [
+            item
+            async for item in QuerySet(AsyncProduct)
+            .filter(brand=brand)
+            .allow_filtering()
+        ]
+        assert len(collected) >= 2
+
+        for pid in ids:
+            await AsyncProduct(id=pid, name="").delete()
+
+    async def test_collections_list(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        tags = ["x", "y", "z"]
+        await AsyncProduct(id=pid, name="AsyncTagTest", tags=tags).save()
+
+        fetched = await AsyncProduct.find_one(id=pid)
+        assert fetched is not None
+        assert sorted(fetched.tags) == sorted(tags)
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_optional_field_roundtrip(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="AsyncOptTest", description="async desc").save()
+
+        fetched = await AsyncProduct.find_one(id=pid)
+        assert fetched is not None
+        assert fetched.description == "async desc"
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_ttl_row_expires(self, coodie_driver: object) -> None:
+        pid = uuid4()
+        p = AsyncProduct(id=pid, name="AsyncTTLTest")
+        await p.save(ttl=2)
+        assert await AsyncProduct.find_one(id=pid) is not None
+
+        await asyncio.sleep(3)
+        assert await AsyncProduct.find_one(id=pid) is None
+
+    async def test_clustering_key_order(self, coodie_driver: object) -> None:
+        await AsyncReview.sync_table()
+        pid = uuid4()
+        t1 = datetime(2024, 3, 1, 10, 0, 0, tzinfo=timezone.utc)
+        t2 = datetime(2024, 3, 2, 10, 0, 0, tzinfo=timezone.utc)
+
+        await AsyncReview(
+            product_id=pid, created_at=t1, author="Alice", rating=3
+        ).save()
+        await AsyncReview(product_id=pid, created_at=t2, author="Bob", rating=5).save()
+
+        results = await AsyncReview.find(product_id=pid).all()
+        assert len(results) == 2
+        assert results[0].created_at.replace(tzinfo=timezone.utc) >= results[
+            1
+        ].created_at.replace(tzinfo=timezone.utc)
+
+        from coodie.aio.query import QuerySet
+
+        await QuerySet(AsyncReview).filter(product_id=pid).delete()
+
+    async def test_multiple_documents_found(self, coodie_driver: object) -> None:
+        brand = f"AsyncDupBrand_{uuid4().hex[:8]}"
+        ids = [uuid4(), uuid4()]
+        for pid in ids:
+            await AsyncProduct(id=pid, name="AsyncDup", brand=brand).save()
+
+        with pytest.raises(MultipleDocumentsFound):
+            await AsyncProduct.find_one(brand=brand)
+
+        for pid in ids:
+            await AsyncProduct(id=pid, name="").delete()
+
+    async def test_multi_model_isolation(self, coodie_driver: object) -> None:
+        await AsyncReview.sync_table()
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="AsyncIsolated").save()
+        await AsyncReview(product_id=pid, author="AsyncTester", rating=4).save()
+
+        assert await AsyncProduct.find_one(id=pid) is not None
+        assert await AsyncReview.find_one(product_id=pid) is not None
+
+        await AsyncProduct(id=pid, name="").delete()
+        from coodie.aio.query import QuerySet
+
+        await QuerySet(AsyncReview).filter(product_id=pid).delete()
+
+
+# ===========================================================================
+# Additional models for broader type / feature coverage
+# ===========================================================================
+
+
+class SyncAllTypes(SyncDocument):
+    """One column per supported scalar CQL type + set and dict collections."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    flag: bool = False
+    count: int = 0
+    score: float = 0.0
+    amount: decimal.Decimal = decimal.Decimal("0.0")
+    blob_val: bytes = b""
+    ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    day: date = Field(default_factory=date.today)
+    ip4: Optional[ipaddress.IPv4Address] = None
+    ip6: Optional[ipaddress.IPv6Address] = None
+    tags_set: Set[str] = Field(default_factory=set)
+    scores_map: Dict[str, int] = Field(default_factory=dict)
+
+    @field_validator("tags_set", mode="before")
+    @classmethod
+    def _coerce_set(cls, v: object) -> object:
+        return v if v is not None else set()
+
+    @field_validator("scores_map", mode="before")
+    @classmethod
+    def _coerce_map(cls, v: object) -> object:
+        return v if v is not None else {}
+
+    @field_validator("day", mode="before")
+    @classmethod
+    def _coerce_day(cls, v: object) -> object:
+        # cassandra-driver returns cassandra.util.Date, not datetime.date
+        if hasattr(v, "date") and callable(v.date):
+            return v.date()
+        return v
+
+    class Settings:
+        name = "it_all_types"
+        keyspace = "test_ks"
+
+
+class AsyncAllTypes(AsyncDocument):
+    """Async counterpart of SyncAllTypes."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    flag: bool = False
+    count: int = 0
+    score: float = 0.0
+    amount: decimal.Decimal = decimal.Decimal("0.0")
+    blob_val: bytes = b""
+    ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    day: date = Field(default_factory=date.today)
+    ip4: Optional[ipaddress.IPv4Address] = None
+    ip6: Optional[ipaddress.IPv6Address] = None
+    tags_set: Set[str] = Field(default_factory=set)
+    scores_map: Dict[str, int] = Field(default_factory=dict)
+
+    @field_validator("tags_set", mode="before")
+    @classmethod
+    def _coerce_set(cls, v: object) -> object:
+        return v if v is not None else set()
+
+    @field_validator("scores_map", mode="before")
+    @classmethod
+    def _coerce_map(cls, v: object) -> object:
+        return v if v is not None else {}
+
+    @field_validator("day", mode="before")
+    @classmethod
+    def _coerce_day(cls, v: object) -> object:
+        # cassandra-driver returns cassandra.util.Date, not datetime.date
+        if hasattr(v, "date") and callable(v.date):
+            return v.date()
+        return v
+
+    class Settings:
+        name = "it_async_all_types"
+        keyspace = "test_ks"
+
+
+class SyncEvent(SyncDocument):
+    """Composite partition key + two clustering columns for ordering tests."""
+
+    partition_a: Annotated[str, PrimaryKey(partition_key_index=0)]
+    partition_b: Annotated[str, PrimaryKey(partition_key_index=1)]
+    seq: Annotated[int, ClusteringKey(order="ASC", clustering_key_index=0)] = 0
+    sub: Annotated[int, ClusteringKey(order="DESC", clustering_key_index=1)] = 0
+    payload: str = ""
+
+    class Settings:
+        name = "it_sync_events"
+        keyspace = "test_ks"
+
+
+class AsyncEvent(AsyncDocument):
+    """Async counterpart of SyncEvent."""
+
+    partition_a: Annotated[str, PrimaryKey(partition_key_index=0)]
+    partition_b: Annotated[str, PrimaryKey(partition_key_index=1)]
+    seq: Annotated[int, ClusteringKey(order="ASC", clustering_key_index=0)] = 0
+    sub: Annotated[int, ClusteringKey(order="DESC", clustering_key_index=1)] = 0
+    payload: str = ""
+
+    class Settings:
+        name = "it_async_events"
+        keyspace = "test_ks"
+
+
+# ===========================================================================
+# Extended synchronous integration tests
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestSyncExtended:
+    """Extended sync tests: all CQL types, collections, LWT, batch, ordering."""
+
+    # ------------------------------------------------------------------
+    # DDL
+    # ------------------------------------------------------------------
+
+    def test_all_types_sync_table(self, coodie_driver: object) -> None:
+        SyncAllTypes.sync_table()
+
+    def test_event_sync_table(self, coodie_driver: object) -> None:
+        SyncEvent.sync_table()
+
+    # ------------------------------------------------------------------
+    # CQL scalar types round-trip
+    # ------------------------------------------------------------------
+
+    def test_scalar_types_roundtrip(self, coodie_driver: object) -> None:
+        """All supported scalar types survive a save/load round-trip."""
+        SyncAllTypes.sync_table()
+        rid = uuid4()
+        today = date.today()
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        original = SyncAllTypes(
+            id=rid,
+            flag=True,
+            count=42,
+            score=3.14,
+            amount=decimal.Decimal("12.34"),
+            blob_val=b"\x00\xff",
+            ts=now,
+            day=today,
+            ip4=ipaddress.IPv4Address("10.0.0.1"),
+            ip6=ipaddress.IPv6Address("::1"),
+        )
+        original.save()
+
+        fetched = SyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.flag is True
+        assert fetched.count == 42
+        assert abs(fetched.score - 3.14) < 0.01
+        assert fetched.amount == decimal.Decimal("12.34")
+        assert fetched.blob_val == b"\x00\xff"
+        assert fetched.ts.replace(tzinfo=timezone.utc) == now
+        assert fetched.day == today
+        assert str(fetched.ip4) == "10.0.0.1"
+        assert str(fetched.ip6) == "::1"
+
+        SyncAllTypes(id=rid).delete()
+
+    # ------------------------------------------------------------------
+    # Collection types
+    # ------------------------------------------------------------------
+
+    def test_set_collection_roundtrip(self, coodie_driver: object) -> None:
+        """set[str] column survives a save/load round-trip."""
+        SyncAllTypes.sync_table()
+        rid = uuid4()
+        SyncAllTypes(id=rid, tags_set={"apple", "banana"}).save()
+
+        fetched = SyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.tags_set == {"apple", "banana"}
+
+        SyncAllTypes(id=rid).delete()
+
+    def test_map_collection_roundtrip(self, coodie_driver: object) -> None:
+        """dict[str, int] column survives a save/load round-trip."""
+        SyncAllTypes.sync_table()
+        rid = uuid4()
+        SyncAllTypes(id=rid, scores_map={"a": 1, "b": 2}).save()
+
+        fetched = SyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.scores_map == {"a": 1, "b": 2}
+
+        SyncAllTypes(id=rid).delete()
+
+    # ------------------------------------------------------------------
+    # LWT — INSERT IF NOT EXISTS
+    # ------------------------------------------------------------------
+
+    def test_insert_if_not_exists_creates(self, coodie_driver: object) -> None:
+        """insert() (IF NOT EXISTS) inserts when the row is absent."""
+        SyncAllTypes.sync_table()
+        rid = uuid4()
+        row = SyncAllTypes(id=rid, count=7)
+        row.insert()
+
+        fetched = SyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.count == 7
+
+        SyncAllTypes(id=rid).delete()
+
+    def test_insert_if_not_exists_no_overwrite(self, coodie_driver: object) -> None:
+        """insert() (IF NOT EXISTS) does NOT overwrite an existing row."""
+        SyncAllTypes.sync_table()
+        rid = uuid4()
+        SyncAllTypes(id=rid, count=1).save()
+
+        # Second insert with a different count — must not overwrite
+        SyncAllTypes(id=rid, count=99).insert()
+
+        fetched = SyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.count == 1  # original value preserved
+
+        SyncAllTypes(id=rid).delete()
+
+    # ------------------------------------------------------------------
+    # Batch writes via raw CQL
+    # ------------------------------------------------------------------
+
+    def test_batch_insert(self, coodie_driver: object) -> None:
+        """build_insert statements combined in a BatchStatement insert atomically."""
+        from cassandra.query import BatchStatement, BatchType  # type: ignore[import-untyped]
+        from coodie.cql_builder import build_insert
+        from coodie.drivers import get_driver
+
+        SyncAllTypes.sync_table()
+        rid1, rid2 = uuid4(), uuid4()
+
+        stmt1, p1 = build_insert("it_all_types", "test_ks", {"id": rid1, "count": 10})
+        stmt2, p2 = build_insert("it_all_types", "test_ks", {"id": rid2, "count": 20})
+
+        drv = get_driver()
+        batch = BatchStatement(batch_type=BatchType.LOGGED)
+        batch.add(drv._session.prepare(stmt1), p1)
+        batch.add(drv._session.prepare(stmt2), p2)
+        drv._session.execute(batch)
+
+        assert SyncAllTypes.find_one(id=rid1) is not None
+        assert SyncAllTypes.find_one(id=rid2) is not None
+
+        SyncAllTypes(id=rid1).delete()
+        SyncAllTypes(id=rid2).delete()
+
+    # ------------------------------------------------------------------
+    # Composite partition key + multiple clustering columns
+    # ------------------------------------------------------------------
+
+    def test_composite_pk_and_clustering(self, coodie_driver: object) -> None:
+        """Composite partition key rows are correctly partitioned and retrieved."""
+        SyncEvent.sync_table()
+        pa, pb = "alpha", "beta"
+        SyncEvent(partition_a=pa, partition_b=pb, seq=1, sub=3, payload="first").save()
+        SyncEvent(partition_a=pa, partition_b=pb, seq=1, sub=2, payload="second").save()
+        SyncEvent(partition_a=pa, partition_b=pb, seq=2, sub=1, payload="third").save()
+
+        results = SyncEvent.find(partition_a=pa, partition_b=pb).all()
+        assert len(results) == 3
+
+        SyncEvent.find(partition_a=pa, partition_b=pb).delete()
+
+    def test_clustering_asc_order(self, coodie_driver: object) -> None:
+        """ASC clustering key (seq) returns rows in ascending order."""
+        SyncEvent.sync_table()
+        pa, pb = "order_test", f"asc_{uuid4().hex[:6]}"
+        for seq in [3, 1, 2]:
+            SyncEvent(partition_a=pa, partition_b=pb, seq=seq, sub=0).save()
+
+        results = SyncEvent.find(partition_a=pa, partition_b=pb).all()
+        seqs = [r.seq for r in results]
+        assert seqs == sorted(seqs)
+
+        SyncEvent.find(partition_a=pa, partition_b=pb).delete()
+
+    # ------------------------------------------------------------------
+    # QuerySet.order_by and __len__
+    # ------------------------------------------------------------------
+
+    def test_queryset_order_by_clustering(self, coodie_driver: object) -> None:
+        """order_by() on a clustering column returns expected sort order."""
+        SyncReview.sync_table()
+        pid = uuid4()
+        t1 = datetime(2024, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+        t2 = datetime(2024, 6, 2, 0, 0, 0, tzinfo=timezone.utc)
+        SyncReview(product_id=pid, created_at=t1, author="X", rating=1).save()
+        SyncReview(product_id=pid, created_at=t2, author="Y", rating=2).save()
+
+        results_asc = SyncReview.find(product_id=pid).order_by("created_at").all()
+        assert results_asc[0].created_at <= results_asc[-1].created_at
+
+        SyncReview.find(product_id=pid).delete()
+
+    def test_queryset_len(self, coodie_driver: object) -> None:
+        """len(queryset) uses count() under the hood."""
+        brand = f"LenBrand_{uuid4().hex[:6]}"
+        ids = [uuid4(), uuid4()]
+        for pid in ids:
+            SyncProduct(id=pid, name="LenTest", brand=brand).save()
+
+        qs = SyncProduct.find(brand=brand).allow_filtering()
+        assert len(qs) >= 2
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_queryset_iter(self, coodie_driver: object) -> None:
+        """Iterating over a QuerySet yields Document instances."""
+        brand = f"IterBrand_{uuid4().hex[:6]}"
+        ids = [uuid4(), uuid4()]
+        for pid in ids:
+            SyncProduct(id=pid, name="IterTest", brand=brand).save()
+
+        items = list(SyncProduct.find(brand=brand).allow_filtering())
+        assert all(isinstance(i, SyncProduct) for i in items)
+        assert len(items) >= 2
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_queryset_first(self, coodie_driver: object) -> None:
+        """first() returns exactly one document or None."""
+        pid = uuid4()
+        SyncProduct(id=pid, name="FirstTest").save()
+
+        result = SyncProduct.find(id=pid).first()
+        assert result is not None
+        assert result.id == pid
+
+        assert SyncProduct.find(id=uuid4()).first() is None
+
+        SyncProduct(id=pid, name="").delete()
+
+    # ------------------------------------------------------------------
+    # Schema migration — ALTER TABLE ADD column
+    # ------------------------------------------------------------------
+
+    def test_schema_migration_add_column(self, coodie_driver: object) -> None:
+        """sync_table adds a new column to an existing table without data loss."""
+        from coodie.drivers import get_driver
+        from coodie.cql_builder import build_create_table
+        from coodie.schema import ColumnDefinition
+
+        ks = "test_ks"
+        tbl = "it_migration_test"
+
+        # Bootstrap a minimal table (single column)
+        drv = get_driver()
+        initial_cols = [
+            ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ]
+        drv._session.execute(build_create_table(tbl, ks, initial_cols))
+
+        # Insert a row with just the PK
+        rid = uuid4()
+        drv._session.execute(
+            drv._session.prepare(f"INSERT INTO {ks}.{tbl} (id) VALUES (?)"), [rid]
+        )
+
+        # Now migrate: add a new column via sync_table
+        extended_cols = [
+            ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+            ColumnDefinition(name="label", cql_type="text"),
+        ]
+        drv.sync_table(tbl, ks, extended_cols)
+
+        # The existing row is still there; the new column is NULL
+        rows = drv.execute(f"SELECT id, label FROM {ks}.{tbl} WHERE id = ?", [rid])
+        assert rows
+        assert rows[0]["id"] == rid
+        assert rows[0].get("label") is None
+
+        # Cleanup
+        drv._session.execute(f"DROP TABLE IF EXISTS {ks}.{tbl}")
+
+
+# ===========================================================================
+# Extended asynchronous integration tests
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestAsyncExtended:
+    """Async counterparts of the extended sync tests."""
+
+    async def test_all_types_sync_table(self, coodie_driver: object) -> None:
+        await AsyncAllTypes.sync_table()
+
+    async def test_scalar_types_roundtrip(self, coodie_driver: object) -> None:
+        await AsyncAllTypes.sync_table()
+        rid = uuid4()
+        today = date.today()
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        await AsyncAllTypes(
+            id=rid,
+            flag=True,
+            count=99,
+            score=2.71,
+            amount=decimal.Decimal("99.99"),
+            blob_val=b"\xde\xad",
+            ts=now,
+            day=today,
+            ip4=ipaddress.IPv4Address("192.168.1.1"),
+            ip6=ipaddress.IPv6Address("::ffff:192.168.1.1"),
+        ).save()
+
+        fetched = await AsyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.flag is True
+        assert fetched.count == 99
+        assert fetched.amount == decimal.Decimal("99.99")
+        assert fetched.blob_val == b"\xde\xad"
+        assert fetched.ts.replace(tzinfo=timezone.utc) == now
+        assert fetched.day == today
+        assert str(fetched.ip4) == "192.168.1.1"
+
+        await AsyncAllTypes(id=rid).delete()
+
+    async def test_set_collection_roundtrip(self, coodie_driver: object) -> None:
+        await AsyncAllTypes.sync_table()
+        rid = uuid4()
+        await AsyncAllTypes(id=rid, tags_set={"x", "y"}).save()
+
+        fetched = await AsyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.tags_set == {"x", "y"}
+
+        await AsyncAllTypes(id=rid).delete()
+
+    async def test_map_collection_roundtrip(self, coodie_driver: object) -> None:
+        await AsyncAllTypes.sync_table()
+        rid = uuid4()
+        await AsyncAllTypes(id=rid, scores_map={"m": 7, "n": 8}).save()
+
+        fetched = await AsyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.scores_map == {"m": 7, "n": 8}
+
+        await AsyncAllTypes(id=rid).delete()
+
+    async def test_insert_if_not_exists(self, coodie_driver: object) -> None:
+        """async insert() (IF NOT EXISTS) does NOT overwrite an existing row."""
+        await AsyncAllTypes.sync_table()
+        rid = uuid4()
+        await AsyncAllTypes(id=rid, count=5).save()
+        await AsyncAllTypes(id=rid, count=50).insert()
+
+        fetched = await AsyncAllTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.count == 5  # original preserved
+
+        await AsyncAllTypes(id=rid).delete()
+
+    async def test_composite_pk_and_clustering(self, coodie_driver: object) -> None:
+        await AsyncEvent.sync_table()
+        pa, pb = "async_alpha", f"async_beta_{uuid4().hex[:6]}"
+        for seq in range(3):
+            await AsyncEvent(
+                partition_a=pa, partition_b=pb, seq=seq, payload=f"p{seq}"
+            ).save()
+
+        results = await AsyncEvent.find(partition_a=pa, partition_b=pb).all()
+        assert len(results) == 3
+
+        from coodie.aio.query import QuerySet as AioQS
+
+        await AioQS(AsyncEvent).filter(partition_a=pa, partition_b=pb).delete()
+
+    async def test_queryset_first(self, coodie_driver: object) -> None:
+        rid = uuid4()
+        await AsyncProduct(id=rid, name="AsyncFirst").save()
+
+        result = await AsyncProduct.find(id=rid).first()
+        assert result is not None
+        assert result.id == rid
+
+        assert await AsyncProduct.find(id=uuid4()).first() is None
+
+        await AsyncProduct(id=rid, name="").delete()
+
+    async def test_batch_insert(self, coodie_driver: object) -> None:
+        """build_insert statements combined in an async BatchStatement insert atomically."""
+        from cassandra.query import BatchStatement, BatchType  # type: ignore[import-untyped]
+        from coodie.cql_builder import build_insert
+        from coodie.drivers import get_driver
+        import asyncio
+
+        await AsyncAllTypes.sync_table()
+        rid1, rid2 = uuid4(), uuid4()
+
+        stmt1, p1 = build_insert(
+            "it_async_all_types", "test_ks", {"id": rid1, "count": 11}
+        )
+        stmt2, p2 = build_insert(
+            "it_async_all_types", "test_ks", {"id": rid2, "count": 22}
+        )
+
+        drv = get_driver()
+        batch = BatchStatement(batch_type=BatchType.LOGGED)
+        batch.add(drv._session.prepare(stmt1), p1)
+        batch.add(drv._session.prepare(stmt2), p2)
+
+        loop = asyncio.get_event_loop()
+        future = drv._session.execute_async(batch)
+        result_future: asyncio.Future = loop.create_future()
+        future.add_callbacks(
+            lambda r: loop.call_soon_threadsafe(result_future.set_result, r),
+            lambda e: loop.call_soon_threadsafe(result_future.set_exception, e),
+        )
+        await result_future
+
+        assert await AsyncAllTypes.find_one(id=rid1) is not None
+        assert await AsyncAllTypes.find_one(id=rid2) is not None
+
+        await AsyncAllTypes(id=rid1).delete()
+        await AsyncAllTypes(id=rid2).delete()

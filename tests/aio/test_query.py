@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID, uuid4
 
-import pytest
 from pydantic import Field
 
 from coodie.fields import PrimaryKey
@@ -22,18 +21,22 @@ class AsyncItem(Document):
 
 
 async def test_all_returns_list(registered_mock_driver):
-    registered_mock_driver.set_return_rows([
-        {"id": uuid4(), "name": "A", "rating": 5},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": uuid4(), "name": "A", "rating": 5},
+        ]
+    )
     results = await QuerySet(AsyncItem).all()
     assert isinstance(results, list)
     assert len(results) == 1
 
 
 async def test_first_returns_single(registered_mock_driver):
-    registered_mock_driver.set_return_rows([
-        {"id": uuid4(), "name": "B", "rating": 3},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": uuid4(), "name": "B", "rating": 3},
+        ]
+    )
     result = await QuerySet(AsyncItem).first()
     assert result is not None
     assert isinstance(result, AsyncItem)
@@ -57,10 +60,12 @@ async def test_delete(registered_mock_driver):
 
 
 async def test_aiter(registered_mock_driver):
-    registered_mock_driver.set_return_rows([
-        {"id": uuid4(), "name": "C", "rating": 1},
-        {"id": uuid4(), "name": "D", "rating": 2},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": uuid4(), "name": "C", "rating": 1},
+            {"id": uuid4(), "name": "D", "rating": 2},
+        ]
+    )
     items = [item async for item in QuerySet(AsyncItem)]
     assert len(items) == 2
 

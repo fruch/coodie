@@ -51,7 +51,8 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
 
         # Check if it's ClassVar
         if origin is typing.ClassVar or (
-            hasattr(typing, "ClassVar") and str(annotation).startswith("typing.ClassVar")
+            hasattr(typing, "ClassVar")
+            and str(annotation).startswith("typing.ClassVar")
         ):
             continue
 

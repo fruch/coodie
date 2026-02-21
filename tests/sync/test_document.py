@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import Field
 
-from coodie.fields import PrimaryKey, ClusteringKey, Indexed
+from coodie.fields import PrimaryKey, Indexed
 from coodie.sync.document import Document
 from coodie.exceptions import DocumentNotFound, MultipleDocumentsFound
 
@@ -52,13 +52,16 @@ def test_delete(registered_mock_driver):
 
 def test_find_returns_queryset(registered_mock_driver):
     from coodie.sync.query import QuerySet
+
     qs = Product.find(brand="Acme")
     assert isinstance(qs, QuerySet)
 
 
 def test_find_one_returns_document(registered_mock_driver):
     pid = uuid4()
-    registered_mock_driver.set_return_rows([{"id": pid, "name": "X", "brand": "Acme", "price": 1.0, "description": None}])
+    registered_mock_driver.set_return_rows(
+        [{"id": pid, "name": "X", "brand": "Acme", "price": 1.0, "description": None}]
+    )
     doc = Product.find_one(brand="Acme")
     assert isinstance(doc, Product)
     assert doc.brand == "Acme"
@@ -76,10 +79,24 @@ def test_get_raises_document_not_found(registered_mock_driver):
 
 def test_find_one_raises_multiple_found(registered_mock_driver):
     pid1, pid2 = uuid4(), uuid4()
-    registered_mock_driver.set_return_rows([
-        {"id": pid1, "name": "A", "brand": "Acme", "price": 1.0, "description": None},
-        {"id": pid2, "name": "B", "brand": "Acme", "price": 2.0, "description": None},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {
+                "id": pid1,
+                "name": "A",
+                "brand": "Acme",
+                "price": 1.0,
+                "description": None,
+            },
+            {
+                "id": pid2,
+                "name": "B",
+                "brand": "Acme",
+                "price": 2.0,
+                "description": None,
+            },
+        ]
+    )
     with pytest.raises(MultipleDocumentsFound):
         Product.find_one(brand="Acme")
 
@@ -91,7 +108,9 @@ def test_get_table_name():
 def test_snake_case_default_table_name():
     class MyDocument(Document):
         id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
         class Settings:
             name = ""
             keyspace = "test_ks"
+
     assert MyDocument._get_table() == "my_document"

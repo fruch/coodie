@@ -24,18 +24,21 @@ class CassandraDriver(AbstractDriver):
 
     def _prepare(self, cql: str) -> Any:
         if cql not in self._prepared:
-            from cassandra.query import SimpleStatement  # type: ignore[import-untyped]
             self._prepared[cql] = self._session.prepare(cql)
         return self._prepared[cql]
 
     @staticmethod
     def _rows_to_dicts(result_set: Any) -> list[dict[str, Any]]:
+        if result_set is None:
+            return []
         rows = []
         for row in result_set:
             if hasattr(row, "_asdict"):
                 rows.append(dict(row._asdict()))
             elif hasattr(row, "__dict__"):
-                rows.append({k: v for k, v in row.__dict__.items() if not k.startswith("_")})
+                rows.append(
+                    {k: v for k, v in row.__dict__.items() if not k.startswith("_")}
+                )
             else:
                 rows.append(dict(row))
         return rows
@@ -65,7 +68,9 @@ class CassandraDriver(AbstractDriver):
 
         for col in cols:
             if col.name not in existing:
-                alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
+                alter = (
+                    f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
+                )
                 self._session.execute(alter)
 
         # Create secondary indexes
@@ -89,9 +94,7 @@ class CassandraDriver(AbstractDriver):
     # Asynchronous interface (asyncio bridge)
     # ------------------------------------------------------------------
 
-    async def execute_async(
-        self, stmt: str, params: list[Any]
-    ) -> list[dict[str, Any]]:
+    async def execute_async(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
         loop = asyncio.get_event_loop()
         prepared = self._prepare(stmt)
         future = self._session.execute_async(prepared, params)

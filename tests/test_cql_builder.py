@@ -33,7 +33,9 @@ def test_create_keyspace_default():
 
 
 def test_create_keyspace_custom():
-    cql = build_create_keyspace("ks", replication_factor=3, strategy="NetworkTopologyStrategy")
+    cql = build_create_keyspace(
+        "ks", replication_factor=3, strategy="NetworkTopologyStrategy"
+    )
     assert "NetworkTopologyStrategy" in cql
     assert "'replication_factor': '3'" in cql
 
@@ -52,8 +54,12 @@ def test_create_table_simple():
 
 def test_create_table_composite_pk():
     cols = [
-        make_col(name="product_id", cql_type="uuid", primary_key=True, partition_key_index=0),
-        make_col(name="category", cql_type="text", primary_key=True, partition_key_index=1),
+        make_col(
+            name="product_id", cql_type="uuid", primary_key=True, partition_key_index=0
+        ),
+        make_col(
+            name="category", cql_type="text", primary_key=True, partition_key_index=1
+        ),
     ]
     cql = build_create_table("products", "ks", cols)
     assert 'PRIMARY KEY (("product_id", "category"))' in cql
@@ -62,7 +68,12 @@ def test_create_table_composite_pk():
 def test_create_table_with_clustering():
     cols = [
         make_col(name="product_id", cql_type="uuid", primary_key=True),
-        make_col(name="created_at", cql_type="timestamp", clustering_key=True, clustering_order="DESC"),
+        make_col(
+            name="created_at",
+            cql_type="timestamp",
+            clustering_key=True,
+            clustering_order="DESC",
+        ),
     ]
     cql = build_create_table("reviews", "ks", cols)
     assert '"created_at"' in cql
@@ -173,7 +184,8 @@ def test_build_insert_ttl():
 
 def test_build_update():
     cql, params = build_update(
-        "products", "ks",
+        "products",
+        "ks",
         set_data={"name": "Y"},
         where=[("id", "=", "1")],
     )

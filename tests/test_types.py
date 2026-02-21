@@ -80,4 +80,5 @@ def test_unsupported_type_raises():
 
 def test_no_cqlengine_import():
     import sys
+
     assert "cassandra.cqlengine" not in sys.modules

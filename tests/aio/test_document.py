@@ -52,9 +52,9 @@ async def test_delete(registered_mock_driver):
 
 async def test_find_one(registered_mock_driver):
     pid = uuid4()
-    registered_mock_driver.set_return_rows([
-        {"id": pid, "name": "X", "brand": "Acme", "price": 1.0, "description": None}
-    ])
+    registered_mock_driver.set_return_rows(
+        [{"id": pid, "name": "X", "brand": "Acme", "price": 1.0, "description": None}]
+    )
     doc = await AsyncProduct.find_one(brand="Acme")
     assert isinstance(doc, AsyncProduct)
 
@@ -71,9 +71,11 @@ async def test_get_raises_not_found(registered_mock_driver):
 
 async def test_find_one_raises_multiple_found(registered_mock_driver):
     pid1, pid2 = uuid4(), uuid4()
-    registered_mock_driver.set_return_rows([
-        {"id": pid1, "name": "A", "brand": "X", "price": 1.0, "description": None},
-        {"id": pid2, "name": "B", "brand": "X", "price": 2.0, "description": None},
-    ])
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": pid1, "name": "A", "brand": "X", "price": 1.0, "description": None},
+            {"id": pid2, "name": "B", "brand": "X", "price": 2.0, "description": None},
+        ]
+    )
     with pytest.raises(MultipleDocumentsFound):
         await AsyncProduct.find_one(brand="X")

@@ -33,9 +33,7 @@ class AbstractDriver(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def execute_async(
-        self, stmt: str, params: list[Any]
-    ) -> list[dict[str, Any]]:
+    async def execute_async(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
         """Async version of :meth:`execute`."""
 
     @abstractmethod

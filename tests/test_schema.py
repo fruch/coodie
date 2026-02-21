@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Annotated, Optional
 from uuid import UUID
 
-import pytest
 from pydantic import BaseModel
 
 from coodie.fields import ClusteringKey, Indexed, PrimaryKey
@@ -60,7 +59,9 @@ def test_build_schema_optional_column():
 
 def test_build_schema_composite_primary_key():
     schema = build_schema(CompositeDoc)
-    pk_cols = sorted([c for c in schema if c.primary_key], key=lambda c: c.partition_key_index)
+    pk_cols = sorted(
+        [c for c in schema if c.primary_key], key=lambda c: c.partition_key_index
+    )
     assert len(pk_cols) == 2
     assert pk_cols[0].name == "product_id"
     assert pk_cols[1].name == "category"

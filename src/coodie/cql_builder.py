@@ -43,18 +43,24 @@ def build_create_table(
         pk_str = "(" + ", ".join(f'"{c.name}"' for c in pk_cols) + ")"
 
     if ck_cols:
-        primary_key = f"PRIMARY KEY ({pk_str}, " + ", ".join(f'"{c.name}"' for c in ck_cols) + ")"
+        primary_key = (
+            f"PRIMARY KEY ({pk_str}, " + ", ".join(f'"{c.name}"' for c in ck_cols) + ")"
+        )
     else:
         primary_key = f"PRIMARY KEY ({pk_str})"
 
     col_defs_str = ", ".join(col_defs)
 
-    clustering_order_parts = [
-        f'"{c.name}" {c.clustering_order}' for c in ck_cols if c.clustering_order != "ASC"
-    ]
+    clustering_order_parts = []
+    if any(c.clustering_order != "ASC" for c in ck_cols):
+        # CQL requires ALL clustering columns to be listed in WITH CLUSTERING
+        # ORDER BY whenever the clause is present — even those that are ASC.
+        clustering_order_parts = [f'"{c.name}" {c.clustering_order}' for c in ck_cols]
     with_clause = ""
     if clustering_order_parts:
-        with_clause = " WITH CLUSTERING ORDER BY (" + ", ".join(clustering_order_parts) + ")"
+        with_clause = (
+            " WITH CLUSTERING ORDER BY (" + ", ".join(clustering_order_parts) + ")"
+        )
 
     return f"CREATE TABLE IF NOT EXISTS {keyspace}.{table} ({col_defs_str}, {primary_key}){with_clause}"
 
@@ -66,7 +72,7 @@ def build_create_index(
 ) -> str:
     index_name = col.index_name or f"{table}_{col.name}_idx"
     return (
-        f"CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} (\"{col.name}\")"
+        f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
     )
 
 
@@ -233,7 +239,9 @@ def build_delete(
     columns: list[str] | None = None,
 ) -> tuple[str, list[Any]]:
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else ""
-    cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace("DELETE  FROM", "DELETE FROM")
+    cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace(
+        "DELETE  FROM", "DELETE FROM"
+    )
 
     clause, params = build_where_clause(where)
     cql += " " + clause

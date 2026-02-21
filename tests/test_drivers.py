@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from coodie.drivers import get_driver, register_driver, _registry
 from coodie.drivers.base import AbstractDriver
 from coodie.exceptions import ConfigurationError
-from tests.conftest import MockDriver
 
 
 def test_register_and_get_driver(mock_driver):

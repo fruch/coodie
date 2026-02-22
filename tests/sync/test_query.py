@@ -112,3 +112,47 @@ def test_chaining(registered_mock_driver):
     assert "LIMIT 10" in stmt
     assert "ALLOW FILTERING" in stmt
     assert params == [3]
+
+
+# --- Phase 3: QuerySet.update() ---
+
+
+def test_update_basic(registered_mock_driver):
+    QuerySet(Item).filter(name="old").update(name="new")
+    stmt, params = registered_mock_driver.executed[0]
+    assert "UPDATE test_ks.items" in stmt
+    assert '"name" = ?' in stmt
+    assert "new" in params
+
+
+def test_update_with_ttl(registered_mock_driver):
+    QuerySet(Item).filter(name="old").update(ttl=300, name="new")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TTL 300" in stmt
+
+
+def test_update_with_if_conditions(registered_mock_driver):
+    QuerySet(Item).filter(name="old").update(if_conditions={"rating": 5}, name="new")
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'IF "rating" = ?' in stmt
+    assert 5 in params
+
+
+def test_update_collection_add(registered_mock_driver):
+    class TagItem(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+        tags: set[str] = set()
+
+        class Settings:
+            name = "tag_items"
+            keyspace = "test_ks"
+
+    QuerySet(TagItem).filter(id=uuid4()).update(tags__add={"x"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"tags" = "tags" + ?' in stmt
+    assert {"x"} in params
+
+
+def test_update_noop_when_empty(registered_mock_driver):
+    QuerySet(Item).filter(name="old").update()
+    assert len(registered_mock_driver.executed) == 0

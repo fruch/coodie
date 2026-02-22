@@ -173,3 +173,90 @@ def test_counter_decrement(registered_mock_driver):
     stmt, params = registered_mock_driver.executed[0]
     assert '"view_count" = "view_count" + ?' in stmt
     assert params == [-1, "/home"]
+
+
+# --- Phase 3: Document.update() ---
+
+
+class TaggedProduct(Document):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    price: float = 0.0
+    tags: set[str] = set()
+    items: list[str] = []
+
+    class Settings:
+        name = "tagged_products"
+        keyspace = "test_ks"
+
+
+def test_update_basic(registered_mock_driver):
+    p = TaggedProduct(name="Widget", price=9.99)
+    p.update(name="Gadget", price=19.99)
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert "UPDATE test_ks.tagged_products" in stmt
+    assert '"name" = ?' in stmt
+    assert '"price" = ?' in stmt
+    assert "Gadget" in params
+    assert 19.99 in params
+
+
+def test_update_updates_local_fields(registered_mock_driver):
+    p = TaggedProduct(name="Widget", price=9.99)
+    p.update(name="Gadget")
+    assert p.name == "Gadget"
+
+
+def test_update_with_ttl(registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    p.update(ttl=600, name="Gadget")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TTL 600" in stmt
+
+
+def test_update_with_if_conditions(registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    p.update(if_conditions={"name": "Widget"}, name="Gadget")
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'IF "name" = ?' in stmt
+    assert "Widget" in params
+
+
+def test_update_collection_add(registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    p.update(tags__add={"new_tag"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"tags" = "tags" + ?' in stmt
+    assert {"new_tag"} in params
+
+
+def test_update_collection_remove(registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    p.update(tags__remove={"old_tag"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"tags" = "tags" - ?' in stmt
+    assert {"old_tag"} in params
+
+
+def test_update_collection_append(registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    p.update(items__append=["z"])
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"items" = "items" + ?' in stmt
+    assert ["z"] in params
+
+
+def test_update_collection_prepend(registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    p.update(items__prepend=["a"])
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"items" = ? + "items"' in stmt
+    assert ["a"] in params
+
+
+def test_update_noop_when_empty(registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    p.update()
+    assert len(registered_mock_driver.executed) == 0
+    assert p.name == "Widget"

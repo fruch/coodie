@@ -4,7 +4,14 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
-from coodie.cql_builder import build_insert, build_delete, build_counter_update
+from coodie.cql_builder import (
+    build_insert,
+    build_delete,
+    build_update,
+    build_counter_update,
+    parse_update_kwargs,
+)
+
 from coodie.exceptions import (
     DocumentNotFound,
     MultipleDocumentsFound,
@@ -105,6 +112,38 @@ class Document(BaseModel):
             where,
         )
         self.__class__._get_driver().execute(cql, params)
+
+    def update(
+        self,
+        ttl: int | None = None,
+        if_conditions: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Update individual fields without a full INSERT (upsert)."""
+        set_data, collection_ops = parse_update_kwargs(kwargs)
+
+        if not set_data and not collection_ops:
+            return
+
+        schema = self.__class__._schema()
+        pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
+        where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
+
+        cql, params = build_update(
+            self.__class__._get_table(),
+            self.__class__._get_keyspace(),
+            set_data,
+            where,
+            ttl=ttl,
+            if_conditions=if_conditions,
+            collection_ops=collection_ops or None,
+        )
+        self.__class__._get_driver().execute(cql, params)
+
+        # Update in-memory model fields for regular set assignments
+        for k, v in set_data.items():
+            if hasattr(self, k):
+                object.__setattr__(self, k, v)
 
     # ------------------------------------------------------------------
     # Query / read operations

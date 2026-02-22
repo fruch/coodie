@@ -6,7 +6,9 @@ from coodie.cql_builder import (
     build_select,
     build_count,
     build_delete,
+    build_update,
     parse_filter_kwargs,
+    parse_update_kwargs,
 )
 from coodie.exceptions import InvalidQueryError
 from coodie.sync.query import _snake_case
@@ -136,6 +138,27 @@ class QuerySet:
 
     async def delete(self) -> None:
         cql, params = build_delete(self._table(), self._keyspace(), self._where)
+        await self._get_driver().execute_async(cql, params)
+
+    async def update(
+        self,
+        ttl: int | None = None,
+        if_conditions: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Bulk UPDATE matching rows."""
+        set_data, collection_ops = parse_update_kwargs(kwargs)
+        if not set_data and not collection_ops:
+            return
+        cql, params = build_update(
+            self._table(),
+            self._keyspace(),
+            set_data,
+            self._where,
+            ttl=ttl,
+            if_conditions=if_conditions,
+            collection_ops=collection_ops or None,
+        )
         await self._get_driver().execute_async(cql, params)
 
     async def __aiter__(self) -> AsyncIterator[Document]:

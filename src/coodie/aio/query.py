@@ -10,6 +10,7 @@ from coodie.cql_builder import (
 )
 from coodie.exceptions import InvalidQueryError
 from coodie.sync.query import _snake_case
+from coodie.types import coerce_row_none_collections
 
 if TYPE_CHECKING:
     from coodie.aio.document import Document
@@ -111,7 +112,10 @@ class QuerySet:
             allow_filtering=self._allow_filtering_val,
         )
         rows = await self._get_driver().execute_async(cql, params)
-        return [self._doc_cls(**row) for row in rows]
+        return [
+            self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
+            for row in rows
+        ]
 
     async def first(self) -> Document | None:
         results = await self.limit(1).all()

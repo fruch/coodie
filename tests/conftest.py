@@ -1,8 +1,36 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--driver-type",
+        default="scylla",
+        choices=["scylla", "cassandra", "acsylla"],
+        help="Driver backend for integration tests (default: scylla)",
+    )
+
+
+@pytest.fixture(scope="session")
+def driver_type(request: pytest.FixtureRequest) -> str:
+    return request.config.getoption("--driver-type")
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """Session-scoped event loop.
+
+    acsylla sessions are bound to the event loop they are created on, so all
+    async tests and the session-scoped ``coodie_driver`` fixture must share
+    the same loop.  A session-scoped loop is harmless for other drivers.
+    """
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
 
 
 class MockDriver:

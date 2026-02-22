@@ -21,6 +21,15 @@ jobs:
         python-version:
           - "3.13"
           - "3.14"
+        driver-type:
+          - scylla
+          - cassandra
+          - acsylla
+        exclude:
+          - python-version: "3.13"
+            driver-type: cassandra
+          - python-version: "3.14"
+            driver-type: cassandra
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,9 +40,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies
-        run: uv sync --all-groups
+        run: |
+          uv sync --all-groups
+          uv pip install -e ".[${{ matrix.driver-type }}]"
       - name: Run integration tests
-        run: uv run pytest -m integration -v --timeout=120
+        run: uv run pytest -m integration -v --timeout=120 --driver-type=${{ matrix.driver-type }}
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

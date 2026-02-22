@@ -2,6 +2,11 @@
 
 Run with:  pytest -m integration -v
 Skipped by default (addopts = "-m 'not integration'").
+
+Use ``--driver-type`` to choose the driver backend:
+- ``scylla`` (default) — uses scylla-driver (``pip install scylla-driver``)
+- ``cassandra`` — uses cassandra-driver (``pip install cassandra-driver``)
+- ``acsylla`` — uses acsylla (``pip install acsylla``)
 """
 
 from __future__ import annotations
@@ -83,8 +88,15 @@ class _LocalhostTranslator:
 
 
 @pytest.fixture(scope="session")
-def scylla_session(scylla_container: object) -> object:
-    """Return a connected cassandra-driver Session with the test keyspace."""
+def scylla_session(scylla_container: object, driver_type: str) -> object:
+    """Return a connected cassandra-driver Session with the test keyspace.
+
+    Skipped when ``--driver-type=acsylla`` (cassandra-driver may not be installed).
+    """
+    if driver_type == "acsylla":
+        yield None
+        return
+
     from cassandra.cluster import Cluster, NoHostAvailable  # type: ignore[import-untyped]
 
     port = int(scylla_container.get_exposed_port(9042))  # type: ignore[attr-defined]
@@ -114,10 +126,63 @@ def scylla_session(scylla_container: object) -> object:
 
 
 @pytest.fixture(scope="session")
-def coodie_driver(scylla_session: object) -> object:
-    """Register a CassandraDriver backed by the real ScyllaDB session."""
+def coodie_driver(
+    scylla_session: object,
+    scylla_container: object,
+    driver_type: str,
+    event_loop: asyncio.AbstractEventLoop,
+) -> object:
+    """Register a coodie driver backed by the real ScyllaDB session.
+
+    When ``--driver-type=scylla`` (default) or ``--driver-type=cassandra``
+    uses CassandraDriver (both scylla-driver and cassandra-driver expose the
+    same ``cassandra`` Python package).
+    When ``--driver-type=acsylla`` creates an acsylla session connecting to the
+    same container and registers an AcsyllaDriver instead.
+    """
     _registry.clear()
-    driver = init_coodie(session=scylla_session, keyspace="test_ks")
+    if driver_type == "acsylla":
+        try:
+            import acsylla  # type: ignore[import-untyped]
+        except ImportError:
+            pytest.skip("acsylla is not installed")
+
+        from coodie.drivers.acsylla import AcsyllaDriver
+
+        # acsylla has no address translator, so connect directly to the
+        # container's internal Docker IP on the native CQL port.
+        container_info = scylla_container.get_wrapped_container()  # type: ignore[attr-defined]
+        container_info.reload()
+        networks = container_info.attrs["NetworkSettings"]["Networks"]
+        container_ip = next(iter(networks.values()))["IPAddress"]
+
+        async def _create_session() -> object:
+            cluster = acsylla.create_cluster([container_ip], port=9042)
+            session = await cluster.create_session()
+            await session.execute(
+                acsylla.create_statement(
+                    "CREATE KEYSPACE IF NOT EXISTS test_ks "
+                    "WITH replication = {'class': 'SimpleStrategy', "
+                    "'replication_factor': '1'}",
+                    parameters=0,
+                )
+            )
+            await session.close()
+            # Reconnect with the keyspace set
+            return await cluster.create_session(keyspace="test_ks")
+
+        acsylla_session = event_loop.run_until_complete(_create_session())
+        acsylla_driver = AcsyllaDriver(
+            session=acsylla_session, default_keyspace="test_ks", loop=event_loop
+        )
+        from coodie.drivers import register_driver
+
+        register_driver("default", acsylla_driver, default=True)
+        driver = acsylla_driver
+    else:
+        driver = init_coodie(
+            session=scylla_session, keyspace="test_ks", driver_type=driver_type
+        )
     yield driver
     _registry.clear()
     driver.close()
@@ -1071,8 +1136,11 @@ class TestSyncExtended:
     # Batch writes via raw CQL
     # ------------------------------------------------------------------
 
-    def test_batch_insert(self, coodie_driver: object) -> None:
+    def test_batch_insert(self, coodie_driver: object, driver_type: str) -> None:
         """build_insert statements combined in a BatchStatement insert atomically."""
+        if driver_type == "acsylla":
+            pytest.skip("BatchStatement is cassandra-driver specific")
+
         from cassandra.query import BatchStatement, BatchType  # type: ignore[import-untyped]
         from coodie.cql_builder import build_insert
         from coodie.drivers import get_driver
@@ -1190,8 +1258,13 @@ class TestSyncExtended:
     # Schema migration — ALTER TABLE ADD column
     # ------------------------------------------------------------------
 
-    def test_schema_migration_add_column(self, coodie_driver: object) -> None:
+    def test_schema_migration_add_column(
+        self, coodie_driver: object, driver_type: str
+    ) -> None:
         """sync_table adds a new column to an existing table without data loss."""
+        if driver_type == "acsylla":
+            pytest.skip("AcsyllaDriver does not support ALTER TABLE ADD migration")
+
         from coodie.drivers import get_driver
         from coodie.cql_builder import build_create_table
         from coodie.schema import ColumnDefinition
@@ -1499,8 +1572,11 @@ class TestAsyncExtended:
 
         await AsyncProduct(id=rid, name="").delete()
 
-    async def test_batch_insert(self, coodie_driver: object) -> None:
+    async def test_batch_insert(self, coodie_driver: object, driver_type: str) -> None:
         """build_insert statements combined in an async BatchStatement insert atomically."""
+        if driver_type == "acsylla":
+            pytest.skip("BatchStatement is cassandra-driver specific")
+
         from cassandra.query import BatchStatement, BatchType  # type: ignore[import-untyped]
         from coodie.cql_builder import build_insert
         from coodie.drivers import get_driver

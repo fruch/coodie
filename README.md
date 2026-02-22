@@ -1,4 +1,4 @@
-<table><tr>
+<table border="0" cellspacing="0" cellpadding="0"><tr>
   <td valign="top" width="170">
     <img src="https://github.com/user-attachments/assets/424bb6ee-3cd3-49e3-a29b-f6615193f4c7" alt="coodie logo" width="150">
   </td>

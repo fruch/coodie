@@ -79,7 +79,13 @@ class Document(BaseModel):
     # Write operations
     # ------------------------------------------------------------------
 
-    def save(self, ttl: int | None = None) -> None:
+    def save(
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         """Insert (upsert) this document."""
         data = self.model_dump(exclude_none=False)
         cql, params = build_insert(
@@ -87,10 +93,19 @@ class Document(BaseModel):
             self.__class__._get_keyspace(),
             data,
             ttl=ttl,
+            timestamp=timestamp,
         )
-        self.__class__._get_driver().execute(cql, params)
+        self.__class__._get_driver().execute(
+            cql, params, consistency=consistency, timeout=timeout
+        )
 
-    def insert(self, ttl: int | None = None) -> None:
+    def insert(
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         """Insert IF NOT EXISTS (create-only)."""
         data = self.model_dump(exclude_none=False)
         cql, params = build_insert(
@@ -99,10 +114,19 @@ class Document(BaseModel):
             data,
             ttl=ttl,
             if_not_exists=True,
+            timestamp=timestamp,
         )
-        self.__class__._get_driver().execute(cql, params)
+        self.__class__._get_driver().execute(
+            cql, params, consistency=consistency, timeout=timeout
+        )
 
-    def delete(self, if_exists: bool = False) -> LWTResult | None:
+    def delete(
+        self,
+        if_exists: bool = False,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> LWTResult | None:
         """Delete this document by its primary key.
 
         When *if_exists* is ``True`` the generated CQL includes ``IF EXISTS``
@@ -116,8 +140,12 @@ class Document(BaseModel):
             self.__class__._get_keyspace(),
             where,
             if_exists=if_exists,
+            timestamp=timestamp,
         )
-        rows = self.__class__._get_driver().execute(cql, params)
+
+        rows = self.__class__._get_driver().execute(
+            cql, params, consistency=consistency, timeout=timeout
+        )
         if if_exists:
             return _parse_lwt_result(rows)
         return None
@@ -209,13 +237,25 @@ class CounterDocument(Document):
     ``save()`` and ``insert()`` are forbidden.
     """
 
-    def save(self, ttl: int | None = None) -> None:  # noqa: ARG002
+    def save(  # noqa: ARG002
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         raise InvalidQueryError(
             "Counter tables do not support save(). "
             "Use increment() or decrement() instead."
         )
 
-    def insert(self, ttl: int | None = None) -> None:  # noqa: ARG002
+    def insert(  # noqa: ARG002
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         raise InvalidQueryError(
             "Counter tables do not support insert(). "
             "Use increment() or decrement() instead."

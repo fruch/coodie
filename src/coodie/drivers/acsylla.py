@@ -86,10 +86,18 @@ class AcsyllaDriver(AbstractDriver):
     # Asynchronous interface
     # ------------------------------------------------------------------
 
-    async def execute_async(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
+    async def execute_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
         prepared = await self._prepare(stmt)
         statement = prepared.bind(params)
-        result = await self._session.execute(statement)
+        if consistency is not None:
+            statement.set_consistency(consistency)
+        result = await self._session.execute(statement, timeout=timeout)
         return self._rows_to_dicts(result)
 
     async def sync_table_async(
@@ -119,8 +127,16 @@ class AcsyllaDriver(AbstractDriver):
     # For async contexts, use the *_async variants directly.
     # ------------------------------------------------------------------
 
-    def execute(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
-        return asyncio.run(self.execute_async(stmt, params))
+    def execute(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
+        return asyncio.run(
+            self.execute_async(stmt, params, consistency=consistency, timeout=timeout)
+        )
 
     def sync_table(
         self,

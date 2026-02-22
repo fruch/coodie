@@ -47,9 +47,22 @@ class CassandraDriver(AbstractDriver):
     # Synchronous interface
     # ------------------------------------------------------------------
 
-    def execute(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
+    def execute(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
         prepared = self._prepare(stmt)
-        result = self._session.execute(prepared, params)
+        if consistency is not None:
+            from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
+
+            prepared = prepared.bind(params)
+            prepared.consistency_level = getattr(ConsistencyLevel, consistency)
+            result = self._session.execute(prepared, timeout=timeout)
+        else:
+            result = self._session.execute(prepared, params, timeout=timeout)
         return self._rows_to_dicts(result)
 
     def sync_table(
@@ -94,10 +107,23 @@ class CassandraDriver(AbstractDriver):
     # Asynchronous interface (asyncio bridge)
     # ------------------------------------------------------------------
 
-    async def execute_async(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
+    async def execute_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
         loop = asyncio.get_event_loop()
         prepared = self._prepare(stmt)
-        future = self._session.execute_async(prepared, params)
+        if consistency is not None:
+            from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
+
+            bound = prepared.bind(params)
+            bound.consistency_level = getattr(ConsistencyLevel, consistency)
+            future = self._session.execute_async(bound, timeout=timeout)
+        else:
+            future = self._session.execute_async(prepared, params, timeout=timeout)
 
         result_future: asyncio.Future[Any] = loop.create_future()
 

@@ -188,3 +188,71 @@ async def test_if_exists_preserved_through_chaining(registered_mock_driver):
 async def test_if_not_exists_preserved_through_chaining(registered_mock_driver):
     qs = QuerySet(AsyncItem).if_not_exists().filter(name="Widget").limit(5)
     assert qs._if_not_exists_val is True
+
+
+# ------------------------------------------------------------------
+# Phase 5: Query Execution Options (async)
+# ------------------------------------------------------------------
+
+
+def test_ttl_chain(registered_mock_driver):
+    qs = QuerySet(AsyncItem).ttl(300)
+    assert qs._ttl_val == 300
+
+
+def test_timestamp_chain(registered_mock_driver):
+    qs = QuerySet(AsyncItem).timestamp(1234567890)
+    assert qs._timestamp_val == 1234567890
+
+
+def test_consistency_chain(registered_mock_driver):
+    qs = QuerySet(AsyncItem).consistency("LOCAL_QUORUM")
+    assert qs._consistency_val == "LOCAL_QUORUM"
+
+
+def test_timeout_chain(registered_mock_driver):
+    qs = QuerySet(AsyncItem).timeout(5.0)
+    assert qs._timeout_val == 5.0
+
+
+def test_using_chain(registered_mock_driver):
+    qs = QuerySet(AsyncItem).using(
+        ttl=60, timestamp=1234567890, consistency="ONE", timeout=10.0
+    )
+    assert qs._ttl_val == 60
+    assert qs._timestamp_val == 1234567890
+    assert qs._consistency_val == "ONE"
+    assert qs._timeout_val == 10.0
+
+
+async def test_consistency_passed_to_driver(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).consistency("LOCAL_QUORUM").all()
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+async def test_timeout_passed_to_driver(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).timeout(5.0).all()
+    assert registered_mock_driver.last_timeout == 5.0
+
+
+async def test_timestamp_in_delete_cql(registered_mock_driver):
+    await QuerySet(AsyncItem).filter(name="old").timestamp(1234567890).delete()
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+async def test_chaining_preserves_execution_options(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    qs = (
+        QuerySet(AsyncItem)
+        .filter(rating__gte=3)
+        .consistency("LOCAL_QUORUM")
+        .timeout(5.0)
+        .timestamp(1234567890)
+        .limit(10)
+    )
+    await qs.all()
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+    assert registered_mock_driver.last_timeout == 5.0

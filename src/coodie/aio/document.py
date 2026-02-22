@@ -81,7 +81,13 @@ class Document(BaseModel):
     # Write operations (all async)
     # ------------------------------------------------------------------
 
-    async def save(self, ttl: int | None = None) -> None:
+    async def save(
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         """Insert (upsert) this document."""
         data = self.model_dump(exclude_none=False)
         cql, params = build_insert(
@@ -89,10 +95,19 @@ class Document(BaseModel):
             self.__class__._get_keyspace(),
             data,
             ttl=ttl,
+            timestamp=timestamp,
         )
-        await self.__class__._get_driver().execute_async(cql, params)
+        await self.__class__._get_driver().execute_async(
+            cql, params, consistency=consistency, timeout=timeout
+        )
 
-    async def insert(self, ttl: int | None = None) -> None:
+    async def insert(
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         """Insert IF NOT EXISTS (create-only)."""
         data = self.model_dump(exclude_none=False)
         cql, params = build_insert(
@@ -101,15 +116,25 @@ class Document(BaseModel):
             data,
             ttl=ttl,
             if_not_exists=True,
+            timestamp=timestamp,
         )
-        await self.__class__._get_driver().execute_async(cql, params)
+        await self.__class__._get_driver().execute_async(
+            cql, params, consistency=consistency, timeout=timeout
+        )
 
-    async def delete(self, if_exists: bool = False) -> LWTResult | None:
+    async def delete(
+        self,
+        if_exists: bool = False,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> LWTResult | None:
         """Delete this document by its primary key.
 
         When *if_exists* is ``True`` the generated CQL includes ``IF EXISTS``
         and a :class:`~coodie.results.LWTResult` is returned.
         """
+
         schema = self.__class__._schema()
         pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
         where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
@@ -118,8 +143,11 @@ class Document(BaseModel):
             self.__class__._get_keyspace(),
             where,
             if_exists=if_exists,
+            timestamp=timestamp,
         )
-        rows = await self.__class__._get_driver().execute_async(cql, params)
+        rows = await self.__class__._get_driver().execute_async(
+            cql, params, consistency=consistency, timeout=timeout
+        )
         if if_exists:
             return _parse_lwt_result(rows)
         return None
@@ -211,13 +239,25 @@ class CounterDocument(Document):
     ``save()`` and ``insert()`` are forbidden.
     """
 
-    async def save(self, ttl: int | None = None) -> None:  # noqa: ARG002
+    async def save(  # noqa: ARG002
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         raise InvalidQueryError(
             "Counter tables do not support save(). "
             "Use increment() or decrement() instead."
         )
 
-    async def insert(self, ttl: int | None = None) -> None:  # noqa: ARG002
+    async def insert(  # noqa: ARG002
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         raise InvalidQueryError(
             "Counter tables do not support insert(). "
             "Use increment() or decrement() instead."

@@ -33,6 +33,10 @@ class QuerySet:
         allow_filtering_val: bool = False,
         if_not_exists_val: bool = False,
         if_exists_val: bool = False,
+        ttl_val: int | None = None,
+        timestamp_val: int | None = None,
+        consistency_val: str | None = None,
+        timeout_val: float | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -41,6 +45,30 @@ class QuerySet:
         self._allow_filtering_val = allow_filtering_val
         self._if_not_exists_val = if_not_exists_val
         self._if_exists_val = if_exists_val
+        self._ttl_val = ttl_val
+        self._timestamp_val = timestamp_val
+        self._consistency_val = consistency_val
+        self._timeout_val = timeout_val
+
+    # ------------------------------------------------------------------
+    # Internal: clone with overrides
+    # ------------------------------------------------------------------
+
+    def _clone(self, **overrides: Any) -> QuerySet:
+        defaults = dict(
+            where=self._where,
+            limit_val=self._limit_val,
+            order_by_val=self._order_by_val,
+            allow_filtering_val=self._allow_filtering_val,
+            if_not_exists_val=self._if_not_exists_val,
+            if_exists_val=self._if_exists_val,
+            ttl_val=self._ttl_val,
+            timestamp_val=self._timestamp_val,
+            consistency_val=self._consistency_val,
+            timeout_val=self._timeout_val,
+        )
+        defaults.update(overrides)
+        return QuerySet(self._doc_cls, **defaults)
 
     # ------------------------------------------------------------------
     # Chainable builder methods
@@ -48,72 +76,53 @@ class QuerySet:
 
     def filter(self, **kwargs: Any) -> QuerySet:
         triples = parse_filter_kwargs(kwargs)
-        return QuerySet(
-            self._doc_cls,
-            where=self._where + triples,
-            limit_val=self._limit_val,
-            order_by_val=self._order_by_val,
-            allow_filtering_val=self._allow_filtering_val,
-            if_not_exists_val=self._if_not_exists_val,
-            if_exists_val=self._if_exists_val,
-        )
+        return self._clone(where=self._where + triples)
 
     def limit(self, n: int) -> QuerySet:
-        return QuerySet(
-            self._doc_cls,
-            where=self._where,
-            limit_val=n,
-            order_by_val=self._order_by_val,
-            allow_filtering_val=self._allow_filtering_val,
-            if_not_exists_val=self._if_not_exists_val,
-            if_exists_val=self._if_exists_val,
-        )
+        return self._clone(limit_val=n)
 
     def order_by(self, *cols: str) -> QuerySet:
-        return QuerySet(
-            self._doc_cls,
-            where=self._where,
-            limit_val=self._limit_val,
-            order_by_val=list(cols),
-            allow_filtering_val=self._allow_filtering_val,
-            if_not_exists_val=self._if_not_exists_val,
-            if_exists_val=self._if_exists_val,
-        )
+        return self._clone(order_by_val=list(cols))
 
     def allow_filtering(self) -> QuerySet:
-        return QuerySet(
-            self._doc_cls,
-            where=self._where,
-            limit_val=self._limit_val,
-            order_by_val=self._order_by_val,
-            allow_filtering_val=True,
-            if_not_exists_val=self._if_not_exists_val,
-            if_exists_val=self._if_exists_val,
-        )
+        return self._clone(allow_filtering_val=True)
 
     def if_not_exists(self) -> QuerySet:
-        """Chain modifier — adds ``IF NOT EXISTS`` to INSERT statements."""
-        return QuerySet(
-            self._doc_cls,
-            where=self._where,
-            limit_val=self._limit_val,
-            order_by_val=self._order_by_val,
-            allow_filtering_val=self._allow_filtering_val,
-            if_not_exists_val=True,
-            if_exists_val=self._if_exists_val,
-        )
+        return self._clone(if_not_exists_val=True)
 
     def if_exists(self) -> QuerySet:
-        """Chain modifier — adds ``IF EXISTS`` to DELETE statements."""
-        return QuerySet(
-            self._doc_cls,
-            where=self._where,
-            limit_val=self._limit_val,
-            order_by_val=self._order_by_val,
-            allow_filtering_val=self._allow_filtering_val,
-            if_not_exists_val=self._if_not_exists_val,
-            if_exists_val=True,
-        )
+        return self._clone(if_exists_val=True)
+
+    def ttl(self, seconds: int) -> QuerySet:
+        return self._clone(ttl_val=seconds)
+
+    def timestamp(self, ts: int) -> QuerySet:
+        return self._clone(timestamp_val=ts)
+
+    def consistency(self, level: str) -> QuerySet:
+        return self._clone(consistency_val=level)
+
+    def timeout(self, seconds: float) -> QuerySet:
+        return self._clone(timeout_val=seconds)
+
+    def using(
+        self,
+        *,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> QuerySet:
+        overrides: dict[str, Any] = {}
+        if ttl is not None:
+            overrides["ttl_val"] = ttl
+        if timestamp is not None:
+            overrides["timestamp_val"] = timestamp
+        if consistency is not None:
+            overrides["consistency_val"] = consistency
+        if timeout is not None:
+            overrides["timeout_val"] = timeout
+        return self._clone(**overrides)
 
     # ------------------------------------------------------------------
     # Terminal methods (all async)
@@ -151,7 +160,9 @@ class QuerySet:
             order_by=self._order_by_val or None,
             allow_filtering=self._allow_filtering_val,
         )
-        rows = await self._get_driver().execute_async(cql, params)
+        rows = await self._get_driver().execute_async(
+            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
+        )
         return [
             self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
             for row in rows
@@ -168,7 +179,9 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        rows = await self._get_driver().execute_async(cql, params)
+        rows = await self._get_driver().execute_async(
+            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
+        )
         if rows:
             row = rows[0]
             return int(next(iter(row.values())))
@@ -179,9 +192,12 @@ class QuerySet:
             self._table(),
             self._keyspace(),
             self._where,
+            timestamp=self._timestamp_val,
             if_exists=self._if_exists_val,
         )
-        rows = await self._get_driver().execute_async(cql, params)
+        rows = await self._get_driver().execute_async(
+            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
+        )
         if self._if_exists_val:
             return _parse_lwt_result(rows)
         return None

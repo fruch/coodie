@@ -11,6 +11,8 @@ class MockDriver:
     def __init__(self) -> None:
         self.executed: list[tuple[str, list[Any]]] = []
         self._return_rows: list[list[dict[str, Any]]] = []
+        self.last_consistency: str | None = None
+        self.last_timeout: float | None = None
 
     def set_return_rows(self, rows: list[dict[str, Any]]) -> None:
         self._return_rows.append(rows)
@@ -20,12 +22,28 @@ class MockDriver:
             return self._return_rows.pop(0)
         return []
 
-    def execute(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
+    def execute(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
         self.executed.append((stmt, params))
+        self.last_consistency = consistency
+        self.last_timeout = timeout
         return self._pop_rows()
 
-    async def execute_async(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
+    async def execute_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
         self.executed.append((stmt, params))
+        self.last_consistency = consistency
+        self.last_timeout = timeout
         return self._pop_rows()
 
     def sync_table(self, table: str, keyspace: str, cols: Any) -> None:

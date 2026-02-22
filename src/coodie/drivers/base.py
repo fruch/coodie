@@ -12,7 +12,13 @@ class AbstractDriver(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def execute(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
+    def execute(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
         """Execute *stmt* with *params*; return rows as a list of dicts."""
 
     @abstractmethod
@@ -33,7 +39,13 @@ class AbstractDriver(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def execute_async(self, stmt: str, params: list[Any]) -> list[dict[str, Any]]:
+    async def execute_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
         """Async version of :meth:`execute`."""
 
     @abstractmethod

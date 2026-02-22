@@ -273,3 +273,60 @@ async def test_delete_without_if_exists_returns_none(registered_mock_driver):
     p = AsyncProduct(name="Widget")
     result = await p.delete()
     assert result is None
+
+
+# ------------------------------------------------------------------
+# Phase 5: Query Execution Options on async Document
+# ------------------------------------------------------------------
+
+
+async def test_save_with_timestamp(registered_mock_driver):
+    p = AsyncProduct(name="Gadget", price=19.99)
+    await p.save(timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+async def test_save_with_ttl_and_timestamp(registered_mock_driver):
+    p = AsyncProduct(name="Gadget", price=19.99)
+    await p.save(ttl=60, timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TTL 60 AND TIMESTAMP 1234567890" in stmt
+
+
+async def test_save_with_consistency(registered_mock_driver):
+    p = AsyncProduct(name="Gadget", price=19.99)
+    await p.save(consistency="LOCAL_QUORUM")
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+async def test_save_with_timeout(registered_mock_driver):
+    p = AsyncProduct(name="Gadget", price=19.99)
+    await p.save(timeout=5.0)
+    assert registered_mock_driver.last_timeout == 5.0
+
+
+async def test_insert_with_timestamp(registered_mock_driver):
+    p = AsyncProduct(name="Gadget")
+    await p.insert(timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+async def test_insert_with_consistency(registered_mock_driver):
+    p = AsyncProduct(name="Gadget")
+    await p.insert(consistency="LOCAL_QUORUM")
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+async def test_delete_with_timestamp(registered_mock_driver):
+    p = AsyncProduct(name="Gadget")
+    await p.delete(timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+async def test_delete_with_consistency(registered_mock_driver):
+    p = AsyncProduct(name="Gadget")
+    await p.delete(consistency="LOCAL_QUORUM")
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"

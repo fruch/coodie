@@ -326,3 +326,60 @@ def test_delete_without_if_exists_returns_none(registered_mock_driver):
     p = Product(name="Widget")
     result = p.delete()
     assert result is None
+
+
+# ------------------------------------------------------------------
+# Phase 5: Query Execution Options on Document
+# ------------------------------------------------------------------
+
+
+def test_save_with_timestamp(registered_mock_driver):
+    p = Product(name="Widget", price=9.99)
+    p.save(timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+def test_save_with_ttl_and_timestamp(registered_mock_driver):
+    p = Product(name="Widget", price=9.99)
+    p.save(ttl=60, timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TTL 60 AND TIMESTAMP 1234567890" in stmt
+
+
+def test_save_with_consistency(registered_mock_driver):
+    p = Product(name="Widget", price=9.99)
+    p.save(consistency="LOCAL_QUORUM")
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+def test_save_with_timeout(registered_mock_driver):
+    p = Product(name="Widget", price=9.99)
+    p.save(timeout=5.0)
+    assert registered_mock_driver.last_timeout == 5.0
+
+
+def test_insert_with_timestamp(registered_mock_driver):
+    p = Product(name="Widget")
+    p.insert(timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+def test_insert_with_consistency(registered_mock_driver):
+    p = Product(name="Widget")
+    p.insert(consistency="LOCAL_QUORUM")
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+def test_delete_with_timestamp(registered_mock_driver):
+    p = Product(name="Widget")
+    p.delete(timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+def test_delete_with_consistency(registered_mock_driver):
+    p = Product(name="Widget")
+    p.delete(consistency="LOCAL_QUORUM")
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"

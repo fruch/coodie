@@ -390,3 +390,50 @@ def test_build_update_mixed_set_and_collection_ops():
     assert '"name" = ?' in cql
     assert '"tags" = "tags" + ?' in cql
     assert params == ["Y", {"new"}, "1"]
+
+
+# ------------------------------------------------------------------
+# Phase 5: timestamp parameter tests
+# ------------------------------------------------------------------
+
+
+def test_build_insert_timestamp():
+    cql, _ = build_insert("products", "ks", {"id": "1"}, timestamp=1234567890)
+    assert "USING TIMESTAMP 1234567890" in cql
+
+
+def test_build_insert_ttl_and_timestamp():
+    cql, _ = build_insert("products", "ks", {"id": "1"}, ttl=60, timestamp=1234567890)
+    assert "USING TTL 60 AND TIMESTAMP 1234567890" in cql
+
+
+def test_build_update_timestamp():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        timestamp=1234567890,
+    )
+    assert "USING TIMESTAMP 1234567890" in cql
+    assert params == ["Y", "1"]
+
+
+def test_build_update_ttl_and_timestamp():
+    cql, _ = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        ttl=60,
+        timestamp=1234567890,
+    )
+    assert "USING TTL 60 AND TIMESTAMP 1234567890" in cql
+
+
+def test_build_delete_timestamp():
+    cql, params = build_delete(
+        "products", "ks", [("id", "=", "1")], timestamp=1234567890
+    )
+    assert "USING TIMESTAMP 1234567890" in cql
+    assert params == ["1"]

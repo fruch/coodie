@@ -39,3 +39,44 @@ async def test_mock_driver_execute_async(mock_driver):
 def test_abstract_driver_cannot_instantiate():
     with pytest.raises(TypeError):
         AbstractDriver()
+
+
+# ------------------------------------------------------------------
+# Phase 5: consistency and timeout parameters
+# ------------------------------------------------------------------
+
+
+def test_mock_driver_execute_with_consistency(mock_driver):
+    mock_driver.set_return_rows([{"id": "1"}])
+    mock_driver.execute("SELECT * FROM ks.t", [], consistency="LOCAL_QUORUM")
+    assert mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+def test_mock_driver_execute_with_timeout(mock_driver):
+    mock_driver.set_return_rows([{"id": "1"}])
+    mock_driver.execute("SELECT * FROM ks.t", [], timeout=5.0)
+    assert mock_driver.last_timeout == 5.0
+
+
+async def test_mock_driver_execute_async_with_consistency(mock_driver):
+    mock_driver.set_return_rows([{"id": "1"}])
+    await mock_driver.execute_async(
+        "SELECT * FROM ks.t", [], consistency="LOCAL_QUORUM"
+    )
+    assert mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+async def test_mock_driver_execute_async_with_timeout(mock_driver):
+    mock_driver.set_return_rows([{"id": "1"}])
+    await mock_driver.execute_async("SELECT * FROM ks.t", [], timeout=5.0)
+    assert mock_driver.last_timeout == 5.0
+
+
+def test_mock_driver_defaults_none_consistency(mock_driver):
+    mock_driver.execute("SELECT * FROM ks.t", [])
+    assert mock_driver.last_consistency is None
+
+
+def test_mock_driver_defaults_none_timeout(mock_driver):
+    mock_driver.execute("SELECT * FROM ks.t", [])
+    assert mock_driver.last_timeout is None

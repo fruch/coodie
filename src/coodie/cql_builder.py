@@ -185,12 +185,27 @@ def build_count(
     return cql, params
 
 
+def _build_using_clause(
+    ttl: int | None = None,
+    timestamp: int | None = None,
+) -> str:
+    parts: list[str] = []
+    if ttl is not None:
+        parts.append(f"TTL {ttl}")
+    if timestamp is not None:
+        parts.append(f"TIMESTAMP {timestamp}")
+    if not parts:
+        return ""
+    return " USING " + " AND ".join(parts)
+
+
 def build_insert(
     table: str,
     keyspace: str,
     data: dict[str, Any],
     ttl: int | None = None,
     if_not_exists: bool = False,
+    timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
     cols = list(data.keys())
     vals = list(data.values())
@@ -199,8 +214,7 @@ def build_insert(
     cql = f"INSERT INTO {keyspace}.{table} ({cols_str}) VALUES ({placeholders})"
     if if_not_exists:
         cql += " IF NOT EXISTS"
-    if ttl is not None:
-        cql += f" USING TTL {ttl}"
+    cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
     return cql, vals
 
 
@@ -235,6 +249,7 @@ def build_update(
     if_conditions: dict[str, Any] | None = None,
     collection_ops: list[tuple[str, str, Any]] | None = None,
     if_exists: bool = False,
+    timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
     set_parts = [f'"{k}" = ?' for k in set_data]
     params: list[Any] = list(set_data.values())
@@ -252,8 +267,7 @@ def build_update(
                 params.append(value)
 
     cql = f"UPDATE {keyspace}.{table}"
-    if ttl is not None:
-        cql += f" USING TTL {ttl}"
+    cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
     cql += " SET " + ", ".join(set_parts)
 
     clause, where_params = build_where_clause(where)
@@ -276,11 +290,13 @@ def build_delete(
     where: list[tuple[str, str, Any]],
     columns: list[str] | None = None,
     if_exists: bool = False,
+    timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else ""
     cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace(
         "DELETE  FROM", "DELETE FROM"
     )
+    cql += _build_using_clause(timestamp=timestamp)
 
     clause, params = build_where_clause(where)
     cql += " " + clause

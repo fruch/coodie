@@ -63,9 +63,9 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
             base_type = args[0]
             metadata = list(args[1:])
 
-        # Determine CQL type
+        # Determine CQL type — pass full annotation so markers are visible
         try:
-            cql_type = python_type_to_cql_type_str(base_type)
+            cql_type = python_type_to_cql_type_str(annotation)
         except Exception:
             continue
 

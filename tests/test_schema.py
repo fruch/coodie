@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from datetime import time as dt_time
 from typing import Annotated, Optional
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from coodie.fields import ClusteringKey, Indexed, PrimaryKey
+from coodie.fields import BigInt, ClusteringKey, Frozen, Indexed, PrimaryKey, TimeUUID
 from coodie.schema import ColumnDefinition, build_schema
 
 
@@ -92,3 +93,42 @@ def test_column_definition_defaults():
     assert col.clustering_key is False
     assert col.index is False
     assert col.required is True
+
+
+# ---- Phase 1: Schema tests for extended types ----
+
+
+class ExtendedTypesDoc(BaseModel):
+    id: Annotated[UUID, PrimaryKey()]
+    big_val: Annotated[int, BigInt()]
+    event_id: Annotated[UUID, TimeUUID()]
+    event_time: dt_time
+    tags: Annotated[list[str], Frozen()]
+
+    class Settings:
+        name = "extended_docs"
+        keyspace = "test_ks"
+
+
+def test_build_schema_bigint_marker():
+    schema = build_schema(ExtendedTypesDoc)
+    col = next(c for c in schema if c.name == "big_val")
+    assert col.cql_type == "bigint"
+
+
+def test_build_schema_timeuuid_marker():
+    schema = build_schema(ExtendedTypesDoc)
+    col = next(c for c in schema if c.name == "event_id")
+    assert col.cql_type == "timeuuid"
+
+
+def test_build_schema_time_scalar():
+    schema = build_schema(ExtendedTypesDoc)
+    col = next(c for c in schema if c.name == "event_time")
+    assert col.cql_type == "time"
+
+
+def test_build_schema_frozen_collection():
+    schema = build_schema(ExtendedTypesDoc)
+    col = next(c for c in schema if c.name == "tags")
+    assert col.cql_type == "frozen<list<text>>"

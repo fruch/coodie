@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time as dt_time
 from decimal import Decimal
 from ipaddress import IPv4Address
 from typing import Annotated, Optional
@@ -9,7 +9,18 @@ from uuid import UUID
 import pytest
 
 from coodie.exceptions import InvalidQueryError
-from coodie.fields import PrimaryKey
+from coodie.fields import (
+    Ascii,
+    BigInt,
+    Double,
+    Frozen,
+    PrimaryKey,
+    SmallInt,
+    Time,
+    TimeUUID,
+    TinyInt,
+    VarInt,
+)
 from coodie.types import python_type_to_cql_type_str, coerce_row_none_collections
 
 
@@ -148,3 +159,79 @@ def test_coerce_optional_collection():
     row: dict = {"tags": None}
     result = coerce_row_none_collections(_OptionalListDoc, row)
     assert result["tags"] == []
+
+
+# ---- Phase 1: Extended type system tests ----
+
+
+def test_time_to_time():
+    assert python_type_to_cql_type_str(dt_time) == "time"
+
+
+def test_bigint_marker():
+    assert python_type_to_cql_type_str(Annotated[int, BigInt()]) == "bigint"
+
+
+def test_smallint_marker():
+    assert python_type_to_cql_type_str(Annotated[int, SmallInt()]) == "smallint"
+
+
+def test_tinyint_marker():
+    assert python_type_to_cql_type_str(Annotated[int, TinyInt()]) == "tinyint"
+
+
+def test_varint_marker():
+    assert python_type_to_cql_type_str(Annotated[int, VarInt()]) == "varint"
+
+
+def test_double_marker():
+    assert python_type_to_cql_type_str(Annotated[float, Double()]) == "double"
+
+
+def test_ascii_marker():
+    assert python_type_to_cql_type_str(Annotated[str, Ascii()]) == "ascii"
+
+
+def test_timeuuid_marker():
+    assert python_type_to_cql_type_str(Annotated[UUID, TimeUUID()]) == "timeuuid"
+
+
+def test_time_marker():
+    assert python_type_to_cql_type_str(Annotated[dt_time, Time()]) == "time"
+
+
+def test_frozen_list():
+    assert python_type_to_cql_type_str(Annotated[list[str], Frozen()]) == "frozen<list<text>>"
+
+
+def test_frozen_set():
+    assert python_type_to_cql_type_str(Annotated[set[int], Frozen()]) == "frozen<set<int>>"
+
+
+def test_frozen_map():
+    assert (
+        python_type_to_cql_type_str(Annotated[dict[str, int], Frozen()])
+        == "frozen<map<text, int>>"
+    )
+
+
+def test_frozen_tuple():
+    assert (
+        python_type_to_cql_type_str(Annotated[tuple[str, int], Frozen()])
+        == "frozen<tuple<text, int>>"
+    )
+
+
+def test_marker_with_primary_key():
+    """Marker should work alongside other annotations like PrimaryKey."""
+    assert (
+        python_type_to_cql_type_str(Annotated[int, PrimaryKey(), BigInt()]) == "bigint"
+    )
+
+
+def test_frozen_with_marker():
+    """Frozen combined with a type marker should wrap the marker's CQL type."""
+    assert (
+        python_type_to_cql_type_str(Annotated[UUID, Frozen(), TimeUUID()])
+        == "frozen<timeuuid>"
+    )

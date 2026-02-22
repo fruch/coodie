@@ -613,6 +613,115 @@ class TestAsyncIntegration:
 
 
 # ===========================================================================
+# Raw CQL integration tests
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestSyncRawCQL:
+    """Test execute_raw (sync) against a real ScyllaDB container."""
+
+    def test_raw_select(self, coodie_driver: object) -> None:
+        """Raw SELECT returns rows as list of dicts."""
+        from coodie.sync import execute_raw
+
+        SyncProduct.sync_table()
+        pid = uuid4()
+        SyncProduct(id=pid, name="RawSync", brand="Test", price=1.0).save()
+
+        rows = execute_raw(
+            "SELECT name, brand FROM test_ks.it_sync_products WHERE id = ?", [pid]
+        )
+        assert len(rows) == 1
+        assert rows[0]["name"] == "RawSync"
+        assert rows[0]["brand"] == "Test"
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_raw_insert_and_select(self, coodie_driver: object) -> None:
+        """Raw INSERT followed by raw SELECT round-trips data."""
+        from coodie.sync import execute_raw
+
+        SyncProduct.sync_table()
+        pid = uuid4()
+        execute_raw(
+            "INSERT INTO test_ks.it_sync_products (id, name, brand, category, price) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [pid, "RawInserted", "RawBrand", "general", 2.5],
+        )
+
+        rows = execute_raw(
+            "SELECT name FROM test_ks.it_sync_products WHERE id = ?", [pid]
+        )
+        assert len(rows) == 1
+        assert rows[0]["name"] == "RawInserted"
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_raw_empty_result(self, coodie_driver: object) -> None:
+        """Raw SELECT returning no rows gives an empty list."""
+        from coodie.sync import execute_raw
+
+        SyncProduct.sync_table()
+        rows = execute_raw(
+            "SELECT * FROM test_ks.it_sync_products WHERE id = ?", [uuid4()]
+        )
+        assert rows == []
+
+
+@pytest.mark.integration
+class TestAsyncRawCQL:
+    """Test execute_raw (async) against a real ScyllaDB container."""
+
+    async def test_raw_select(self, coodie_driver: object) -> None:
+        """Raw async SELECT returns rows as list of dicts."""
+        from coodie.aio import execute_raw
+
+        await AsyncProduct.sync_table()
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="RawAsync", brand="Test", price=1.0).save()
+
+        rows = await execute_raw(
+            "SELECT name, brand FROM test_ks.it_async_products WHERE id = ?", [pid]
+        )
+        assert len(rows) == 1
+        assert rows[0]["name"] == "RawAsync"
+        assert rows[0]["brand"] == "Test"
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_raw_insert_and_select(self, coodie_driver: object) -> None:
+        """Raw async INSERT followed by raw SELECT round-trips data."""
+        from coodie.aio import execute_raw
+
+        await AsyncProduct.sync_table()
+        pid = uuid4()
+        await execute_raw(
+            "INSERT INTO test_ks.it_async_products (id, name, brand, category, price) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [pid, "RawInserted", "RawBrand", "general", 2.5],
+        )
+
+        rows = await execute_raw(
+            "SELECT name FROM test_ks.it_async_products WHERE id = ?", [pid]
+        )
+        assert len(rows) == 1
+        assert rows[0]["name"] == "RawInserted"
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_raw_empty_result(self, coodie_driver: object) -> None:
+        """Raw async SELECT returning no rows gives an empty list."""
+        from coodie.aio import execute_raw
+
+        await AsyncProduct.sync_table()
+        rows = await execute_raw(
+            "SELECT * FROM test_ks.it_async_products WHERE id = ?", [uuid4()]
+        )
+        assert rows == []
+
+
+# ===========================================================================
 # Additional models for broader type / feature coverage
 # ===========================================================================
 

@@ -118,7 +118,7 @@ Legend:
 | `Model.consistency(level)` on instance operations | — | ❌ |
 | `Model.if_not_exists()` on save | `Document.insert()` | ✅ |
 | `Model.if_exists()` on update/delete | — | ❌ |
-| `Model.batch(batch_query)` | — | ❌ no per-model batch context |
+| `Model.batch(batch_query)` | `doc.save(batch=batch)` / `doc.delete(batch=batch)` | ✅ |
 | `Model.timestamp(ts)` on write ops | — | ❌ |
 
 ### 1.3 QuerySet / Query API
@@ -198,13 +198,13 @@ that use custom types.
 
 | cqlengine Feature | coodie Equivalent | Status |
 |---|---|---|
-| `BatchQuery()` context manager | `build_batch()` in `cql_builder` | 🔧 CQL generation exists; no high-level API |
-| `Model.batch(batch_query).create()` | — | ❌ |
-| `Model.batch(batch_query).save()` | — | ❌ |
-| `Model.batch(batch_query).delete()` | — | ❌ |
-| Logged batch | `build_batch(logged=True)` | 🔧 |
-| Unlogged batch | `build_batch(logged=False)` | 🔧 |
-| Counter batch | — | ❌ |
+| `BatchQuery()` context manager | `BatchQuery` / `AsyncBatchQuery` in `coodie.batch` | ✅ |
+| `Model.batch(batch_query).create()` | `doc.insert(batch=batch)` | ✅ |
+| `Model.batch(batch_query).save()` | `doc.save(batch=batch)` | ✅ |
+| `Model.batch(batch_query).delete()` | `doc.delete(batch=batch)` | ✅ |
+| Logged batch | `BatchQuery(logged=True)` | ✅ |
+| Unlogged batch | `BatchQuery(logged=False)` | ✅ |
+| Counter batch | `BatchQuery(batch_type="COUNTER")` | ✅ |
 
 ### 1.7 Connection / Session Management
 

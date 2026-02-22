@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -18,6 +18,9 @@ from coodie.exceptions import (
     InvalidQueryError,
 )
 from coodie.results import LWTResult
+
+if TYPE_CHECKING:
+    from coodie.batch import BatchQuery
 from coodie.schema import build_schema, ColumnDefinition
 from coodie.sync.query import QuerySet, _snake_case
 
@@ -85,6 +88,7 @@ class Document(BaseModel):
         timestamp: int | None = None,
         consistency: str | None = None,
         timeout: float | None = None,
+        batch: BatchQuery | None = None,
     ) -> None:
         """Insert (upsert) this document."""
         data = self.model_dump(exclude_none=False)
@@ -95,9 +99,12 @@ class Document(BaseModel):
             ttl=ttl,
             timestamp=timestamp,
         )
-        self.__class__._get_driver().execute(
-            cql, params, consistency=consistency, timeout=timeout
-        )
+        if batch is not None:
+            batch.add(cql, params)
+        else:
+            self.__class__._get_driver().execute(
+                cql, params, consistency=consistency, timeout=timeout
+            )
 
     def insert(
         self,
@@ -105,6 +112,7 @@ class Document(BaseModel):
         timestamp: int | None = None,
         consistency: str | None = None,
         timeout: float | None = None,
+        batch: BatchQuery | None = None,
     ) -> None:
         """Insert IF NOT EXISTS (create-only)."""
         data = self.model_dump(exclude_none=False)
@@ -116,9 +124,12 @@ class Document(BaseModel):
             if_not_exists=True,
             timestamp=timestamp,
         )
-        self.__class__._get_driver().execute(
-            cql, params, consistency=consistency, timeout=timeout
-        )
+        if batch is not None:
+            batch.add(cql, params)
+        else:
+            self.__class__._get_driver().execute(
+                cql, params, consistency=consistency, timeout=timeout
+            )
 
     def delete(
         self,
@@ -126,6 +137,7 @@ class Document(BaseModel):
         timestamp: int | None = None,
         consistency: str | None = None,
         timeout: float | None = None,
+        batch: BatchQuery | None = None,
     ) -> LWTResult | None:
         """Delete this document by its primary key.
 
@@ -142,6 +154,10 @@ class Document(BaseModel):
             if_exists=if_exists,
             timestamp=timestamp,
         )
+
+        if batch is not None:
+            batch.add(cql, params)
+            return None
 
         rows = self.__class__._get_driver().execute(
             cql, params, consistency=consistency, timeout=timeout

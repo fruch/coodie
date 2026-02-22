@@ -4,6 +4,7 @@ from typing import Any
 
 from coodie.sync.document import Document, CounterDocument
 from coodie.sync.query import QuerySet
+from coodie.batch import BatchQuery
 from coodie.drivers import init_coodie
 
 
@@ -23,4 +24,11 @@ def execute_raw(stmt: str, params: list[Any] | None = None) -> list[dict[str, An
     return get_driver().execute(stmt, params or [])
 
 
-__all__ = ["Document", "CounterDocument", "QuerySet", "init_coodie", "execute_raw"]
+__all__ = [
+    "Document",
+    "CounterDocument",
+    "QuerySet",
+    "BatchQuery",
+    "init_coodie",
+    "execute_raw",
+]

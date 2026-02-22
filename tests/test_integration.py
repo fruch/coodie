@@ -10,7 +10,7 @@ import asyncio
 import decimal
 import ipaddress
 import time
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time as dt_time, timezone
 from typing import Annotated, Dict, List, Optional, Set
 from uuid import UUID, uuid4
 
@@ -20,7 +20,20 @@ from pydantic import Field, field_validator
 from coodie.aio.document import Document as AsyncDocument
 from coodie.drivers import _registry, init_coodie
 from coodie.exceptions import DocumentNotFound, MultipleDocumentsFound
-from coodie.fields import ClusteringKey, Indexed, PrimaryKey
+from coodie.fields import (
+    Ascii,
+    BigInt,
+    ClusteringKey,
+    Double,
+    Frozen,
+    Indexed,
+    PrimaryKey,
+    SmallInt,
+    Time,
+    TimeUUID,
+    TinyInt,
+    VarInt,
+)
 from coodie.sync.document import Document as SyncDocument
 
 
@@ -711,6 +724,109 @@ class AsyncEvent(AsyncDocument):
         keyspace = "test_ks"
 
 
+# Microsecond constants for converting CQL time (nanoseconds) → datetime.time
+_US_PER_HOUR = 3_600_000_000
+_US_PER_MINUTE = 60_000_000
+_US_PER_SECOND = 1_000_000
+
+
+def _coerce_cql_time(v: object) -> object:
+    """Coerce cassandra-driver's nanosecond ``int`` for CQL ``time`` to ``datetime.time``.
+
+    The driver returns CQL ``time`` values as nanoseconds since midnight.
+    We divide by 1000 to obtain microseconds, then decompose into h/m/s/µs.
+    """
+    if isinstance(v, int):
+        total_us = v // 1000  # nanoseconds → microseconds
+        hours, remainder = divmod(total_us, _US_PER_HOUR)
+        minutes, remainder = divmod(remainder, _US_PER_MINUTE)
+        seconds, microseconds = divmod(remainder, _US_PER_SECOND)
+        return dt_time(hours, minutes, seconds, microseconds)
+    return v
+
+
+class SyncExtendedTypes(SyncDocument):
+    """One column per Phase-1 extended CQL scalar type + frozen collections."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    big_val: Annotated[int, BigInt()] = 0
+    small_val: Annotated[int, SmallInt()] = 0
+    tiny_val: Annotated[int, TinyInt()] = 0
+    var_val: Annotated[int, VarInt()] = 0
+    dbl_val: Annotated[float, Double()] = 0.0
+    ascii_val: Annotated[str, Ascii()] = ""
+    timeuuid_val: Annotated[Optional[UUID], TimeUUID()] = None
+    time_val: Optional[dt_time] = None
+    frozen_list: Annotated[List[str], Frozen()] = Field(default_factory=list)
+    frozen_set: Annotated[Set[int], Frozen()] = Field(default_factory=set)
+    frozen_map: Annotated[Dict[str, int], Frozen()] = Field(default_factory=dict)
+
+    @field_validator("frozen_list", mode="before")
+    @classmethod
+    def _coerce_flist(cls, v: object) -> object:
+        return v if v is not None else []
+
+    @field_validator("frozen_set", mode="before")
+    @classmethod
+    def _coerce_fset(cls, v: object) -> object:
+        return v if v is not None else set()
+
+    @field_validator("frozen_map", mode="before")
+    @classmethod
+    def _coerce_fmap(cls, v: object) -> object:
+        return v if v is not None else {}
+
+    @field_validator("time_val", mode="before")
+    @classmethod
+    def _coerce_time(cls, v: object) -> object:
+        return _coerce_cql_time(v)
+
+    class Settings:
+        name = "it_sync_extended_types"
+        keyspace = "test_ks"
+
+
+class AsyncExtendedTypes(AsyncDocument):
+    """Async counterpart of SyncExtendedTypes."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    big_val: Annotated[int, BigInt()] = 0
+    small_val: Annotated[int, SmallInt()] = 0
+    tiny_val: Annotated[int, TinyInt()] = 0
+    var_val: Annotated[int, VarInt()] = 0
+    dbl_val: Annotated[float, Double()] = 0.0
+    ascii_val: Annotated[str, Ascii()] = ""
+    timeuuid_val: Annotated[Optional[UUID], TimeUUID()] = None
+    time_val: Optional[dt_time] = None
+    frozen_list: Annotated[List[str], Frozen()] = Field(default_factory=list)
+    frozen_set: Annotated[Set[int], Frozen()] = Field(default_factory=set)
+    frozen_map: Annotated[Dict[str, int], Frozen()] = Field(default_factory=dict)
+
+    @field_validator("frozen_list", mode="before")
+    @classmethod
+    def _coerce_flist(cls, v: object) -> object:
+        return v if v is not None else []
+
+    @field_validator("frozen_set", mode="before")
+    @classmethod
+    def _coerce_fset(cls, v: object) -> object:
+        return v if v is not None else set()
+
+    @field_validator("frozen_map", mode="before")
+    @classmethod
+    def _coerce_fmap(cls, v: object) -> object:
+        return v if v is not None else {}
+
+    @field_validator("time_val", mode="before")
+    @classmethod
+    def _coerce_time(cls, v: object) -> object:
+        return _coerce_cql_time(v)
+
+    class Settings:
+        name = "it_async_extended_types"
+        keyspace = "test_ks"
+
+
 # ===========================================================================
 # Extended synchronous integration tests
 # ===========================================================================
@@ -989,6 +1105,172 @@ class TestSyncExtended:
         # Cleanup
         drv._session.execute(f"DROP TABLE IF EXISTS {ks}.{tbl}")
 
+    # ------------------------------------------------------------------
+    # Phase-1 extended types round-trip
+    # ------------------------------------------------------------------
+
+    def test_extended_types_sync_table(self, coodie_driver: object) -> None:
+        """sync_table for extended types should succeed."""
+        SyncExtendedTypes.sync_table()
+
+    def test_bigint_roundtrip(self, coodie_driver: object) -> None:
+        """BigInt (bigint) column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, big_val=2**40).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.big_val == 2**40
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_smallint_roundtrip(self, coodie_driver: object) -> None:
+        """SmallInt (smallint) column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, small_val=32000).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.small_val == 32000
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_tinyint_roundtrip(self, coodie_driver: object) -> None:
+        """TinyInt (tinyint) column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, tiny_val=127).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.tiny_val == 127
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_varint_roundtrip(self, coodie_driver: object) -> None:
+        """VarInt (varint) column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, var_val=10**30).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.var_val == 10**30
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_double_roundtrip(self, coodie_driver: object) -> None:
+        """Double (double) column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, dbl_val=3.141592653589793).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert abs(fetched.dbl_val - 3.141592653589793) < 1e-12
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_ascii_roundtrip(self, coodie_driver: object) -> None:
+        """Ascii (ascii) column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, ascii_val="hello").save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.ascii_val == "hello"
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_timeuuid_roundtrip(self, coodie_driver: object) -> None:
+        """TimeUUID (timeuuid) column survives a save/load round-trip."""
+        from uuid import uuid1
+
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        tuuid = uuid1()
+        SyncExtendedTypes(id=rid, timeuuid_val=tuuid).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.timeuuid_val == tuuid
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_time_roundtrip(self, coodie_driver: object) -> None:
+        """CQL time column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        t = dt_time(13, 45, 30)
+        SyncExtendedTypes(id=rid, time_val=t).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.time_val is not None
+        assert fetched.time_val.hour == 13
+        assert fetched.time_val.minute == 45
+        assert fetched.time_val.second == 30
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_frozen_list_roundtrip(self, coodie_driver: object) -> None:
+        """frozen<list<text>> column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, frozen_list=["a", "b", "c"]).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.frozen_list == ["a", "b", "c"]
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_frozen_set_roundtrip(self, coodie_driver: object) -> None:
+        """frozen<set<int>> column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, frozen_set={10, 20, 30}).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.frozen_set == {10, 20, 30}
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_frozen_map_roundtrip(self, coodie_driver: object) -> None:
+        """frozen<map<text, int>> column survives a save/load round-trip."""
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        SyncExtendedTypes(id=rid, frozen_map={"x": 1, "y": 2}).save()
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.frozen_map == {"x": 1, "y": 2}
+        SyncExtendedTypes(id=rid).delete()
+
+    def test_extended_types_all_fields_roundtrip(self, coodie_driver: object) -> None:
+        """All extended type fields set together survive a save/load round-trip."""
+        from uuid import uuid1
+
+        SyncExtendedTypes.sync_table()
+        rid = uuid4()
+        t = dt_time(9, 15, 0)
+        tuuid = uuid1()
+        original = SyncExtendedTypes(
+            id=rid,
+            big_val=2**40,
+            small_val=1000,
+            tiny_val=42,
+            var_val=10**20,
+            dbl_val=2.718281828,
+            ascii_val="test",
+            timeuuid_val=tuuid,
+            time_val=t,
+            frozen_list=["x"],
+            frozen_set={7},
+            frozen_map={"k": 99},
+        )
+        original.save()
+
+        fetched = SyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.big_val == 2**40
+        assert fetched.small_val == 1000
+        assert fetched.tiny_val == 42
+        assert fetched.var_val == 10**20
+        assert abs(fetched.dbl_val - 2.718281828) < 1e-6
+        assert fetched.ascii_val == "test"
+        assert fetched.timeuuid_val == tuuid
+        assert fetched.time_val is not None
+        assert fetched.time_val.hour == 9
+        assert fetched.frozen_list == ["x"]
+        assert fetched.frozen_set == {7}
+        assert fetched.frozen_map == {"k": 99}
+
+        SyncExtendedTypes(id=rid).delete()
+
 
 # ===========================================================================
 # Extended asynchronous integration tests
@@ -1129,3 +1411,169 @@ class TestAsyncExtended:
 
         await AsyncAllTypes(id=rid1).delete()
         await AsyncAllTypes(id=rid2).delete()
+
+    # ------------------------------------------------------------------
+    # Phase-1 extended types round-trip
+    # ------------------------------------------------------------------
+
+    async def test_extended_types_sync_table(self, coodie_driver: object) -> None:
+        """sync_table for extended types should succeed."""
+        await AsyncExtendedTypes.sync_table()
+
+    async def test_bigint_roundtrip(self, coodie_driver: object) -> None:
+        """BigInt (bigint) column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, big_val=2**40).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.big_val == 2**40
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_smallint_roundtrip(self, coodie_driver: object) -> None:
+        """SmallInt (smallint) column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, small_val=32000).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.small_val == 32000
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_tinyint_roundtrip(self, coodie_driver: object) -> None:
+        """TinyInt (tinyint) column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, tiny_val=127).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.tiny_val == 127
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_varint_roundtrip(self, coodie_driver: object) -> None:
+        """VarInt (varint) column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, var_val=10**30).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.var_val == 10**30
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_double_roundtrip(self, coodie_driver: object) -> None:
+        """Double (double) column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, dbl_val=3.141592653589793).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert abs(fetched.dbl_val - 3.141592653589793) < 1e-12
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_ascii_roundtrip(self, coodie_driver: object) -> None:
+        """Ascii (ascii) column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, ascii_val="hello").save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.ascii_val == "hello"
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_timeuuid_roundtrip(self, coodie_driver: object) -> None:
+        """TimeUUID (timeuuid) column survives an async save/load round-trip."""
+        from uuid import uuid1
+
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        tuuid = uuid1()
+        await AsyncExtendedTypes(id=rid, timeuuid_val=tuuid).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.timeuuid_val == tuuid
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_time_roundtrip(self, coodie_driver: object) -> None:
+        """CQL time column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        t = dt_time(13, 45, 30)
+        await AsyncExtendedTypes(id=rid, time_val=t).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.time_val is not None
+        assert fetched.time_val.hour == 13
+        assert fetched.time_val.minute == 45
+        assert fetched.time_val.second == 30
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_frozen_list_roundtrip(self, coodie_driver: object) -> None:
+        """frozen<list<text>> column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, frozen_list=["a", "b", "c"]).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.frozen_list == ["a", "b", "c"]
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_frozen_set_roundtrip(self, coodie_driver: object) -> None:
+        """frozen<set<int>> column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, frozen_set={10, 20, 30}).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.frozen_set == {10, 20, 30}
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_frozen_map_roundtrip(self, coodie_driver: object) -> None:
+        """frozen<map<text, int>> column survives an async save/load round-trip."""
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        await AsyncExtendedTypes(id=rid, frozen_map={"x": 1, "y": 2}).save()
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.frozen_map == {"x": 1, "y": 2}
+        await AsyncExtendedTypes(id=rid).delete()
+
+    async def test_extended_types_all_fields_roundtrip(self, coodie_driver: object) -> None:
+        """All extended type fields set together survive an async save/load round-trip."""
+        from uuid import uuid1
+
+        await AsyncExtendedTypes.sync_table()
+        rid = uuid4()
+        t = dt_time(9, 15, 0)
+        tuuid = uuid1()
+        original = AsyncExtendedTypes(
+            id=rid,
+            big_val=2**40,
+            small_val=1000,
+            tiny_val=42,
+            var_val=10**20,
+            dbl_val=2.718281828,
+            ascii_val="test",
+            timeuuid_val=tuuid,
+            time_val=t,
+            frozen_list=["x"],
+            frozen_set={7},
+            frozen_map={"k": 99},
+        )
+        await original.save()
+
+        fetched = await AsyncExtendedTypes.find_one(id=rid)
+        assert fetched is not None
+        assert fetched.big_val == 2**40
+        assert fetched.small_val == 1000
+        assert fetched.tiny_val == 42
+        assert fetched.var_val == 10**20
+        assert abs(fetched.dbl_val - 2.718281828) < 1e-6
+        assert fetched.ascii_val == "test"
+        assert fetched.timeuuid_val == tuuid
+        assert fetched.time_val is not None
+        assert fetched.time_val.hour == 9
+        assert fetched.frozen_list == ["x"]
+        assert fetched.frozen_set == {7}
+        assert fetched.frozen_map == {"k": 99}
+
+        await AsyncExtendedTypes(id=rid).delete()

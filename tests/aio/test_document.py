@@ -378,3 +378,131 @@ async def test_execute_raw_insert(registered_mock_driver):
     stmt, params = registered_mock_driver.executed[0]
     assert "INSERT INTO" in stmt
     assert params == [1, "Alice"]
+
+
+# ------------------------------------------------------------------
+# Phase 8: Model Enhancements (async)
+# ------------------------------------------------------------------
+
+
+async def test_create_classmethod(registered_mock_driver):
+    """8.1 – Document.create(**kwargs) constructs + saves."""
+    doc = await AsyncProduct.create(name="NewWidget", price=42.0)
+    assert isinstance(doc, AsyncProduct)
+    assert doc.name == "NewWidget"
+    assert doc.price == 42.0
+    assert len(registered_mock_driver.executed) == 1
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "INSERT INTO test_ks.async_products" in stmt
+
+
+async def test_abstract_skips_sync_table(registered_mock_driver):
+    """8.2 – __abstract__ = True prevents table creation."""
+
+    class AsyncAbstractBase(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
+        class Settings:
+            name = "abstract_base"
+            keyspace = "test_ks"
+            __abstract__ = True
+
+    await AsyncAbstractBase.sync_table()
+    assert len(registered_mock_driver.executed) == 0
+
+
+async def test_default_ttl_in_sync_table(registered_mock_driver):
+    """8.3 – __default_ttl__ is passed as table_options."""
+
+    class AsyncTTLModel(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
+        class Settings:
+            name = "async_ttl_models"
+            keyspace = "test_ks"
+            __default_ttl__ = 86400
+
+    await AsyncTTLModel.sync_table()
+    options = AsyncTTLModel._get_table_options()
+    assert options == {"default_time_to_live": 86400}
+
+
+async def test_options_in_sync_table(registered_mock_driver):
+    """8.4 – __options__ dict is passed as table_options."""
+
+    class AsyncOptionsModel(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
+        class Settings:
+            name = "async_options_models"
+            keyspace = "test_ks"
+            __options__ = {"gc_grace_seconds": 864000, "comment": "test table"}
+
+    await AsyncOptionsModel.sync_table()
+    options = AsyncOptionsModel._get_table_options()
+    assert options == {"gc_grace_seconds": 864000, "comment": "test table"}
+
+
+async def test_default_ttl_merged_with_options():
+    """8.3+8.4 – __default_ttl__ is merged into __options__."""
+
+    class AsyncMergedModel(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
+        class Settings:
+            name = "merged"
+            keyspace = "test_ks"
+            __default_ttl__ = 3600
+            __options__ = {"gc_grace_seconds": 1000}
+
+    options = AsyncMergedModel._get_table_options()
+    assert options == {"default_time_to_live": 3600, "gc_grace_seconds": 1000}
+
+
+async def test_connection_setting(registered_mock_driver):
+    """8.5 – Settings.connection selects named driver."""
+    from coodie.drivers import register_driver
+
+    second = type(registered_mock_driver)()
+    register_driver("secondary", second)
+
+    class AsyncConnectedModel(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+        name: str = ""
+
+        class Settings:
+            name = "connected"
+            keyspace = "test_ks"
+            connection = "secondary"
+
+    doc = AsyncConnectedModel(name="Hi")
+    await doc.save()
+    assert len(second.executed) == 1
+    assert len(registered_mock_driver.executed) == 0
+
+
+async def test_drop_table(registered_mock_driver):
+    """8.6 – drop_table() classmethod."""
+    await AsyncProduct.drop_table()
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert stmt == "DROP TABLE IF EXISTS test_ks.async_products"
+    assert params == []
+
+
+def test_table_name():
+    """8.7 – table_name() wraps _get_table()."""
+    assert AsyncProduct.table_name() == "async_products"
+
+
+def test_table_name_snake_case():
+    """8.7 – table_name() uses snake_case when no Settings.name."""
+
+    class MyAsyncSpecialDocument(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
+        class Settings:
+            name = ""
+            keyspace = "test_ks"
+
+    assert MyAsyncSpecialDocument.table_name() == "my_async_special_document"

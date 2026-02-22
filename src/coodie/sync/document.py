@@ -9,6 +9,7 @@ from coodie.cql_builder import (
     build_delete,
     build_update,
     build_counter_update,
+    build_drop_table,
     parse_update_kwargs,
 )
 
@@ -64,7 +65,9 @@ class Document(BaseModel):
     def _get_driver(cls) -> Any:
         from coodie.drivers import get_driver
 
-        return get_driver()
+        settings = getattr(cls, "Settings", None)
+        connection = getattr(settings, "connection", None) if settings else None
+        return get_driver(name=connection)
 
     @classmethod
     def _schema(cls) -> list[ColumnDefinition]:
@@ -73,10 +76,50 @@ class Document(BaseModel):
         return cls.__schema__
 
     @classmethod
+    def _get_table_options(cls) -> dict[str, Any] | None:
+        settings = getattr(cls, "Settings", None)
+        if settings is None:
+            return None
+        options: dict[str, Any] = {}
+        default_ttl = getattr(settings, "__default_ttl__", None)
+        if default_ttl is not None:
+            options["default_time_to_live"] = default_ttl
+        extra = getattr(settings, "__options__", None)
+        if extra:
+            options.update(extra)
+        return options or None
+
+    @classmethod
     def sync_table(cls) -> None:
         """Idempotently create or update the table in the database."""
+        settings = getattr(cls, "Settings", None)
+        if settings and getattr(settings, "__abstract__", False):
+            return
         schema = cls._schema()
-        cls._get_driver().sync_table(cls._get_table(), cls._get_keyspace(), schema)
+        cls._get_driver().sync_table(
+            cls._get_table(),
+            cls._get_keyspace(),
+            schema,
+            table_options=cls._get_table_options(),
+        )
+
+    @classmethod
+    def table_name(cls) -> str:
+        """Return the CQL table name for this model."""
+        return cls._get_table()
+
+    @classmethod
+    def drop_table(cls) -> None:
+        """Drop the table for this model."""
+        cql = build_drop_table(cls._get_table(), cls._get_keyspace())
+        cls._get_driver().execute(cql, [])
+
+    @classmethod
+    def create(cls, **kwargs: Any) -> Document:
+        """Construct and save a new document in one step."""
+        doc = cls(**kwargs)
+        doc.save()
+        return doc
 
     # ------------------------------------------------------------------
     # Write operations

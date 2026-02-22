@@ -58,9 +58,7 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
 
         # Extract Annotated metadata
         metadata: list[Any] = []
-        base_type = annotation
         if origin is typing.Annotated:
-            base_type = args[0]
             metadata = list(args[1:])
 
         # Determine CQL type — pass full annotation so markers are visible

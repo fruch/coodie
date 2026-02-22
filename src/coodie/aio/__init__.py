@@ -4,6 +4,7 @@ from typing import Any
 
 from coodie.aio.document import Document, CounterDocument
 from coodie.aio.query import QuerySet
+from coodie.batch import AsyncBatchQuery
 from coodie.drivers import init_coodie_async as init_coodie
 
 
@@ -25,4 +26,11 @@ async def execute_raw(
     return await get_driver().execute_async(stmt, params or [])
 
 
-__all__ = ["Document", "CounterDocument", "QuerySet", "init_coodie", "execute_raw"]
+__all__ = [
+    "Document",
+    "CounterDocument",
+    "QuerySet",
+    "AsyncBatchQuery",
+    "init_coodie",
+    "execute_raw",
+]

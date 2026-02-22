@@ -333,13 +333,17 @@ def build_counter_update(
 def build_batch(
     statements: list[tuple[str, list[Any]]],
     logged: bool = True,
+    batch_type: str | None = None,
 ) -> tuple[str, list[Any]]:
-    batch_type = "LOGGED" if logged else "UNLOGGED"
+    if batch_type is not None:
+        bt = batch_type.upper()
+    else:
+        bt = "LOGGED" if logged else "UNLOGGED"
     all_params: list[Any] = []
     stmt_lines = []
     for stmt, p in statements:
         stmt_lines.append(stmt + ";")
         all_params.extend(p)
     inner = "\n  ".join(stmt_lines)
-    cql = f"BEGIN {batch_type} BATCH\n  {inner}\nAPPLY BATCH"
+    cql = f"BEGIN {bt} BATCH\n  {inner}\nAPPLY BATCH"
     return cql, all_params

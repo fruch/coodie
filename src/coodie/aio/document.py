@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -20,6 +20,9 @@ from coodie.results import LWTResult
 from coodie.schema import build_schema, ColumnDefinition
 from coodie.aio.query import QuerySet
 from coodie.sync.query import _snake_case
+
+if TYPE_CHECKING:
+    from coodie.batch import AsyncBatchQuery
 
 
 class Document(BaseModel):
@@ -87,6 +90,7 @@ class Document(BaseModel):
         timestamp: int | None = None,
         consistency: str | None = None,
         timeout: float | None = None,
+        batch: AsyncBatchQuery | None = None,
     ) -> None:
         """Insert (upsert) this document."""
         data = self.model_dump(exclude_none=False)
@@ -97,9 +101,12 @@ class Document(BaseModel):
             ttl=ttl,
             timestamp=timestamp,
         )
-        await self.__class__._get_driver().execute_async(
-            cql, params, consistency=consistency, timeout=timeout
-        )
+        if batch is not None:
+            batch.add(cql, params)
+        else:
+            await self.__class__._get_driver().execute_async(
+                cql, params, consistency=consistency, timeout=timeout
+            )
 
     async def insert(
         self,
@@ -107,6 +114,7 @@ class Document(BaseModel):
         timestamp: int | None = None,
         consistency: str | None = None,
         timeout: float | None = None,
+        batch: AsyncBatchQuery | None = None,
     ) -> None:
         """Insert IF NOT EXISTS (create-only)."""
         data = self.model_dump(exclude_none=False)
@@ -118,9 +126,12 @@ class Document(BaseModel):
             if_not_exists=True,
             timestamp=timestamp,
         )
-        await self.__class__._get_driver().execute_async(
-            cql, params, consistency=consistency, timeout=timeout
-        )
+        if batch is not None:
+            batch.add(cql, params)
+        else:
+            await self.__class__._get_driver().execute_async(
+                cql, params, consistency=consistency, timeout=timeout
+            )
 
     async def delete(
         self,
@@ -128,6 +139,7 @@ class Document(BaseModel):
         timestamp: int | None = None,
         consistency: str | None = None,
         timeout: float | None = None,
+        batch: AsyncBatchQuery | None = None,
     ) -> LWTResult | None:
         """Delete this document by its primary key.
 
@@ -145,6 +157,10 @@ class Document(BaseModel):
             if_exists=if_exists,
             timestamp=timestamp,
         )
+        if batch is not None:
+            batch.add(cql, params)
+            return None
+
         rows = await self.__class__._get_driver().execute_async(
             cql, params, consistency=consistency, timeout=timeout
         )

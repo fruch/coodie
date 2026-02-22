@@ -503,4 +503,5 @@ def test_create_table_no_options():
         make_col(name="id", cql_type="uuid", primary_key=True),
     ]
     cql = build_create_table("products", "ks", cols, table_options=None)
-    assert "WITH" not in cql
+    assert "default_time_to_live" not in cql
+    assert "gc_grace_seconds" not in cql

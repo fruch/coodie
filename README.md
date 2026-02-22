@@ -1,6 +1,10 @@
 # coodie
 
 <p align="center">
+  <img src="https://github.com/user-attachments/assets/424bb6ee-3cd3-49e3-a29b-f6615193f4c7" alt="coodie logo" width="200">
+</p>
+
+<p align="center">
   <a href="https://github.com/fruch/coodie/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/fruch/coodie/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status" >
   </a>

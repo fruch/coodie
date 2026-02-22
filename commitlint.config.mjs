@@ -1,4 +1,5 @@
 export default {
+  ignores: [(message) => /^Initial plan/.test(message)],
   extends: ["@commitlint/config-conventional"],
   rules: {
     "header-max-length": [0, "always", Infinity],

@@ -31,9 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: wagoid/commitlint-github-action@v6
         with:
-          commitDepth: 1
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
 
   test:
     strategy:

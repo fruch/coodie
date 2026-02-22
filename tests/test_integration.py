@@ -841,8 +841,11 @@ class TestSyncExtended:
         SyncAllTypes.sync_table()
         rid1, rid2 = uuid4(), uuid4()
 
-        stmt1, p1 = build_insert("it_all_types", "test_ks", {"id": rid1, "count": 10})
-        stmt2, p2 = build_insert("it_all_types", "test_ks", {"id": rid2, "count": 20})
+        # Include all required fields so that reading back via SyncAllTypes succeeds.
+        row1 = SyncAllTypes(id=rid1, count=10)
+        row2 = SyncAllTypes(id=rid2, count=20)
+        stmt1, p1 = build_insert("it_all_types", "test_ks", row1.model_dump())
+        stmt2, p2 = build_insert("it_all_types", "test_ks", row2.model_dump())
 
         drv = get_driver()
         batch = BatchStatement(batch_type=BatchType.LOGGED)
@@ -1101,12 +1104,11 @@ class TestAsyncExtended:
         await AsyncAllTypes.sync_table()
         rid1, rid2 = uuid4(), uuid4()
 
-        stmt1, p1 = build_insert(
-            "it_async_all_types", "test_ks", {"id": rid1, "count": 11}
-        )
-        stmt2, p2 = build_insert(
-            "it_async_all_types", "test_ks", {"id": rid2, "count": 22}
-        )
+        # Include all required fields so that reading back via AsyncAllTypes succeeds.
+        row1 = AsyncAllTypes(id=rid1, count=11)
+        row2 = AsyncAllTypes(id=rid2, count=22)
+        stmt1, p1 = build_insert("it_async_all_types", "test_ks", row1.model_dump())
+        stmt2, p2 = build_insert("it_async_all_types", "test_ks", row2.model_dump())
 
         drv = get_driver()
         batch = BatchStatement(batch_type=BatchType.LOGGED)

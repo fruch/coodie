@@ -9,6 +9,7 @@ from coodie.batch import BatchQuery, AsyncBatchQuery
 from coodie.cql_builder import build_batch
 from coodie.fields import PrimaryKey
 from coodie.sync.document import Document
+from coodie.aio.document import Document as AsyncDocument
 
 
 class BatchItem(Document):
@@ -243,29 +244,16 @@ async def test_async_batch_query_exception_no_execute(registered_mock_driver):
 # ------------------------------------------------------------------
 
 
-class AsyncBatchItem(Document):
-    """Re-use sync Document class — works for unit test since MockDriver
-    supports both sync and async paths."""
-
+class AsyncBatchProduct(AsyncDocument):
     id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
     name: str = ""
 
     class Settings:
-        name = "async_batch_items"
+        name = "async_batch_products"
         keyspace = "test_ks"
 
 
 async def test_async_save_with_batch(registered_mock_driver):
-    from coodie.aio.document import Document as AsyncDocument
-
-    class AsyncBatchProduct(AsyncDocument):
-        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
-        name: str = ""
-
-        class Settings:
-            name = "async_batch_products"
-            keyspace = "test_ks"
-
     batch = AsyncBatchQuery()
     p = AsyncBatchProduct(name="A")
     await p.save(batch=batch)
@@ -277,16 +265,6 @@ async def test_async_save_with_batch(registered_mock_driver):
 
 
 async def test_async_insert_with_batch(registered_mock_driver):
-    from coodie.aio.document import Document as AsyncDocument
-
-    class AsyncBatchProduct(AsyncDocument):
-        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
-        name: str = ""
-
-        class Settings:
-            name = "async_batch_products"
-            keyspace = "test_ks"
-
     batch = AsyncBatchQuery()
     p = AsyncBatchProduct(name="B")
     await p.insert(batch=batch)
@@ -298,16 +276,6 @@ async def test_async_insert_with_batch(registered_mock_driver):
 
 
 async def test_async_delete_with_batch(registered_mock_driver):
-    from coodie.aio.document import Document as AsyncDocument
-
-    class AsyncBatchProduct(AsyncDocument):
-        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
-        name: str = ""
-
-        class Settings:
-            name = "async_batch_products"
-            keyspace = "test_ks"
-
     batch = AsyncBatchQuery()
     p = AsyncBatchProduct(name="C")
     result = await p.delete(batch=batch)
@@ -320,16 +288,6 @@ async def test_async_delete_with_batch(registered_mock_driver):
 
 
 async def test_async_full_batch_workflow(registered_mock_driver):
-    from coodie.aio.document import Document as AsyncDocument
-
-    class AsyncBatchProduct(AsyncDocument):
-        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
-        name: str = ""
-
-        class Settings:
-            name = "async_batch_products"
-            keyspace = "test_ks"
-
     async with AsyncBatchQuery() as batch:
         await AsyncBatchProduct(name="A").save(batch=batch)
         await AsyncBatchProduct(name="B").save(batch=batch)

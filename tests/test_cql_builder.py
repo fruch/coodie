@@ -197,9 +197,42 @@ def test_build_update():
     assert params == ["Y", "1"]
 
 
+def test_build_update_with_if_exists():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        if_exists=True,
+    )
+    assert "IF EXISTS" in cql
+    assert params == ["Y", "1"]
+
+
+def test_build_update_if_exists_takes_precedence_over_if_conditions():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        if_conditions={"name": "X"},
+        if_exists=True,
+    )
+    assert "IF EXISTS" in cql
+    assert 'IF "name"' not in cql
+    assert params == ["Y", "1"]
+
+
 def test_build_delete():
     cql, params = build_delete("products", "ks", [("id", "=", "1")])
     assert "DELETE FROM ks.products" in cql
+    assert params == ["1"]
+
+
+def test_build_delete_if_exists():
+    cql, params = build_delete("products", "ks", [("id", "=", "1")], if_exists=True)
+    assert "DELETE FROM ks.products" in cql
+    assert "IF EXISTS" in cql
     assert params == ["1"]
 
 

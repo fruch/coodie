@@ -23,6 +23,7 @@ from coodie.fields import (
     TinyInt,
     VarInt,
 )
+from coodie.results import LWTResult
 
 __all__ = [
     "Document",
@@ -47,4 +48,5 @@ __all__ = [
     "TimeUUID",
     "Time",
     "Frozen",
+    "LWTResult",
 ]

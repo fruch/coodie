@@ -16,6 +16,7 @@ from coodie.exceptions import (
     MultipleDocumentsFound,
     InvalidQueryError,
 )
+from coodie.results import LWTResult
 from coodie.schema import build_schema, ColumnDefinition
 from coodie.aio.query import QuerySet
 from coodie.sync.query import _snake_case
@@ -103,8 +104,12 @@ class Document(BaseModel):
         )
         await self.__class__._get_driver().execute_async(cql, params)
 
-    async def delete(self) -> None:
-        """Delete this document by its primary key."""
+    async def delete(self, if_exists: bool = False) -> LWTResult | None:
+        """Delete this document by its primary key.
+
+        When *if_exists* is ``True`` the generated CQL includes ``IF EXISTS``
+        and a :class:`~coodie.results.LWTResult` is returned.
+        """
         schema = self.__class__._schema()
         pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
         where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
@@ -112,20 +117,34 @@ class Document(BaseModel):
             self.__class__._get_table(),
             self.__class__._get_keyspace(),
             where,
+            if_exists=if_exists,
         )
-        await self.__class__._get_driver().execute_async(cql, params)
+        rows = await self.__class__._get_driver().execute_async(cql, params)
+        if if_exists:
+            return _parse_lwt_result(rows)
+        return None
 
     async def update(
         self,
-        ttl: int | None = None,
+        *,
         if_conditions: dict[str, Any] | None = None,
+        if_exists: bool = False,
+        ttl: int | None = None,
         **kwargs: Any,
-    ) -> None:
-        """Update individual fields without a full INSERT (upsert)."""
+    ) -> LWTResult | None:
+        """Partial update — sets only the given fields.
+
+        Supports collection operations via ``parse_update_kwargs`` (e.g.
+        ``add__``, ``remove__`` prefixed keys).
+
+        When *if_conditions* or *if_exists* is supplied the generated CQL
+        includes a lightweight-transaction clause and a
+        :class:`~coodie.results.LWTResult` is returned.
+        """
         set_data, collection_ops = parse_update_kwargs(kwargs)
 
         if not set_data and not collection_ops:
-            return
+            return None
 
         schema = self.__class__._schema()
         pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
@@ -134,18 +153,23 @@ class Document(BaseModel):
         cql, params = build_update(
             self.__class__._get_table(),
             self.__class__._get_keyspace(),
-            set_data,
-            where,
+            set_data=set_data,
+            where=where,
             ttl=ttl,
             if_conditions=if_conditions,
+            if_exists=if_exists,
             collection_ops=collection_ops or None,
         )
-        await self.__class__._get_driver().execute_async(cql, params)
+        rows = await self.__class__._get_driver().execute_async(cql, params)
 
         # Update in-memory model fields for regular set assignments
         for k, v in set_data.items():
             if hasattr(self, k):
                 object.__setattr__(self, k, v)
+
+        if if_conditions or if_exists:
+            return _parse_lwt_result(rows)
+        return None
 
     # ------------------------------------------------------------------
     # Query / read operations
@@ -230,3 +254,13 @@ class CounterDocument(Document):
         """
         negated = {k: -v for k, v in field_deltas.items()}
         await self._counter_update(negated)
+
+
+def _parse_lwt_result(rows: list[dict[str, Any]]) -> LWTResult:
+    """Parse the result of a LWT operation into a :class:`LWTResult`."""
+    if not rows:
+        return LWTResult(applied=True)
+    row = rows[0]
+    applied = row.get("[applied]", True)
+    existing = {k: v for k, v in row.items() if k != "[applied]"} or None
+    return LWTResult(applied=applied, existing=existing)

@@ -234,6 +234,7 @@ def build_update(
     ttl: int | None = None,
     if_conditions: dict[str, Any] | None = None,
     collection_ops: list[tuple[str, str, Any]] | None = None,
+    if_exists: bool = False,
 ) -> tuple[str, list[Any]]:
     set_parts = [f'"{k}" = ?' for k in set_data]
     params: list[Any] = list(set_data.values())
@@ -259,7 +260,9 @@ def build_update(
     cql += " " + clause
     params.extend(where_params)
 
-    if if_conditions:
+    if if_exists:
+        cql += " IF EXISTS"
+    elif if_conditions:
         cond_parts = [f'"{k}" = ?' for k in if_conditions]
         cql += " IF " + " AND ".join(cond_parts)
         params.extend(if_conditions.values())
@@ -272,6 +275,7 @@ def build_delete(
     keyspace: str,
     where: list[tuple[str, str, Any]],
     columns: list[str] | None = None,
+    if_exists: bool = False,
 ) -> tuple[str, list[Any]]:
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else ""
     cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace(
@@ -280,6 +284,9 @@ def build_delete(
 
     clause, params = build_where_clause(where)
     cql += " " + clause
+
+    if if_exists:
+        cql += " IF EXISTS"
 
     return cql, params
 

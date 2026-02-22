@@ -25,3 +25,15 @@ def test_document_public_method_parity():
         f"sync-only: {sync_methods - async_methods}\n"
         f"async-only: {async_methods - sync_methods}"
     )
+
+
+def test_counter_document_public_method_parity():
+    """Both sync and async CounterDocument must expose the same set of public method names."""
+    sync_methods = public_methods(sync_doc.CounterDocument)
+    async_methods = public_methods(aio_doc.CounterDocument)
+
+    assert sync_methods == async_methods, (
+        f"CounterDocument API drift detected!\n"
+        f"sync-only: {sync_methods - async_methods}\n"
+        f"async-only: {async_methods - sync_methods}"
+    )

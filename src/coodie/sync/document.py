@@ -4,8 +4,12 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
-from coodie.cql_builder import build_insert, build_delete
-from coodie.exceptions import DocumentNotFound, MultipleDocumentsFound
+from coodie.cql_builder import build_insert, build_delete, build_counter_update
+from coodie.exceptions import (
+    DocumentNotFound,
+    MultipleDocumentsFound,
+    InvalidQueryError,
+)
 from coodie.schema import build_schema, ColumnDefinition
 from coodie.sync.query import QuerySet, _snake_case
 
@@ -133,3 +137,55 @@ class Document(BaseModel):
         return result
 
     model_config = {"arbitrary_types_allowed": True}
+
+
+class CounterDocument(Document):
+    """Base class for synchronous counter-column documents.
+
+    Counter tables only support increment/decrement operations.
+    ``save()`` and ``insert()`` are forbidden.
+    """
+
+    def save(self, ttl: int | None = None) -> None:  # noqa: ARG002
+        raise InvalidQueryError(
+            "Counter tables do not support save(). "
+            "Use increment() or decrement() instead."
+        )
+
+    def insert(self, ttl: int | None = None) -> None:  # noqa: ARG002
+        raise InvalidQueryError(
+            "Counter tables do not support insert(). "
+            "Use increment() or decrement() instead."
+        )
+
+    def _counter_update(self, deltas: dict[str, int]) -> None:
+        """Execute a counter UPDATE with the given deltas."""
+        schema = self.__class__._schema()
+        pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
+        where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
+        cql, params = build_counter_update(
+            self.__class__._get_table(),
+            self.__class__._get_keyspace(),
+            deltas,
+            where,
+        )
+        self.__class__._get_driver().execute(cql, params)
+
+    def increment(self, **field_deltas: int) -> None:
+        """Increment counter columns by the given amounts.
+
+        Example::
+
+            page_view.increment(view_count=1, unique_visitors=1)
+        """
+        self._counter_update(field_deltas)
+
+    def decrement(self, **field_deltas: int) -> None:
+        """Decrement counter columns by the given amounts.
+
+        Example::
+
+            page_view.decrement(view_count=1)
+        """
+        negated = {k: -v for k, v in field_deltas.items()}
+        self._counter_update(negated)

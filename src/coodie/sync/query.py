@@ -9,6 +9,7 @@ from coodie.cql_builder import (
     parse_filter_kwargs,
 )
 from coodie.exceptions import InvalidQueryError
+from coodie.types import coerce_row_none_collections
 
 if TYPE_CHECKING:
     from coodie.sync.document import Document
@@ -110,7 +111,10 @@ class QuerySet:
             allow_filtering=self._allow_filtering_val,
         )
         rows = self._get_driver().execute(cql, params)
-        return [self._doc_cls(**row) for row in rows]
+        return [
+            self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
+            for row in rows
+        ]
 
     def first(self) -> Document | None:
         results = self.limit(1).all()

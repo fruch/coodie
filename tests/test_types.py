@@ -10,7 +10,7 @@ import pytest
 
 from coodie.exceptions import InvalidQueryError
 from coodie.fields import PrimaryKey
-from coodie.types import python_type_to_cql_type_str
+from coodie.types import python_type_to_cql_type_str, coerce_row_none_collections
 
 
 def test_str_to_text():
@@ -82,3 +82,69 @@ def test_no_cqlengine_import():
     import sys
 
     assert "cassandra.cqlengine" not in sys.modules
+
+
+# ---- coerce_row_none_collections tests ----
+
+
+class _FakeDoc:
+    """Minimal stand-in with type annotations for coercion tests."""
+
+    tags: list[str]
+    labels: set[int]
+    meta: dict[str, int]
+    name: str
+    description: Optional[str]
+
+
+def test_coerce_none_list_to_empty_list():
+    row: dict = {"tags": None, "name": "x"}
+    result = coerce_row_none_collections(_FakeDoc, row)
+    assert result["tags"] == []
+    assert result["name"] == "x"
+
+
+def test_coerce_none_set_to_empty_set():
+    row: dict = {"labels": None}
+    result = coerce_row_none_collections(_FakeDoc, row)
+    assert result["labels"] == set()
+
+
+def test_coerce_none_dict_to_empty_dict():
+    row: dict = {"meta": None}
+    result = coerce_row_none_collections(_FakeDoc, row)
+    assert result["meta"] == {}
+
+
+def test_coerce_leaves_non_none_collections_alone():
+    row: dict = {"tags": ["a", "b"], "name": "x"}
+    result = coerce_row_none_collections(_FakeDoc, row)
+    assert result["tags"] == ["a", "b"]
+
+
+def test_coerce_leaves_scalar_none_alone():
+    row: dict = {"description": None}
+    result = coerce_row_none_collections(_FakeDoc, row)
+    assert result["description"] is None
+
+
+def test_coerce_annotated_collection():
+    """Collections wrapped in Annotated should also be coerced."""
+
+    class _AnnotatedDoc:
+        tags: Annotated[list[str], PrimaryKey()]
+
+    row: dict = {"tags": None}
+    result = coerce_row_none_collections(_AnnotatedDoc, row)
+    assert result["tags"] == []
+
+
+def test_coerce_optional_collection():
+    """Optional[list[str]] with None should be coerced to empty list."""
+
+    class _OptionalListDoc:
+        tags: Optional[list[str]]
+
+    row: dict = {"tags": None}
+    result = coerce_row_none_collections(_OptionalListDoc, row)
+    assert result["tags"] == []

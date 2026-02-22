@@ -66,3 +66,56 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
         return _SCALAR_CQL_TYPES[annotation]
 
     raise InvalidQueryError(f"Cannot map Python type {annotation!r} to a CQL type")
+
+
+# Mapping from collection origin types to their empty factory
+_COLLECTION_ORIGINS: dict[type, type] = {
+    list: list,
+    set: set,
+    dict: dict,
+    tuple: tuple,
+    frozenset: frozenset,
+}
+
+
+def _unwrap_annotation(annotation: Any) -> Any:
+    """Strip ``Annotated`` and ``Optional`` wrappers from a type annotation."""
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+
+    if origin is typing.Annotated:
+        return _unwrap_annotation(args[0])
+
+    if origin is Union:
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) == 1:
+            return _unwrap_annotation(non_none[0])
+
+    return annotation
+
+
+def coerce_row_none_collections(doc_cls: type, row: dict[str, Any]) -> dict[str, Any]:
+    """Replace ``None`` values for collection-typed fields with empty collections.
+
+    Cassandra returns ``None`` for empty collections (``list``, ``set``, ``map``).
+    Pydantic rejects ``None`` for non-optional collection fields, so we coerce
+    them to the appropriate empty container *before* constructing the model.
+    """
+    try:
+        hints = typing.get_type_hints(doc_cls, include_extras=True)
+    except Exception:
+        hints = getattr(doc_cls, "__annotations__", {})
+
+    for key, value in row.items():
+        if value is not None:
+            continue
+        annotation = hints.get(key)
+        if annotation is None:
+            continue
+        base = _unwrap_annotation(annotation)
+        origin = typing.get_origin(base) or base
+        factory = _COLLECTION_ORIGINS.get(origin)  # type: ignore[arg-type]
+        if factory is not None:
+            row[key] = factory()
+
+    return row

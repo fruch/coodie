@@ -127,3 +127,64 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
 
     doc_cls.__schema__ = cols
     return cols
+
+
+# ------------------------------------------------------------------
+# Polymorphic (single-table inheritance) helpers
+# ------------------------------------------------------------------
+
+
+def _find_discriminator_column(doc_cls: type) -> str | None:
+    """Return the name of the discriminator column, or ``None``."""
+    from coodie.fields import Discriminator
+
+    try:
+        hints = get_type_hints(doc_cls, include_extras=True)
+    except Exception:
+        hints = getattr(doc_cls, "__annotations__", {})
+
+    for field_name, annotation in hints.items():
+        if field_name.startswith("_") or field_name == "Settings":
+            continue
+        origin = typing.get_origin(annotation)
+        if origin is typing.Annotated:
+            args = typing.get_args(annotation)
+            for meta in args[1:]:
+                if isinstance(meta, Discriminator):
+                    return field_name
+    return None
+
+
+def _get_discriminator_value(doc_cls: type) -> str | None:
+    """Return ``__discriminator_value__`` from *Settings*, or ``None``."""
+    settings = getattr(doc_cls, "Settings", None)
+    if settings is None:
+        return None
+    return getattr(settings, "__discriminator_value__", None)
+
+
+def _resolve_polymorphic_base(doc_cls: type) -> type | None:
+    """Return the class that defines the discriminator column.
+
+    May return *doc_cls* itself.  Returns ``None`` when the hierarchy
+    is not polymorphic.
+    """
+    disc_col = _find_discriminator_column(doc_cls)
+    if disc_col is None:
+        return None
+    for cls in doc_cls.__mro__:
+        own_annotations = cls.__dict__.get("__annotations__", {})
+        if disc_col in own_annotations:
+            return cls
+    return None
+
+
+def _build_subclass_map(base_cls: type) -> dict[str, type]:
+    """Recursively build ``{discriminator_value: cls}`` for the hierarchy."""
+    result: dict[str, type] = {}
+    val = _get_discriminator_value(base_cls)
+    if val is not None:
+        result[val] = base_cls
+    for sub in base_cls.__subclasses__():
+        result.update(_build_subclass_map(sub))
+    return result

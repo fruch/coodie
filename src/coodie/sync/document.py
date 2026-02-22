@@ -22,7 +22,13 @@ from coodie.results import LWTResult
 
 if TYPE_CHECKING:
     from coodie.batch import BatchQuery
-from coodie.schema import build_schema, ColumnDefinition
+from coodie.schema import (
+    build_schema,
+    ColumnDefinition,
+    _find_discriminator_column,
+    _get_discriminator_value,
+    _resolve_polymorphic_base,
+)
 from coodie.sync.query import QuerySet, _snake_case
 
 
@@ -41,6 +47,9 @@ class Document(BaseModel):
 
     @classmethod
     def _get_table(cls) -> str:
+        base = _resolve_polymorphic_base(cls)
+        if base is not None and base is not cls:
+            return base._get_table()
         settings = getattr(cls, "Settings", None)
         if settings and getattr(settings, "name", None):
             return settings.name
@@ -48,6 +57,9 @@ class Document(BaseModel):
 
     @classmethod
     def _get_keyspace(cls) -> str:
+        base = _resolve_polymorphic_base(cls)
+        if base is not None and base is not cls:
+            return base._get_keyspace()
         settings = getattr(cls, "Settings", None)
         if settings and getattr(settings, "keyspace", None):
             return settings.keyspace
@@ -135,6 +147,10 @@ class Document(BaseModel):
     ) -> None:
         """Insert (upsert) this document."""
         data = self.model_dump(exclude_none=False)
+        disc_col = _find_discriminator_column(self.__class__)
+        disc_val = _get_discriminator_value(self.__class__)
+        if disc_col and disc_val:
+            data[disc_col] = disc_val
         cql, params = build_insert(
             self.__class__._get_table(),
             self.__class__._get_keyspace(),
@@ -159,6 +175,10 @@ class Document(BaseModel):
     ) -> None:
         """Insert IF NOT EXISTS (create-only)."""
         data = self.model_dump(exclude_none=False)
+        disc_col = _find_discriminator_column(self.__class__)
+        disc_val = _get_discriminator_value(self.__class__)
+        if disc_col and disc_val:
+            data[disc_col] = disc_val
         cql, params = build_insert(
             self.__class__._get_table(),
             self.__class__._get_keyspace(),
@@ -266,6 +286,10 @@ class Document(BaseModel):
         qs = QuerySet(cls)
         if kwargs:
             qs = qs.filter(**kwargs)
+        disc_col = _find_discriminator_column(cls)
+        disc_val = _get_discriminator_value(cls)
+        if disc_col and disc_val:
+            qs = qs.filter(**{disc_col: disc_val})
         return qs
 
     @classmethod

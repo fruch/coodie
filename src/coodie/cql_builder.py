@@ -21,6 +21,7 @@ def build_create_table(
     table: str,
     keyspace: str,
     cols: list[ColumnDefinition],
+    table_options: dict[str, Any] | None = None,
 ) -> str:
     col_defs = []
     for col in cols:
@@ -56,11 +57,22 @@ def build_create_table(
         # CQL requires ALL clustering columns to be listed in WITH CLUSTERING
         # ORDER BY whenever the clause is present — even those that are ASC.
         clustering_order_parts = [f'"{c.name}" {c.clustering_order}' for c in ck_cols]
-    with_clause = ""
+
+    with_parts: list[str] = []
     if clustering_order_parts:
-        with_clause = (
-            " WITH CLUSTERING ORDER BY (" + ", ".join(clustering_order_parts) + ")"
+        with_parts.append(
+            "CLUSTERING ORDER BY (" + ", ".join(clustering_order_parts) + ")"
         )
+    if table_options:
+        for k, v in table_options.items():
+            if isinstance(v, str):
+                with_parts.append(f"{k} = '{v}'")
+            else:
+                with_parts.append(f"{k} = {v}")
+
+    with_clause = ""
+    if with_parts:
+        with_clause = " WITH " + " AND ".join(with_parts)
 
     return f"CREATE TABLE IF NOT EXISTS {keyspace}.{table} ({col_defs_str}, {primary_key}){with_clause}"
 

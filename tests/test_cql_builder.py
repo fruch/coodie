@@ -437,3 +437,70 @@ def test_build_delete_timestamp():
     )
     assert "USING TIMESTAMP 1234567890" in cql
     assert params == ["1"]
+
+
+# ------------------------------------------------------------------
+# Phase 8: build_create_table with table_options
+# ------------------------------------------------------------------
+
+
+def test_create_table_with_default_ttl():
+    cols = [
+        make_col(name="id", cql_type="uuid", primary_key=True),
+        make_col(name="name", cql_type="text"),
+    ]
+    cql = build_create_table(
+        "products", "ks", cols, table_options={"default_time_to_live": 86400}
+    )
+    assert "WITH default_time_to_live = 86400" in cql
+
+
+def test_create_table_with_multiple_options():
+    cols = [
+        make_col(name="id", cql_type="uuid", primary_key=True),
+    ]
+    cql = build_create_table(
+        "products",
+        "ks",
+        cols,
+        table_options={"default_time_to_live": 3600, "gc_grace_seconds": 864000},
+    )
+    assert "default_time_to_live = 3600" in cql
+    assert "gc_grace_seconds = 864000" in cql
+    assert " AND " in cql
+
+
+def test_create_table_with_string_option():
+    cols = [
+        make_col(name="id", cql_type="uuid", primary_key=True),
+    ]
+    cql = build_create_table(
+        "products", "ks", cols, table_options={"comment": "my table"}
+    )
+    assert "comment = 'my table'" in cql
+
+
+def test_create_table_with_clustering_and_options():
+    cols = [
+        make_col(name="id", cql_type="uuid", primary_key=True),
+        make_col(
+            name="created_at",
+            cql_type="timestamp",
+            clustering_key=True,
+            clustering_order="DESC",
+        ),
+    ]
+    cql = build_create_table(
+        "reviews", "ks", cols, table_options={"default_time_to_live": 3600}
+    )
+    assert "WITH CLUSTERING ORDER BY" in cql
+    assert "default_time_to_live = 3600" in cql
+    assert " AND " in cql
+
+
+def test_create_table_no_options():
+    cols = [
+        make_col(name="id", cql_type="uuid", primary_key=True),
+    ]
+    cql = build_create_table("products", "ks", cols, table_options=None)
+    assert "WITH" not in cql

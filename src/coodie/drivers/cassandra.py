@@ -70,10 +70,13 @@ class CassandraDriver(AbstractDriver):
         table: str,
         keyspace: str,
         cols: list[Any],
+        table_options: dict[str, Any] | None = None,
     ) -> None:
         from coodie.cql_builder import build_create_table, build_create_index
 
-        create_cql = build_create_table(table, keyspace, cols)
+        create_cql = build_create_table(
+            table, keyspace, cols, table_options=table_options
+        )
         self._session.execute(create_cql)
 
         # Introspect existing columns
@@ -142,9 +145,12 @@ class CassandraDriver(AbstractDriver):
         table: str,
         keyspace: str,
         cols: list[Any],
+        table_options: dict[str, Any] | None = None,
     ) -> None:
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, self.sync_table, table, keyspace, cols)
+        await loop.run_in_executor(
+            None, self.sync_table, table, keyspace, cols, table_options
+        )
 
     async def close_async(self) -> None:
         self.close()

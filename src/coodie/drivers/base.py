@@ -27,6 +27,7 @@ class AbstractDriver(ABC):
         table: str,
         keyspace: str,
         cols: list[Any],  # list[ColumnDefinition]
+        table_options: dict[str, Any] | None = None,
     ) -> None:
         """Idempotent CREATE TABLE + ALTER TABLE ADD for new columns."""
 
@@ -54,6 +55,7 @@ class AbstractDriver(ABC):
         table: str,
         keyspace: str,
         cols: list[Any],  # list[ColumnDefinition]
+        table_options: dict[str, Any] | None = None,
     ) -> None:
         """Async version of :meth:`sync_table`."""
 

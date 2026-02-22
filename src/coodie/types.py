@@ -1,11 +1,22 @@
 import typing
-from datetime import date, datetime
+from datetime import date, datetime, time as dt_time
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv6Address
 from typing import Any, Union
 from uuid import UUID
 
 from coodie.exceptions import InvalidQueryError
+from coodie.fields import (
+    Ascii,
+    BigInt,
+    Double,
+    Frozen,
+    SmallInt,
+    Time,
+    TimeUUID,
+    TinyInt,
+    VarInt,
+)
 
 _SCALAR_CQL_TYPES: dict[type, str] = {
     str: "text",
@@ -16,9 +27,22 @@ _SCALAR_CQL_TYPES: dict[type, str] = {
     UUID: "uuid",
     datetime: "timestamp",
     date: "date",
+    dt_time: "time",
     Decimal: "decimal",
     IPv4Address: "inet",
     IPv6Address: "inet",
+}
+
+# Annotation markers that override the CQL type of the base Python type.
+_MARKER_CQL_OVERRIDES: dict[type, str] = {
+    BigInt: "bigint",
+    SmallInt: "smallint",
+    TinyInt: "tinyint",
+    VarInt: "varint",
+    Double: "double",
+    Ascii: "ascii",
+    TimeUUID: "timeuuid",
+    Time: "time",
 }
 
 
@@ -27,9 +51,20 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
     origin = typing.get_origin(annotation)
     args = typing.get_args(annotation)
 
-    # Annotated[X, ...] -> unwrap to X
+    # Annotated[X, ...] -> check for type markers, then unwrap to X
     if origin is typing.Annotated:
-        return python_type_to_cql_type_str(args[0])
+        has_frozen = False
+        cql_override = None
+        for meta in args[1:]:
+            if isinstance(meta, Frozen):
+                has_frozen = True
+            override = _MARKER_CQL_OVERRIDES.get(type(meta))
+            if override is not None:
+                cql_override = override
+        if cql_override is not None:
+            return f"frozen<{cql_override}>" if has_frozen else cql_override
+        inner = python_type_to_cql_type_str(args[0])
+        return f"frozen<{inner}>" if has_frozen else inner
 
     # Optional[X] == Union[X, None] -> unwrap to X
     if origin is Union:

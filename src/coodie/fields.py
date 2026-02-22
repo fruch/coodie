@@ -37,3 +37,48 @@ class Indexed:
 @dataclass(frozen=True)
 class Counter:
     """Annotated marker: counter column."""
+
+
+@dataclass(frozen=True)
+class BigInt:
+    """Annotated marker: maps ``int`` to CQL ``bigint``."""
+
+
+@dataclass(frozen=True)
+class SmallInt:
+    """Annotated marker: maps ``int`` to CQL ``smallint``."""
+
+
+@dataclass(frozen=True)
+class TinyInt:
+    """Annotated marker: maps ``int`` to CQL ``tinyint``."""
+
+
+@dataclass(frozen=True)
+class VarInt:
+    """Annotated marker: maps ``int`` to CQL ``varint``."""
+
+
+@dataclass(frozen=True)
+class Double:
+    """Annotated marker: maps ``float`` to CQL ``double``."""
+
+
+@dataclass(frozen=True)
+class Ascii:
+    """Annotated marker: maps ``str`` to CQL ``ascii``."""
+
+
+@dataclass(frozen=True)
+class TimeUUID:
+    """Annotated marker: maps ``UUID`` to CQL ``timeuuid``."""
+
+
+@dataclass(frozen=True)
+class Time:
+    """Annotated marker: maps to CQL ``time``."""
+
+
+@dataclass(frozen=True)
+class Frozen:
+    """Annotated marker: wraps a collection or UDT type with ``frozen<>``."""

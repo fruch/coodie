@@ -8,7 +8,21 @@ from coodie.exceptions import (
     ConfigurationError,
     InvalidQueryError,
 )
-from coodie.fields import PrimaryKey, ClusteringKey, Indexed, Counter
+from coodie.fields import (
+    Ascii,
+    BigInt,
+    ClusteringKey,
+    Counter,
+    Double,
+    Frozen,
+    Indexed,
+    PrimaryKey,
+    SmallInt,
+    Time,
+    TimeUUID,
+    TinyInt,
+    VarInt,
+)
 
 __all__ = [
     "Document",
@@ -23,4 +37,13 @@ __all__ = [
     "ClusteringKey",
     "Indexed",
     "Counter",
+    "BigInt",
+    "SmallInt",
+    "TinyInt",
+    "VarInt",
+    "Double",
+    "Ascii",
+    "TimeUUID",
+    "Time",
+    "Frozen",
 ]

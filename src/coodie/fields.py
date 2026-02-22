@@ -82,3 +82,8 @@ class Time:
 @dataclass(frozen=True)
 class Frozen:
     """Annotated marker: wraps a collection or UDT type with ``frozen<>``."""
+
+
+@dataclass(frozen=True)
+class Discriminator:
+    """Annotated marker: discriminator column for polymorphic (single-table inheritance) models."""

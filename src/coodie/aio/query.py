@@ -11,9 +11,12 @@ from coodie.cql_builder import (
     parse_filter_kwargs,
     parse_update_kwargs,
 )
-from coodie.exceptions import InvalidQueryError
 from coodie.results import LWTResult
-from coodie.sync.query import _snake_case
+from coodie.schema import (
+    _find_discriminator_column,
+    _resolve_polymorphic_base,
+    _build_subclass_map,
+)
 from coodie.types import coerce_row_none_collections
 
 if TYPE_CHECKING:
@@ -134,22 +137,10 @@ class QuerySet:
         return get_driver()
 
     def _table(self) -> str:
-        settings = getattr(self._doc_cls, "Settings", None)
-        if settings and hasattr(settings, "name"):
-            return settings.name
-        return _snake_case(self._doc_cls.__name__)
+        return self._doc_cls._get_table()
 
     def _keyspace(self) -> str:
-        settings = getattr(self._doc_cls, "Settings", None)
-        if settings and hasattr(settings, "keyspace"):
-            return settings.keyspace
-        from coodie.drivers import get_driver
-
-        driver = get_driver()
-        ks = getattr(driver, "_default_keyspace", None)
-        if ks:
-            return ks
-        raise InvalidQueryError("No keyspace configured")
+        return self._doc_cls._get_keyspace()
 
     async def all(self) -> list[Document]:
         cql, params = build_select(
@@ -163,6 +154,19 @@ class QuerySet:
         rows = await self._get_driver().execute_async(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val
         )
+        disc_col = _find_discriminator_column(self._doc_cls)
+        if disc_col is not None:
+            base = _resolve_polymorphic_base(self._doc_cls) or self._doc_cls
+            subclass_map = _build_subclass_map(base)
+            result = []
+            for row in rows:
+                disc_value = row.get(disc_col)
+                target_cls = subclass_map.get(disc_value, self._doc_cls)
+                coerced = coerce_row_none_collections(target_cls, row)
+                known = target_cls.model_fields
+                filtered = {k: v for k, v in coerced.items() if k in known}
+                result.append(target_cls(**filtered))
+            return result
         return [
             self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
             for row in rows

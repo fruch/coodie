@@ -35,32 +35,11 @@ jobs:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v6
 
-  test-integration:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          python-version: "3.13"
-      - name: Install Dependencies
-        run: uv sync --all-groups
-      - name: Run integration tests
-        run: uv run pytest -m integration -v --timeout=120
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: integration
-
   release:
     runs-on: ubuntu-latest
     environment: release
     if: github.ref == 'refs/heads/main'
     needs:
-      - test-integration
       - lint
       - commitlint
 

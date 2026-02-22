@@ -31,6 +31,7 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
 
     from coodie.fields import PrimaryKey, ClusteringKey, Indexed, Counter
     from coodie.types import python_type_to_cql_type_str
+    from coodie.exceptions import InvalidQueryError
 
     try:
         hints = get_type_hints(doc_cls, include_extras=True)
@@ -111,6 +112,18 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
                 required=required,
             )
         )
+
+    # Validate counter tables: non-PK/CK columns must all be counter, or none.
+    counter_cols = [c for c in cols if c.cql_type == "counter"]
+    if counter_cols:
+        non_key_cols = [c for c in cols if not c.primary_key and not c.clustering_key]
+        non_counter = [c for c in non_key_cols if c.cql_type != "counter"]
+        if non_counter:
+            names = ", ".join(c.name for c in non_counter)
+            raise InvalidQueryError(
+                f"Counter tables can only have counter and primary key columns. "
+                f"Non-counter data columns found: {names}"
+            )
 
     doc_cls.__schema__ = cols
     return cols

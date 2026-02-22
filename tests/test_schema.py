@@ -4,10 +4,20 @@ from datetime import time as dt_time
 from typing import Annotated, Optional
 from uuid import UUID
 
+import pytest
 from pydantic import BaseModel
 
-from coodie.fields import BigInt, ClusteringKey, Frozen, Indexed, PrimaryKey, TimeUUID
+from coodie.fields import (
+    BigInt,
+    ClusteringKey,
+    Frozen,
+    Indexed,
+    PrimaryKey,
+    TimeUUID,
+    Counter,
+)
 from coodie.schema import ColumnDefinition, build_schema
+from coodie.exceptions import InvalidQueryError
 
 
 class SimpleDoc(BaseModel):
@@ -132,3 +142,34 @@ def test_build_schema_frozen_collection():
     schema = build_schema(ExtendedTypesDoc)
     col = next(c for c in schema if c.name == "tags")
     assert col.cql_type == "frozen<list<text>>"
+
+
+class ValidCounterDoc(BaseModel):
+    url: Annotated[str, PrimaryKey()]
+    view_count: Annotated[int, Counter()] = 0
+
+    class Settings:
+        name = "valid_counters"
+        keyspace = "test_ks"
+
+
+class InvalidCounterDoc(BaseModel):
+    url: Annotated[str, PrimaryKey()]
+    view_count: Annotated[int, Counter()] = 0
+    name: str = ""  # non-counter data column — invalid
+
+    class Settings:
+        name = "invalid_counters"
+        keyspace = "test_ks"
+
+
+def test_counter_table_valid_schema():
+    schema = build_schema(ValidCounterDoc)
+    counter_cols = [c for c in schema if c.cql_type == "counter"]
+    assert len(counter_cols) == 1
+    assert counter_cols[0].name == "view_count"
+
+
+def test_counter_table_mixed_columns_raises():
+    with pytest.raises(InvalidQueryError, match="Non-counter data columns found"):
+        build_schema(InvalidCounterDoc)

@@ -249,6 +249,29 @@ def build_delete(
     return cql, params
 
 
+def build_counter_update(
+    table: str,
+    keyspace: str,
+    deltas: dict[str, int],
+    where: list[tuple[str, str, Any]],
+) -> tuple[str, list[Any]]:
+    """Build an UPDATE statement for counter columns.
+
+    Generates ``UPDATE … SET col = col + ?`` for each counter column.
+    Negative delta values produce decrement operations.
+    """
+    set_parts = [f'"{k}" = "{k}" + ?' for k in deltas]
+    params: list[Any] = list(deltas.values())
+
+    cql = f"UPDATE {keyspace}.{table} SET " + ", ".join(set_parts)
+
+    clause, where_params = build_where_clause(where)
+    cql += " " + clause
+    params.extend(where_params)
+
+    return cql, params
+
+
 def build_batch(
     statements: list[tuple[str, list[Any]]],
     logged: bool = True,

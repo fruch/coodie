@@ -1,6 +1,6 @@
 __version__ = "0.0.1"
 
-from coodie.aio import Document, QuerySet, init_coodie
+from coodie.aio import Document, CounterDocument, QuerySet, init_coodie
 from coodie.exceptions import (
     CoodieError,
     DocumentNotFound,
@@ -26,6 +26,7 @@ from coodie.fields import (
 
 __all__ = [
     "Document",
+    "CounterDocument",
     "QuerySet",
     "init_coodie",
     "CoodieError",

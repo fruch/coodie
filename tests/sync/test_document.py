@@ -6,9 +6,13 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import Field
 
-from coodie.fields import PrimaryKey, Indexed
-from coodie.sync.document import Document
-from coodie.exceptions import DocumentNotFound, MultipleDocumentsFound
+from coodie.fields import PrimaryKey, Indexed, Counter
+from coodie.sync.document import Document, CounterDocument
+from coodie.exceptions import (
+    DocumentNotFound,
+    MultipleDocumentsFound,
+    InvalidQueryError,
+)
 
 
 class Product(Document):
@@ -114,3 +118,58 @@ def test_snake_case_default_table_name():
             keyspace = "test_ks"
 
     assert MyDocument._get_table() == "my_document"
+
+
+# ------------------------------------------------------------------
+# CounterDocument tests
+# ------------------------------------------------------------------
+
+
+class PageView(CounterDocument):
+    url: Annotated[str, PrimaryKey()]
+    view_count: Annotated[int, Counter()] = 0
+    unique_visitors: Annotated[int, Counter()] = 0
+
+    class Settings:
+        name = "page_views"
+        keyspace = "test_ks"
+
+
+def test_counter_save_raises(registered_mock_driver):
+    pv = PageView(url="/home")
+    with pytest.raises(InvalidQueryError, match="do not support save"):
+        pv.save()
+
+
+def test_counter_insert_raises(registered_mock_driver):
+    pv = PageView(url="/home")
+    with pytest.raises(InvalidQueryError, match="do not support insert"):
+        pv.insert()
+
+
+def test_counter_increment(registered_mock_driver):
+    pv = PageView(url="/home")
+    pv.increment(view_count=1)
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert "UPDATE test_ks.page_views" in stmt
+    assert '"view_count" = "view_count" + ?' in stmt
+    assert 'WHERE "url" = ?' in stmt
+    assert params == [1, "/home"]
+
+
+def test_counter_increment_multiple(registered_mock_driver):
+    pv = PageView(url="/home")
+    pv.increment(view_count=5, unique_visitors=1)
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"view_count" = "view_count" + ?' in stmt
+    assert '"unique_visitors" = "unique_visitors" + ?' in stmt
+    assert params == [5, 1, "/home"]
+
+
+def test_counter_decrement(registered_mock_driver):
+    pv = PageView(url="/home")
+    pv.decrement(view_count=1)
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"view_count" = "view_count" + ?' in stmt
+    assert params == [-1, "/home"]

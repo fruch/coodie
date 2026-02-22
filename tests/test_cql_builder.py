@@ -5,6 +5,7 @@ import pytest
 from coodie.cql_builder import (
     build_batch,
     build_count,
+    build_counter_update,
     build_create_index,
     build_create_keyspace,
     build_create_table,
@@ -210,3 +211,39 @@ def test_build_batch():
     assert "BEGIN LOGGED BATCH" in cql
     assert "APPLY BATCH" in cql
     assert params == ["1", "2"]
+
+
+def test_build_counter_update_single():
+    cql, params = build_counter_update(
+        "page_views",
+        "ks",
+        deltas={"view_count": 1},
+        where=[("url", "=", "/home")],
+    )
+    assert "UPDATE ks.page_views" in cql
+    assert '"view_count" = "view_count" + ?' in cql
+    assert 'WHERE "url" = ?' in cql
+    assert params == [1, "/home"]
+
+
+def test_build_counter_update_multiple():
+    cql, params = build_counter_update(
+        "page_views",
+        "ks",
+        deltas={"view_count": 5, "unique_visitors": 1},
+        where=[("url", "=", "/home")],
+    )
+    assert '"view_count" = "view_count" + ?' in cql
+    assert '"unique_visitors" = "unique_visitors" + ?' in cql
+    assert params == [5, 1, "/home"]
+
+
+def test_build_counter_update_decrement():
+    cql, params = build_counter_update(
+        "page_views",
+        "ks",
+        deltas={"view_count": -1},
+        where=[("url", "=", "/home")],
+    )
+    assert '"view_count" = "view_count" + ?' in cql
+    assert params == [-1, "/home"]

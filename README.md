@@ -1,6 +1,8 @@
-# <img src="https://github.com/user-attachments/assets/424bb6ee-3cd3-49e3-a29b-f6615193f4c7" alt="coodie logo" width="200">
+<img src="https://github.com/user-attachments/assets/424bb6ee-3cd3-49e3-a29b-f6615193f4c7" alt="coodie logo" width="150" align="left">
 
-<p align="center">
+# coodie
+
+<p>
   <a href="https://github.com/fruch/coodie/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/fruch/coodie/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status" >
   </a>
@@ -10,8 +12,7 @@
   <a href="https://codecov.io/gh/fruch/coodie">
     <img src="https://img.shields.io/codecov/c/github/fruch/coodie.svg?logo=codecov&logoColor=fff&style=flat-square" alt="Test coverage percentage">
   </a>
-</p>
-<p align="center">
+  <br>
   <a href="https://github.com/astral-sh/uv">
     <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json&style=flat-square" alt="uv">
   </a>
@@ -21,14 +22,15 @@
   <a href="https://github.com/pre-commit/pre-commit">
     <img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=flat-square" alt="pre-commit">
   </a>
-</p>
-<p align="center">
+  <br>
   <a href="https://pypi.org/project/coodie/">
     <img src="https://img.shields.io/pypi/v/coodie.svg?logo=python&logoColor=fff&style=flat-square" alt="PyPI Version">
   </a>
   <img src="https://img.shields.io/pypi/pyversions/coodie.svg?style=flat-square&logo=python&amp;logoColor=fff" alt="Supported Python versions">
   <img src="https://img.shields.io/pypi/l/coodie.svg?style=flat-square" alt="License">
 </p>
+
+<br clear="left"/>
 
 **coodie** = Cassandra / ScyllaDB + Beanie (hoodie) — a Pydantic-based ODM for Cassandra and ScyllaDB,
 inspired by [Beanie](https://github.com/BeanieODM/beanie). Define your data models as Python classes,

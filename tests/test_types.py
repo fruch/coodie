@@ -201,11 +201,16 @@ def test_time_marker():
 
 
 def test_frozen_list():
-    assert python_type_to_cql_type_str(Annotated[list[str], Frozen()]) == "frozen<list<text>>"
+    assert (
+        python_type_to_cql_type_str(Annotated[list[str], Frozen()])
+        == "frozen<list<text>>"
+    )
 
 
 def test_frozen_set():
-    assert python_type_to_cql_type_str(Annotated[set[int], Frozen()]) == "frozen<set<int>>"
+    assert (
+        python_type_to_cql_type_str(Annotated[set[int], Frozen()]) == "frozen<set<int>>"
+    )
 
 
 def test_frozen_map():

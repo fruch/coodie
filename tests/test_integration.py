@@ -29,7 +29,6 @@ from coodie.fields import (
     Indexed,
     PrimaryKey,
     SmallInt,
-    Time,
     TimeUUID,
     TinyInt,
     VarInt,
@@ -729,19 +728,34 @@ _US_PER_HOUR = 3_600_000_000
 _US_PER_MINUTE = 60_000_000
 _US_PER_SECOND = 1_000_000
 
+try:
+    from cassandra.util import Time as _CqlTime  # type: ignore[import-untyped]
+except ImportError:  # pragma: no cover – only needed at integration time
+    _CqlTime = None
+
+
+def _ns_to_time(ns: int) -> dt_time:
+    """Convert nanoseconds since midnight to ``datetime.time``."""
+    total_us = ns // 1000
+    hours, remainder = divmod(total_us, _US_PER_HOUR)
+    minutes, remainder = divmod(remainder, _US_PER_MINUTE)
+    seconds, microseconds = divmod(remainder, _US_PER_SECOND)
+    return dt_time(hours, minutes, seconds, microseconds)
+
 
 def _coerce_cql_time(v: object) -> object:
-    """Coerce cassandra-driver's nanosecond ``int`` for CQL ``time`` to ``datetime.time``.
+    """Coerce cassandra-driver's CQL ``time`` value to ``datetime.time``.
 
-    The driver returns CQL ``time`` values as nanoseconds since midnight.
-    We divide by 1000 to obtain microseconds, then decompose into h/m/s/µs.
+    The driver may return:
+    - A ``cassandra.util.Time`` object (which wraps nanoseconds since midnight)
+    - A raw ``int`` (nanoseconds since midnight)
+
+    We convert nanoseconds → microseconds then decompose into h/m/s/µs.
     """
+    if _CqlTime is not None and isinstance(v, _CqlTime):
+        return _ns_to_time(v.nanosecond_time)
     if isinstance(v, int):
-        total_us = v // 1000  # nanoseconds → microseconds
-        hours, remainder = divmod(total_us, _US_PER_HOUR)
-        minutes, remainder = divmod(remainder, _US_PER_MINUTE)
-        seconds, microseconds = divmod(remainder, _US_PER_SECOND)
-        return dt_time(hours, minutes, seconds, microseconds)
+        return _ns_to_time(v)
     return v
 
 
@@ -1537,7 +1551,9 @@ class TestAsyncExtended:
         assert fetched.frozen_map == {"x": 1, "y": 2}
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_extended_types_all_fields_roundtrip(self, coodie_driver: object) -> None:
+    async def test_extended_types_all_fields_roundtrip(
+        self, coodie_driver: object
+    ) -> None:
         """All extended type fields set together survive an async save/load round-trip."""
         from uuid import uuid1
 

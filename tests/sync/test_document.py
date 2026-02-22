@@ -383,3 +383,49 @@ def test_delete_with_consistency(registered_mock_driver):
     p = Product(name="Widget")
     p.delete(consistency="LOCAL_QUORUM")
     assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+# ------------------------------------------------------------------
+# execute_raw tests
+# ------------------------------------------------------------------
+
+
+def test_execute_raw(registered_mock_driver):
+    from coodie.sync import execute_raw
+
+    registered_mock_driver.set_return_rows(
+        [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+    )
+    rows = execute_raw("SELECT * FROM test_ks.users")
+    assert len(rows) == 2
+    assert rows[0]["name"] == "Alice"
+    stmt, params = registered_mock_driver.executed[0]
+    assert stmt == "SELECT * FROM test_ks.users"
+    assert params == []
+
+
+def test_execute_raw_with_params(registered_mock_driver):
+    from coodie.sync import execute_raw
+
+    registered_mock_driver.set_return_rows([{"id": 1, "name": "Alice"}])
+    rows = execute_raw("SELECT * FROM test_ks.users WHERE id = ?", [1])
+    assert len(rows) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert stmt == "SELECT * FROM test_ks.users WHERE id = ?"
+    assert params == [1]
+
+
+def test_execute_raw_empty_result(registered_mock_driver):
+    from coodie.sync import execute_raw
+
+    rows = execute_raw("SELECT * FROM test_ks.users WHERE id = ?", [999])
+    assert rows == []
+
+
+def test_execute_raw_insert(registered_mock_driver):
+    from coodie.sync import execute_raw
+
+    execute_raw("INSERT INTO test_ks.users (id, name) VALUES (?, ?)", [1, "Alice"])
+    stmt, params = registered_mock_driver.executed[0]
+    assert "INSERT INTO" in stmt
+    assert params == [1, "Alice"]

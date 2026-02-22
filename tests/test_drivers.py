@@ -1,11 +1,24 @@
 from __future__ import annotations
 
+from collections import namedtuple
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from coodie.drivers import get_driver, register_driver, _registry
+from coodie.drivers import (
+    get_driver,
+    init_coodie,
+    init_coodie_async,
+    register_driver,
+    _registry,
+)
 from coodie.drivers.base import AbstractDriver
 from coodie.exceptions import ConfigurationError
+
+
+# ------------------------------------------------------------------
+# Registry tests
+# ------------------------------------------------------------------
 
 
 def test_register_and_get_driver(mock_driver):
@@ -80,3 +93,337 @@ def test_mock_driver_defaults_none_consistency(mock_driver):
 def test_mock_driver_defaults_none_timeout(mock_driver):
     mock_driver.execute("SELECT * FROM ks.t", [])
     assert mock_driver.last_timeout is None
+
+
+# ------------------------------------------------------------------
+# Phase 6: CassandraDriver with mock Session
+# ------------------------------------------------------------------
+
+
+Row = namedtuple("Row", ["id", "name"])
+
+
+@pytest.fixture
+def mock_cassandra_session():
+    """Build a mock cassandra.cluster.Session for CassandraDriver tests."""
+    session = MagicMock()
+    prepared = MagicMock()
+    session.prepare.return_value = prepared
+    prepared.bind.return_value = prepared
+    session.cluster = MagicMock()
+    return session
+
+
+@pytest.fixture
+def cassandra_driver(mock_cassandra_session):
+    from coodie.drivers.cassandra import CassandraDriver
+
+    return CassandraDriver(session=mock_cassandra_session, default_keyspace="test_ks")
+
+
+def test_cassandra_driver_execute(cassandra_driver, mock_cassandra_session):
+    mock_cassandra_session.execute.return_value = [Row(id="1", name="Alice")]
+    rows = cassandra_driver.execute("SELECT * FROM test_ks.t", [])
+    assert rows == [{"id": "1", "name": "Alice"}]
+    mock_cassandra_session.prepare.assert_called_once_with("SELECT * FROM test_ks.t")
+
+
+def test_cassandra_driver_prepared_cache(cassandra_driver, mock_cassandra_session):
+    mock_cassandra_session.execute.return_value = []
+    cassandra_driver.execute("SELECT * FROM test_ks.t", [])
+    cassandra_driver.execute("SELECT * FROM test_ks.t", [])
+    # prepare() should only be called once due to caching
+    mock_cassandra_session.prepare.assert_called_once_with("SELECT * FROM test_ks.t")
+
+
+def test_cassandra_driver_execute_with_consistency(
+    cassandra_driver, mock_cassandra_session
+):
+    from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
+
+    mock_cassandra_session.execute.return_value = []
+    cassandra_driver.execute(
+        "SELECT * FROM test_ks.t", ["p1"], consistency="LOCAL_QUORUM"
+    )
+    prepared = mock_cassandra_session.prepare.return_value
+    prepared.bind.assert_called_once_with(["p1"])
+    bound = prepared.bind.return_value
+    assert bound.consistency_level == ConsistencyLevel.LOCAL_QUORUM
+
+
+def test_cassandra_driver_execute_with_timeout(
+    cassandra_driver, mock_cassandra_session
+):
+    mock_cassandra_session.execute.return_value = []
+    cassandra_driver.execute("SELECT * FROM test_ks.t", [], timeout=5.0)
+    mock_cassandra_session.execute.assert_called_with(
+        mock_cassandra_session.prepare.return_value, [], timeout=5.0
+    )
+
+
+def test_cassandra_driver_rows_to_dicts_none():
+    from coodie.drivers.cassandra import CassandraDriver
+
+    assert CassandraDriver._rows_to_dicts(None) == []
+
+
+def test_cassandra_driver_rows_to_dicts_asdict():
+    from coodie.drivers.cassandra import CassandraDriver
+
+    rows = [Row(id="1", name="Alice"), Row(id="2", name="Bob")]
+    result = CassandraDriver._rows_to_dicts(rows)
+    assert result == [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+
+
+def test_cassandra_driver_rows_to_dicts_dict_fallback():
+    from coodie.drivers.cassandra import CassandraDriver
+
+    rows = [{"id": "3", "name": "Carol"}]
+    result = CassandraDriver._rows_to_dicts(rows)
+    assert result == [{"id": "3", "name": "Carol"}]
+
+
+def test_cassandra_driver_sync_table(cassandra_driver, mock_cassandra_session):
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    # Simulate that only "id" already exists in the table
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id")],  # system_schema query
+        None,  # ALTER TABLE ADD "name"
+    ]
+    cassandra_driver.sync_table("my_table", "test_ks", cols)
+    calls = mock_cassandra_session.execute.call_args_list
+    # First call: CREATE TABLE
+    assert "CREATE TABLE" in str(calls[0])
+    # Second call: system_schema introspection
+    assert "system_schema" in str(calls[1])
+    # Third call: ALTER TABLE ADD for the missing column
+    assert "ALTER TABLE" in str(calls[2])
+    assert '"name"' in str(calls[2])
+
+
+def test_cassandra_driver_sync_table_with_index(
+    cassandra_driver, mock_cassandra_session
+):
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="email", cql_type="text", index=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id"), SysRow(column_name="email")],  # system_schema
+        None,  # CREATE INDEX
+    ]
+    cassandra_driver.sync_table("users", "test_ks", cols)
+    calls = mock_cassandra_session.execute.call_args_list
+    assert "CREATE INDEX" in str(calls[2])
+
+
+def test_cassandra_driver_close(cassandra_driver, mock_cassandra_session):
+    cassandra_driver.close()
+    mock_cassandra_session.cluster.shutdown.assert_called_once()
+
+
+async def test_cassandra_driver_execute_async(cassandra_driver, mock_cassandra_session):
+    """Test the asyncio bridge for execute_async."""
+    import asyncio
+
+    result_rows = [Row(id="1", name="Alice")]
+
+    def fake_execute_async(stmt, params=None, timeout=None):
+        future = MagicMock()
+
+        def add_callbacks(on_success, on_error):
+            loop = asyncio.get_event_loop()
+            loop.call_soon(on_success, result_rows)
+
+        future.add_callbacks = add_callbacks
+        return future
+
+    mock_cassandra_session.execute_async.side_effect = fake_execute_async
+    rows = await cassandra_driver.execute_async("SELECT * FROM test_ks.t", [])
+    assert rows == [{"id": "1", "name": "Alice"}]
+
+
+async def test_cassandra_driver_sync_table_async(
+    cassandra_driver, mock_cassandra_session
+):
+    """sync_table_async delegates to sync_table via run_in_executor."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id")],  # system_schema
+    ]
+    await cassandra_driver.sync_table_async("t", "test_ks", cols)
+    assert mock_cassandra_session.execute.call_count >= 1
+
+
+async def test_cassandra_driver_close_async(cassandra_driver, mock_cassandra_session):
+    await cassandra_driver.close_async()
+    mock_cassandra_session.cluster.shutdown.assert_called_once()
+
+
+# ------------------------------------------------------------------
+# Phase 6: AcsyllaDriver with mock acsylla session
+# ------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_acsylla_session():
+    """Build a mock acsylla session for AcsyllaDriver tests."""
+    session = MagicMock()
+    prepared = MagicMock()
+    prepared.bind.return_value = MagicMock()
+
+    # create_prepared is async
+    session.create_prepared = AsyncMock(return_value=prepared)
+    # execute is async
+    session.execute = AsyncMock(return_value=[{"id": "1", "name": "Alice"}])
+    # close is async
+    session.close = AsyncMock()
+
+    return session
+
+
+@pytest.fixture
+def acsylla_driver(mock_acsylla_session):
+    """Create an AcsyllaDriver with import of acsylla mocked out."""
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        from coodie.drivers.acsylla import AcsyllaDriver
+
+        return AcsyllaDriver(session=mock_acsylla_session, default_keyspace="test_ks")
+
+
+async def test_acsylla_driver_execute_async(acsylla_driver, mock_acsylla_session):
+    rows = await acsylla_driver.execute_async("SELECT * FROM test_ks.t", ["p1"])
+    assert rows == [{"id": "1", "name": "Alice"}]
+    mock_acsylla_session.create_prepared.assert_awaited_once_with(
+        "SELECT * FROM test_ks.t"
+    )
+
+
+async def test_acsylla_driver_prepared_cache(acsylla_driver, mock_acsylla_session):
+    await acsylla_driver.execute_async("SELECT * FROM test_ks.t", [])
+    await acsylla_driver.execute_async("SELECT * FROM test_ks.t", [])
+    # create_prepared should only be called once due to caching
+    mock_acsylla_session.create_prepared.assert_awaited_once()
+
+
+async def test_acsylla_driver_execute_async_with_consistency(
+    acsylla_driver, mock_acsylla_session
+):
+    await acsylla_driver.execute_async(
+        "SELECT * FROM test_ks.t", [], consistency="LOCAL_QUORUM"
+    )
+    prepared = await mock_acsylla_session.create_prepared("SELECT * FROM test_ks.t")
+    bound = prepared.bind.return_value
+    bound.set_consistency.assert_called_with("LOCAL_QUORUM")
+
+
+async def test_acsylla_driver_sync_table_async(acsylla_driver, mock_acsylla_session):
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="email", cql_type="text", index=True),
+    ]
+    mock_acsylla_session.execute = AsyncMock(return_value=None)
+    await acsylla_driver.sync_table_async("users", "test_ks", cols)
+    calls = mock_acsylla_session.execute.await_args_list
+    # At least CREATE TABLE and CREATE INDEX (wrapped in Statement objects)
+    assert len(calls) >= 2
+
+
+async def test_acsylla_driver_close_async(acsylla_driver, mock_acsylla_session):
+    await acsylla_driver.close_async()
+    mock_acsylla_session.close.assert_awaited_once()
+
+
+def test_acsylla_driver_rows_to_dicts():
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        from coodie.drivers.acsylla import AcsyllaDriver
+
+        rows = [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+        result = AcsyllaDriver._rows_to_dicts(rows)
+        assert result == [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+
+
+# ------------------------------------------------------------------
+# Phase 6: init_coodie / init_coodie_async tests
+# ------------------------------------------------------------------
+
+
+def test_init_coodie_with_session():
+    _registry.clear()
+    mock_session = MagicMock()
+    mock_session.cluster = MagicMock()
+    driver = init_coodie(session=mock_session, keyspace="ks")
+    assert get_driver() is driver
+    _registry.clear()
+
+
+def test_init_coodie_cassandra_alias():
+    _registry.clear()
+    mock_session = MagicMock()
+    mock_session.cluster = MagicMock()
+    driver = init_coodie(session=mock_session, keyspace="ks", driver_type="cassandra")
+    assert get_driver() is driver
+    _registry.clear()
+
+
+def test_init_coodie_unknown_driver_type():
+    _registry.clear()
+    with pytest.raises(ConfigurationError, match="Unknown driver_type"):
+        init_coodie(driver_type="unknown", keyspace="ks")
+    _registry.clear()
+
+
+def test_init_coodie_acsylla_requires_session():
+    _registry.clear()
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        with pytest.raises(ConfigurationError, match="pre-created acsylla session"):
+            init_coodie(driver_type="acsylla", keyspace="ks")
+    _registry.clear()
+
+
+def test_init_coodie_acsylla_with_session():
+    _registry.clear()
+    mock_session = MagicMock()
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        driver = init_coodie(session=mock_session, keyspace="ks", driver_type="acsylla")
+    assert get_driver() is driver
+    _registry.clear()
+
+
+async def test_init_coodie_async_acsylla_with_hosts():
+    _registry.clear()
+    mock_acsylla = MagicMock()
+    mock_cluster = MagicMock()
+    mock_session = MagicMock()
+    mock_acsylla.create_cluster = MagicMock(return_value=mock_cluster)
+    mock_cluster.create_session = AsyncMock(return_value=mock_session)
+
+    with patch.dict("sys.modules", {"acsylla": mock_acsylla}):
+        driver = await init_coodie_async(
+            hosts=["127.0.0.1"],
+            keyspace="ks",
+            driver_type="acsylla",
+        )
+    assert get_driver() is driver
+    mock_acsylla.create_cluster.assert_called_once()
+    mock_cluster.create_session.assert_awaited_once_with(keyspace="ks")
+    _registry.clear()

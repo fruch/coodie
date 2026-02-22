@@ -17,10 +17,18 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0",
-    "scylla-driver>=3.25.4",
 ]
 
 [project.optional-dependencies]
+scylla = [
+    "scylla-driver>=3.25.4",
+]
+cassandra = [
+    "cassandra-driver>=3.25.0",
+]
+acsylla = [
+    "acsylla>=0.1.0",
+]
 docs = [
     "Sphinx>=5.0,<6",
     "sphinx-rtd-theme>=1.0,<2",
@@ -46,6 +54,7 @@ dev = [
     "pytest-timeout>=2.0",
     "testcontainers>=4.0",
     "pre-commit>=4.5.1,<5",
+    "scylla-driver>=3.25.4",
 ]
 
 [tool.semantic_release]

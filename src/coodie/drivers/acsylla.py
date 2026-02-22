@@ -35,7 +35,7 @@ class AcsyllaDriver(AbstractDriver):
                 keyspace = "catalog"
 
         # Build an acsylla session, then wrap it in AcsyllaDriver
-        cluster = await acsylla.create_cluster(["127.0.0.1"])
+        cluster = acsylla.create_cluster(["127.0.0.1"])
         session = await cluster.create_session(keyspace="catalog")
 
         driver = AcsyllaDriver(session=session, default_keyspace="catalog")
@@ -48,23 +48,30 @@ class AcsyllaDriver(AbstractDriver):
 
         results = await Product.find(name="Widget").all()
 
-    **Sync bridge** — ``execute()``, ``sync_table()``, and ``close()`` wrap the
-    async methods via :func:`asyncio.run` and therefore **must only be called
-    from non-async contexts** (scripts, CLI tools, Django/Flask views).  Calling
-    them from inside a running event loop will raise ``RuntimeError``.
+    **Sync bridge** — ``execute()``, ``sync_table()``, and ``close()`` run the
+    async methods on the event loop that was passed at construction (or a new
+    dedicated loop).  They **must only be called from non-async contexts**
+    (scripts, CLI tools, Django/Flask views).
     """
 
-    def __init__(self, session: Any, default_keyspace: str | None = None) -> None:
+    def __init__(
+        self,
+        session: Any,
+        default_keyspace: str | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
+    ) -> None:
         try:
-            import acsylla  # noqa: F401  # type: ignore[import-untyped]
+            import acsylla  # type: ignore[import-untyped]
         except ImportError as exc:
             raise ImportError(
                 "acsylla is required for AcsyllaDriver. "
                 "Install it with: pip install acsylla"
             ) from exc
+        self._acsylla = acsylla
         self._session = session
         self._default_keyspace = default_keyspace
         self._prepared: dict[str, Any] = {}
+        self._loop = loop or asyncio.new_event_loop()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -81,6 +88,10 @@ class AcsyllaDriver(AbstractDriver):
         for row in result:
             rows.append(dict(row))
         return rows
+
+    def _cql_to_statement(self, cql: str) -> Any:
+        """Wrap a raw CQL string in an acsylla Statement for session.execute()."""
+        return self._acsylla.create_statement(cql, parameters=0)
 
     # ------------------------------------------------------------------
     # Asynchronous interface
@@ -109,22 +120,22 @@ class AcsyllaDriver(AbstractDriver):
         from coodie.cql_builder import build_create_table, build_create_index
 
         create_cql = build_create_table(table, keyspace, cols)
-        await self._session.execute(create_cql)
+        await self._session.execute(self._cql_to_statement(create_cql))
 
         # Secondary indexes
         for col in cols:
             if col.index:
                 index_cql = build_create_index(table, keyspace, col)
-                await self._session.execute(index_cql)
+                await self._session.execute(self._cql_to_statement(index_cql))
 
     async def close_async(self) -> None:
         await self._session.close()
 
     # ------------------------------------------------------------------
-    # Synchronous interface (asyncio.run bridge)
-    # Note: these methods must only be called from non-async contexts.
-    # Calling them from within a running event loop will raise RuntimeError.
-    # For async contexts, use the *_async variants directly.
+    # Synchronous interface (event-loop bridge)
+    # Uses the stored event loop so the acsylla session — which is bound
+    # to a specific loop — is always accessed from the correct one.
+    # Must only be called from non-async contexts.
     # ------------------------------------------------------------------
 
     def execute(
@@ -134,7 +145,7 @@ class AcsyllaDriver(AbstractDriver):
         consistency: str | None = None,
         timeout: float | None = None,
     ) -> list[dict[str, Any]]:
-        return asyncio.run(
+        return self._loop.run_until_complete(
             self.execute_async(stmt, params, consistency=consistency, timeout=timeout)
         )
 
@@ -144,7 +155,7 @@ class AcsyllaDriver(AbstractDriver):
         keyspace: str,
         cols: list[Any],
     ) -> None:
-        asyncio.run(self.sync_table_async(table, keyspace, cols))
+        self._loop.run_until_complete(self.sync_table_async(table, keyspace, cols))
 
     def close(self) -> None:
-        asyncio.run(self.close_async())
+        self._loop.run_until_complete(self.close_async())

@@ -125,3 +125,66 @@ async def test_update_collection_add(registered_mock_driver):
 async def test_update_noop_when_empty(registered_mock_driver):
     await QuerySet(AsyncItem).filter(name="old").update()
     assert len(registered_mock_driver.executed) == 0
+
+
+# ------------------------------------------------------------------
+# LWT chain methods
+# ------------------------------------------------------------------
+
+
+async def test_if_not_exists_returns_new_queryset(registered_mock_driver):
+    qs = QuerySet(AsyncItem).if_not_exists()
+    assert qs._if_not_exists_val is True
+
+
+async def test_if_exists_returns_new_queryset(registered_mock_driver):
+    qs = QuerySet(AsyncItem).if_exists()
+    assert qs._if_exists_val is True
+
+
+async def test_if_not_exists_create(registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"[applied]": True}])
+    result = (
+        await QuerySet(AsyncItem)
+        .if_not_exists()
+        .create(id=uuid4(), name="Widget", rating=5)
+    )
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "INSERT INTO" in stmt
+    assert "IF NOT EXISTS" in stmt
+    assert result is not None
+    assert result.applied is True
+
+
+async def test_if_not_exists_create_not_applied(registered_mock_driver):
+    registered_mock_driver.set_return_rows(
+        [{"[applied]": False, "id": "existing-id", "name": "Old", "rating": 3}]
+    )
+    result = (
+        await QuerySet(AsyncItem)
+        .if_not_exists()
+        .create(id=uuid4(), name="Widget", rating=5)
+    )
+    assert result is not None
+    assert result.applied is False
+    assert result.existing is not None
+
+
+async def test_if_exists_delete(registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"[applied]": True}])
+    result = await QuerySet(AsyncItem).filter(name="Widget").if_exists().delete()
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "DELETE FROM" in stmt
+    assert "IF EXISTS" in stmt
+    assert result is not None
+    assert result.applied is True
+
+
+async def test_if_exists_preserved_through_chaining(registered_mock_driver):
+    qs = QuerySet(AsyncItem).if_exists().filter(name="Widget").limit(5)
+    assert qs._if_exists_val is True
+
+
+async def test_if_not_exists_preserved_through_chaining(registered_mock_driver):
+    qs = QuerySet(AsyncItem).if_not_exists().filter(name="Widget").limit(5)
+    assert qs._if_not_exists_val is True

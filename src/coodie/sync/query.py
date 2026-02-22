@@ -7,10 +7,12 @@ from coodie.cql_builder import (
     build_count,
     build_delete,
     build_update,
+    build_insert,
     parse_filter_kwargs,
     parse_update_kwargs,
 )
 from coodie.exceptions import InvalidQueryError
+from coodie.results import LWTResult
 from coodie.types import coerce_row_none_collections
 
 if TYPE_CHECKING:
@@ -28,12 +30,16 @@ class QuerySet:
         limit_val: int | None = None,
         order_by_val: list[str] | None = None,
         allow_filtering_val: bool = False,
+        if_not_exists_val: bool = False,
+        if_exists_val: bool = False,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
         self._limit_val = limit_val
         self._order_by_val: list[str] = order_by_val or []
         self._allow_filtering_val = allow_filtering_val
+        self._if_not_exists_val = if_not_exists_val
+        self._if_exists_val = if_exists_val
 
     # ------------------------------------------------------------------
     # Chainable builder methods
@@ -47,6 +53,8 @@ class QuerySet:
             limit_val=self._limit_val,
             order_by_val=self._order_by_val,
             allow_filtering_val=self._allow_filtering_val,
+            if_not_exists_val=self._if_not_exists_val,
+            if_exists_val=self._if_exists_val,
         )
 
     def limit(self, n: int) -> QuerySet:
@@ -56,6 +64,8 @@ class QuerySet:
             limit_val=n,
             order_by_val=self._order_by_val,
             allow_filtering_val=self._allow_filtering_val,
+            if_not_exists_val=self._if_not_exists_val,
+            if_exists_val=self._if_exists_val,
         )
 
     def order_by(self, *cols: str) -> QuerySet:
@@ -65,6 +75,8 @@ class QuerySet:
             limit_val=self._limit_val,
             order_by_val=list(cols),
             allow_filtering_val=self._allow_filtering_val,
+            if_not_exists_val=self._if_not_exists_val,
+            if_exists_val=self._if_exists_val,
         )
 
     def allow_filtering(self) -> QuerySet:
@@ -74,6 +86,32 @@ class QuerySet:
             limit_val=self._limit_val,
             order_by_val=self._order_by_val,
             allow_filtering_val=True,
+            if_not_exists_val=self._if_not_exists_val,
+            if_exists_val=self._if_exists_val,
+        )
+
+    def if_not_exists(self) -> QuerySet:
+        """Chain modifier — adds ``IF NOT EXISTS`` to INSERT statements."""
+        return QuerySet(
+            self._doc_cls,
+            where=self._where,
+            limit_val=self._limit_val,
+            order_by_val=self._order_by_val,
+            allow_filtering_val=self._allow_filtering_val,
+            if_not_exists_val=True,
+            if_exists_val=self._if_exists_val,
+        )
+
+    def if_exists(self) -> QuerySet:
+        """Chain modifier — adds ``IF EXISTS`` to DELETE statements."""
+        return QuerySet(
+            self._doc_cls,
+            where=self._where,
+            limit_val=self._limit_val,
+            order_by_val=self._order_by_val,
+            allow_filtering_val=self._allow_filtering_val,
+            if_not_exists_val=self._if_not_exists_val,
+            if_exists_val=True,
         )
 
     # ------------------------------------------------------------------
@@ -135,9 +173,31 @@ class QuerySet:
             return int(next(iter(row.values())))
         return 0
 
-    def delete(self) -> None:
-        cql, params = build_delete(self._table(), self._keyspace(), self._where)
-        self._get_driver().execute(cql, params)
+    def delete(self) -> LWTResult | None:
+        cql, params = build_delete(
+            self._table(),
+            self._keyspace(),
+            self._where,
+            if_exists=self._if_exists_val,
+        )
+        rows = self._get_driver().execute(cql, params)
+        if self._if_exists_val:
+            return _parse_lwt_result(rows)
+        return None
+
+    def create(self, **kwargs: Any) -> LWTResult | None:
+        """Insert a new document. Respects ``if_not_exists()`` chain modifier."""
+        data = kwargs
+        cql, params = build_insert(
+            self._table(),
+            self._keyspace(),
+            data,
+            if_not_exists=self._if_not_exists_val,
+        )
+        rows = self._get_driver().execute(cql, params)
+        if self._if_not_exists_val:
+            return _parse_lwt_result(rows)
+        return None
 
     def update(
         self,
@@ -165,6 +225,16 @@ class QuerySet:
 
     def __len__(self) -> int:
         return self.count()
+
+
+def _parse_lwt_result(rows: list[dict[str, Any]]) -> LWTResult:
+    """Parse the result of a LWT operation into a :class:`LWTResult`."""
+    if not rows:
+        return LWTResult(applied=True)
+    row = rows[0]
+    applied = row.get("[applied]", True)
+    existing = {k: v for k, v in row.items() if k != "[applied]"} or None
+    return LWTResult(applied=applied, existing=existing)
 
 
 def _snake_case(name: str) -> str:

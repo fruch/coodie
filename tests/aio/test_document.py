@@ -207,3 +207,69 @@ async def test_update_noop_when_empty(registered_mock_driver):
     await p.update()
     assert len(registered_mock_driver.executed) == 0
     assert p.name == "Widget"
+
+
+# ------------------------------------------------------------------
+# LWT / update() tests
+# ------------------------------------------------------------------
+
+
+async def test_update_generates_update_cql(registered_mock_driver):
+    p = AsyncProduct(name="Widget", price=9.99)
+    await p.update(name="NewWidget")
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert "UPDATE test_ks.async_products" in stmt
+    assert 'SET "name" = ?' in stmt
+    assert "NewWidget" in params
+
+
+async def test_update_with_if_conditions_not_applied(registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"[applied]": False, "name": "OtherName"}])
+    p = AsyncProduct(name="Widget", price=9.99)
+    result = await p.update(if_conditions={"name": "Widget"}, name="NewWidget")
+    assert result is not None
+    assert result.applied is False
+    assert result.existing == {"name": "OtherName"}
+
+
+async def test_update_with_if_exists(registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"[applied]": True}])
+    p = AsyncProduct(name="Widget", price=9.99)
+    result = await p.update(if_exists=True, name="NewWidget")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "IF EXISTS" in stmt
+    assert result is not None
+    assert result.applied is True
+
+
+async def test_update_no_kwargs_noop(registered_mock_driver):
+    p = AsyncProduct(name="Widget", price=9.99)
+    result = await p.update()
+    assert result is None
+    assert len(registered_mock_driver.executed) == 0
+
+
+async def test_delete_if_exists(registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"[applied]": True}])
+    p = AsyncProduct(name="Widget")
+    result = await p.delete(if_exists=True)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "DELETE FROM test_ks.async_products" in stmt
+    assert "IF EXISTS" in stmt
+    assert result is not None
+    assert result.applied is True
+
+
+async def test_delete_if_exists_not_applied(registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"[applied]": False}])
+    p = AsyncProduct(name="Widget")
+    result = await p.delete(if_exists=True)
+    assert result is not None
+    assert result.applied is False
+
+
+async def test_delete_without_if_exists_returns_none(registered_mock_driver):
+    p = AsyncProduct(name="Widget")
+    result = await p.delete()
+    assert result is None

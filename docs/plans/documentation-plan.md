@@ -169,7 +169,7 @@ class Greeting(Document):
         table_name = "greetings"
 
 # Create the table — like CREATE TABLE but without the carpal tunnel
-await Greeting.sync_table()
+Greeting.sync_table()
 
 # Insert a greeting
 hello = Greeting(id=uuid4(), message="Hello, World!", shouted=False)

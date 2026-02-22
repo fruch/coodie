@@ -204,6 +204,28 @@ def build_insert(
     return cql, vals
 
 
+def parse_update_kwargs(
+    kwargs: dict[str, Any],
+) -> tuple[dict[str, Any], list[tuple[str, str, Any]]]:
+    """Parse update kwargs into regular set data and collection operations.
+
+    Returns ``(set_data, collection_ops)`` where *collection_ops* is a list of
+    ``(column, operator, value)`` tuples.  Supported operators: ``add``,
+    ``remove``, ``append``, ``prepend``.
+    """
+    collection_operators = {"add", "remove", "append", "prepend"}
+    set_data: dict[str, Any] = {}
+    collection_ops: list[tuple[str, str, Any]] = []
+    for key, value in kwargs.items():
+        parts = key.rsplit("__", 1)
+        if len(parts) == 2 and parts[1] in collection_operators:
+            col, op = parts
+            collection_ops.append((col, op, value))
+        else:
+            set_data[key] = value
+    return set_data, collection_ops
+
+
 def build_update(
     table: str,
     keyspace: str,
@@ -211,9 +233,22 @@ def build_update(
     where: list[tuple[str, str, Any]],
     ttl: int | None = None,
     if_conditions: dict[str, Any] | None = None,
+    collection_ops: list[tuple[str, str, Any]] | None = None,
 ) -> tuple[str, list[Any]]:
     set_parts = [f'"{k}" = ?' for k in set_data]
     params: list[Any] = list(set_data.values())
+
+    if collection_ops:
+        for col, op, value in collection_ops:
+            if op in ("add", "append"):
+                set_parts.append(f'"{col}" = "{col}" + ?')
+                params.append(value)
+            elif op == "prepend":
+                set_parts.append(f'"{col}" = ? + "{col}"')
+                params.append(value)
+            elif op == "remove":
+                set_parts.append(f'"{col}" = "{col}" - ?')
+                params.append(value)
 
     cql = f"UPDATE {keyspace}.{table}"
     if ttl is not None:

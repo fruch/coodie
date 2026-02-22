@@ -77,3 +77,51 @@ async def test_filter_chaining(registered_mock_driver):
     stmt, params = registered_mock_driver.executed[0]
     assert "LIMIT 5" in stmt
     assert "ALLOW FILTERING" in stmt
+
+
+# --- Phase 3: async QuerySet.update() ---
+
+
+async def test_update_basic(registered_mock_driver):
+    await QuerySet(AsyncItem).filter(name="old").update(name="new")
+    stmt, params = registered_mock_driver.executed[0]
+    assert "UPDATE test_ks.async_items" in stmt
+    assert '"name" = ?' in stmt
+    assert "new" in params
+
+
+async def test_update_with_ttl(registered_mock_driver):
+    await QuerySet(AsyncItem).filter(name="old").update(ttl=300, name="new")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TTL 300" in stmt
+
+
+async def test_update_with_if_conditions(registered_mock_driver):
+    await (
+        QuerySet(AsyncItem)
+        .filter(name="old")
+        .update(if_conditions={"rating": 5}, name="new")
+    )
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'IF "rating" = ?' in stmt
+    assert 5 in params
+
+
+async def test_update_collection_add(registered_mock_driver):
+    class AsyncTagItem(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+        tags: set[str] = set()
+
+        class Settings:
+            name = "async_tag_items"
+            keyspace = "test_ks"
+
+    await QuerySet(AsyncTagItem).filter(id=uuid4()).update(tags__add={"x"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"tags" = "tags" + ?' in stmt
+    assert {"x"} in params
+
+
+async def test_update_noop_when_empty(registered_mock_driver):
+    await QuerySet(AsyncItem).filter(name="old").update()
+    assert len(registered_mock_driver.executed) == 0

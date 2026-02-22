@@ -16,6 +16,7 @@ from coodie.cql_builder import (
     build_update,
     build_where_clause,
     parse_filter_kwargs,
+    parse_update_kwargs,
 )
 from coodie.schema import ColumnDefinition
 
@@ -247,3 +248,112 @@ def test_build_counter_update_decrement():
     )
     assert '"view_count" = "view_count" + ?' in cql
     assert params == [-1, "/home"]
+
+
+# --- Phase 3: Partial Update API ---
+
+
+def test_parse_update_kwargs_regular():
+    set_data, ops = parse_update_kwargs({"name": "Y", "price": 10})
+    assert set_data == {"name": "Y", "price": 10}
+    assert ops == []
+
+
+def test_parse_update_kwargs_collection_ops():
+    set_data, ops = parse_update_kwargs(
+        {"tags__add": {"new"}, "items__remove": ["old"], "name": "X"}
+    )
+    assert set_data == {"name": "X"}
+    assert ("tags", "add", {"new"}) in ops
+    assert ("items", "remove", ["old"]) in ops
+
+
+def test_parse_update_kwargs_append_prepend():
+    set_data, ops = parse_update_kwargs(
+        {"items__append": ["z"], "items__prepend": ["a"]}
+    )
+    assert set_data == {}
+    assert ("items", "append", ["z"]) in ops
+    assert ("items", "prepend", ["a"]) in ops
+
+
+def test_build_update_with_ttl():
+    cql, params = build_update(
+        "products", "ks", set_data={"name": "Y"}, where=[("id", "=", "1")], ttl=300
+    )
+    assert "USING TTL 300" in cql
+    assert 'SET "name" = ?' in cql
+    assert params == ["Y", "1"]
+
+
+def test_build_update_with_if_conditions():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        if_conditions={"name": "X"},
+    )
+    assert 'IF "name" = ?' in cql
+    assert params == ["Y", "1", "X"]
+
+
+def test_build_update_collection_add():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("tags", "add", {"new_tag"})],
+    )
+    assert '"tags" = "tags" + ?' in cql
+    assert params == [{"new_tag"}, "1"]
+
+
+def test_build_update_collection_remove():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("tags", "remove", {"old_tag"})],
+    )
+    assert '"tags" = "tags" - ?' in cql
+    assert params == [{"old_tag"}, "1"]
+
+
+def test_build_update_collection_append():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("items", "append", ["z"])],
+    )
+    assert '"items" = "items" + ?' in cql
+    assert params == [["z"], "1"]
+
+
+def test_build_update_collection_prepend():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("items", "prepend", ["a"])],
+    )
+    assert '"items" = ? + "items"' in cql
+    assert params == [["a"], "1"]
+
+
+def test_build_update_mixed_set_and_collection_ops():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        collection_ops=[("tags", "add", {"new"})],
+    )
+    assert '"name" = ?' in cql
+    assert '"tags" = "tags" + ?' in cql
+    assert params == ["Y", {"new"}, "1"]

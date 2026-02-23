@@ -1525,6 +1525,77 @@ class TestSyncExtended:
 
         SyncExtendedTypes(id=rid).delete()
 
+    # ------------------------------------------------------------------
+    # Phase 11: QuerySet Enhancements
+    # ------------------------------------------------------------------
+
+    def test_only_column_projection(self, coodie_driver: object) -> None:
+        """`.only()` returns Documents with only the selected columns populated."""
+        SyncProduct.sync_table()
+        pid = uuid4()
+        SyncProduct(id=pid, name="OnlyTest", brand="OnlyBrand", price=5.0).save()
+
+        from coodie.sync.query import QuerySet
+
+        results = QuerySet(SyncProduct).filter(id=pid).only("id", "name").all()
+        assert len(results) >= 1
+        found = [r for r in results if r.id == pid][0]
+        assert found.name == "OnlyTest"
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_defer_excludes_columns(self, coodie_driver: object) -> None:
+        """`.defer()` excludes the specified columns from the SELECT."""
+        SyncProduct.sync_table()
+        pid = uuid4()
+        SyncProduct(id=pid, name="DeferTest", brand="DeferBrand", price=7.0).save()
+
+        from coodie.sync.query import QuerySet
+
+        results = QuerySet(SyncProduct).filter(id=pid).defer("description").all()
+        assert len(results) >= 1
+        found = [r for r in results if r.id == pid][0]
+        assert found.name == "DeferTest"
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_values_list_returns_tuples(self, coodie_driver: object) -> None:
+        """`.values_list()` returns a list of tuples."""
+        SyncProduct.sync_table()
+        pid = uuid4()
+        SyncProduct(id=pid, name="VLTest", brand="VLBrand", price=3.0).save()
+
+        from coodie.sync.query import QuerySet
+
+        results = QuerySet(SyncProduct).filter(id=pid).values_list("id", "name").all()
+        assert len(results) >= 1
+        assert isinstance(results[0], tuple)
+        matching = [r for r in results if r[0] == pid]
+        assert len(matching) == 1
+        assert matching[0][1] == "VLTest"
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_per_partition_limit(self, coodie_driver: object) -> None:
+        """`.per_partition_limit()` limits rows per partition."""
+        SyncEvent.sync_table()
+        pa = f"ppl_sync_{uuid4().hex[:6]}"
+        pb = "ppl_b"
+        for seq in range(5):
+            SyncEvent(partition_a=pa, partition_b=pb, seq=seq, payload=f"p{seq}").save()
+
+        from coodie.sync.query import QuerySet
+
+        results = (
+            QuerySet(SyncEvent)
+            .filter(partition_a=pa, partition_b=pb)
+            .per_partition_limit(2)
+            .all()
+        )
+        assert len(results) <= 2
+
+        QuerySet(SyncEvent).filter(partition_a=pa, partition_b=pb).delete()
+
 
 # ===========================================================================
 # Extended asynchronous integration tests
@@ -1907,3 +1978,78 @@ class TestAsyncExtended:
         assert fetched.frozen_map == {"k": 99}
 
         await AsyncExtendedTypes(id=rid).delete()
+
+    # ------------------------------------------------------------------
+    # Phase 11: QuerySet Enhancements (async)
+    # ------------------------------------------------------------------
+
+    async def test_only_column_projection(self, coodie_driver: object) -> None:
+        """`.only()` returns Documents with only the selected columns populated."""
+        await AsyncProduct.sync_table()
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="OnlyAsync", brand="OnlyB", price=5.0).save()
+
+        from coodie.aio.query import QuerySet
+
+        results = await QuerySet(AsyncProduct).filter(id=pid).only("id", "name").all()
+        assert len(results) >= 1
+        found = [r for r in results if r.id == pid][0]
+        assert found.name == "OnlyAsync"
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_defer_excludes_columns(self, coodie_driver: object) -> None:
+        """`.defer()` excludes the specified columns from the SELECT."""
+        await AsyncProduct.sync_table()
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="DeferAsync", brand="DeferB", price=7.0).save()
+
+        from coodie.aio.query import QuerySet
+
+        results = await QuerySet(AsyncProduct).filter(id=pid).defer("description").all()
+        assert len(results) >= 1
+        found = [r for r in results if r.id == pid][0]
+        assert found.name == "DeferAsync"
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_values_list_returns_tuples(self, coodie_driver: object) -> None:
+        """`.values_list()` returns a list of tuples."""
+        await AsyncProduct.sync_table()
+        pid = uuid4()
+        await AsyncProduct(id=pid, name="VLAsync", brand="VLB", price=3.0).save()
+
+        from coodie.aio.query import QuerySet
+
+        results = (
+            await QuerySet(AsyncProduct).filter(id=pid).values_list("id", "name").all()
+        )
+        assert len(results) >= 1
+        assert isinstance(results[0], tuple)
+        matching = [r for r in results if r[0] == pid]
+        assert len(matching) == 1
+        assert matching[0][1] == "VLAsync"
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_per_partition_limit(self, coodie_driver: object) -> None:
+        """`.per_partition_limit()` limits rows per partition."""
+        await AsyncEvent.sync_table()
+        pa = f"ppl_async_{uuid4().hex[:6]}"
+        pb = "ppl_b"
+        for seq in range(5):
+            await AsyncEvent(
+                partition_a=pa, partition_b=pb, seq=seq, payload=f"p{seq}"
+            ).save()
+
+        from coodie.aio.query import QuerySet
+
+        results = (
+            await QuerySet(AsyncEvent)
+            .filter(partition_a=pa, partition_b=pb)
+            .per_partition_limit(2)
+            .all()
+        )
+        assert len(results) <= 2
+
+        await QuerySet(AsyncEvent).filter(partition_a=pa, partition_b=pb).delete()

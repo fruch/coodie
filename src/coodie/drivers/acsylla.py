@@ -116,10 +116,13 @@ class AcsyllaDriver(AbstractDriver):
         table: str,
         keyspace: str,
         cols: list[Any],
+        table_options: dict[str, Any] | None = None,
     ) -> None:
         from coodie.cql_builder import build_create_table, build_create_index
 
-        create_cql = build_create_table(table, keyspace, cols)
+        create_cql = build_create_table(
+            table, keyspace, cols, table_options=table_options
+        )
         await self._session.execute(self._cql_to_statement(create_cql))
 
         # Secondary indexes
@@ -154,8 +157,11 @@ class AcsyllaDriver(AbstractDriver):
         table: str,
         keyspace: str,
         cols: list[Any],
+        table_options: dict[str, Any] | None = None,
     ) -> None:
-        self._loop.run_until_complete(self.sync_table_async(table, keyspace, cols))
+        self._loop.run_until_complete(
+            self.sync_table_async(table, keyspace, cols, table_options=table_options)
+        )
 
     def close(self) -> None:
         self._loop.run_until_complete(self.close_async())

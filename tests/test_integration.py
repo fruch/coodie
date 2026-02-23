@@ -474,6 +474,7 @@ class TestSyncIntegration:
 
 
 @pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
 class TestAsyncIntegration:
     """Full CRUD tests using coodie.aio against the same ScyllaDB container."""
 
@@ -735,6 +736,7 @@ class TestSyncRawCQL:
 
 
 @pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
 class TestAsyncRawCQL:
     """Test execute_raw (async) against a real ScyllaDB container."""
 
@@ -1474,6 +1476,7 @@ class TestSyncExtended:
 
 
 @pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
 class TestAsyncExtended:
     """Async counterparts of the extended sync tests."""
 

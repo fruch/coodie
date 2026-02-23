@@ -8,8 +8,10 @@ from coodie.cql_builder import (
     build_counter_update,
     build_create_index,
     build_create_keyspace,
+    build_create_materialized_view,
     build_create_table,
     build_delete,
+    build_drop_materialized_view,
     build_drop_table,
     build_insert,
     build_select,
@@ -591,3 +593,81 @@ def test_parse_filter_kwargs_mixed_token_and_regular():
     result = parse_filter_kwargs({"id__token__gt": 100, "name": "Alice"})
     assert ("id", "TOKEN >", 100) in result
     assert ("name", "=", "Alice") in result
+
+
+# ------------------------------------------------------------------
+# Phase 12: Materialized Views
+# ------------------------------------------------------------------
+
+
+def test_build_create_materialized_view_simple():
+    cql = build_create_materialized_view(
+        view_name="products_by_brand",
+        keyspace="ks",
+        base_table="products",
+        columns=["*"],
+        primary_key_columns=["brand"],
+        clustering_columns=["id"],
+        where_clause='"brand" IS NOT NULL AND "id" IS NOT NULL',
+    )
+    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS ks.products_by_brand" in cql
+    assert "AS SELECT * FROM ks.products" in cql
+    assert '"brand" IS NOT NULL AND "id" IS NOT NULL' in cql
+    assert 'PRIMARY KEY ("brand", "id")' in cql
+
+
+def test_build_create_materialized_view_specific_columns():
+    cql = build_create_materialized_view(
+        view_name="products_by_brand",
+        keyspace="ks",
+        base_table="products",
+        columns=["id", "name", "brand"],
+        primary_key_columns=["brand"],
+        clustering_columns=["id"],
+        where_clause='"brand" IS NOT NULL AND "id" IS NOT NULL',
+    )
+    assert 'SELECT "id", "name", "brand" FROM ks.products' in cql
+
+
+def test_build_create_materialized_view_composite_pk():
+    cql = build_create_materialized_view(
+        view_name="mv_test",
+        keyspace="ks",
+        base_table="base",
+        columns=["*"],
+        primary_key_columns=["a", "b"],
+        where_clause='"a" IS NOT NULL AND "b" IS NOT NULL',
+    )
+    assert 'PRIMARY KEY (("a", "b"))' in cql
+
+
+def test_build_create_materialized_view_no_clustering():
+    cql = build_create_materialized_view(
+        view_name="mv_test",
+        keyspace="ks",
+        base_table="base",
+        columns=["*"],
+        primary_key_columns=["id"],
+        where_clause='"id" IS NOT NULL',
+    )
+    assert 'PRIMARY KEY ("id")' in cql
+
+
+def test_build_create_materialized_view_with_clustering_order():
+    cql = build_create_materialized_view(
+        view_name="products_by_brand",
+        keyspace="ks",
+        base_table="products",
+        columns=["*"],
+        primary_key_columns=["brand"],
+        clustering_columns=["created_at"],
+        where_clause='"brand" IS NOT NULL AND "created_at" IS NOT NULL',
+        clustering_order={"created_at": "DESC"},
+    )
+    assert "WITH CLUSTERING ORDER BY" in cql
+    assert '"created_at" DESC' in cql
+
+
+def test_build_drop_materialized_view():
+    cql = build_drop_materialized_view("products_by_brand", "ks")
+    assert cql == "DROP MATERIALIZED VIEW IF EXISTS ks.products_by_brand"

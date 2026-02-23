@@ -92,6 +92,71 @@ def build_drop_table(table: str, keyspace: str) -> str:
     return f"DROP TABLE IF EXISTS {keyspace}.{table}"
 
 
+def build_create_materialized_view(
+    view_name: str,
+    keyspace: str,
+    base_table: str,
+    columns: list[str],
+    primary_key_columns: list[str],
+    clustering_columns: list[str] | None = None,
+    where_clause: str | None = None,
+    clustering_order: dict[str, str] | None = None,
+) -> str:
+    """Build a ``CREATE MATERIALIZED VIEW`` CQL statement.
+
+    Args:
+        view_name: Name of the materialized view.
+        keyspace: Keyspace for the view.
+        base_table: The base table the view selects from.
+        columns: Columns to include (use ``["*"]`` for all).
+        primary_key_columns: Partition key column(s).
+        clustering_columns: Optional clustering column(s).
+        where_clause: The ``WHERE`` clause required by CQL (e.g.
+            ``'"col" IS NOT NULL AND "pk" IS NOT NULL'``).
+        clustering_order: Optional dict mapping column name to ``"ASC"``/``"DESC"``.
+    """
+    cols_str = ", ".join(c if c == "*" else f'"{c}"' for c in columns)
+
+    if len(primary_key_columns) == 1:
+        pk_str = f'"{primary_key_columns[0]}"'
+    else:
+        pk_str = "(" + ", ".join(f'"{c}"' for c in primary_key_columns) + ")"
+
+    if clustering_columns:
+        key_str = (
+            f"PRIMARY KEY ({pk_str}, "
+            + ", ".join(f'"{c}"' for c in clustering_columns)
+            + ")"
+        )
+    else:
+        key_str = f"PRIMARY KEY ({pk_str})"
+
+    cql = (
+        f"CREATE MATERIALIZED VIEW IF NOT EXISTS {keyspace}.{view_name} "
+        f"AS SELECT {cols_str} FROM {keyspace}.{base_table}"
+    )
+
+    if where_clause:
+        cql += f" WHERE {where_clause}"
+
+    cql += f" {key_str}"
+
+    with_parts: list[str] = []
+    if clustering_order:
+        order_parts = [f'"{c}" {d}' for c, d in clustering_order.items()]
+        with_parts.append("CLUSTERING ORDER BY (" + ", ".join(order_parts) + ")")
+
+    if with_parts:
+        cql += " WITH " + " AND ".join(with_parts)
+
+    return cql
+
+
+def build_drop_materialized_view(view_name: str, keyspace: str) -> str:
+    """Build a ``DROP MATERIALIZED VIEW`` CQL statement."""
+    return f"DROP MATERIALIZED VIEW IF EXISTS {keyspace}.{view_name}"
+
+
 def parse_filter_kwargs(
     kwargs: dict[str, Any],
 ) -> list[tuple[str, str, Any]]:

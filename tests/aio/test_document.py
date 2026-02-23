@@ -6,8 +6,8 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import Field
 
-from coodie.fields import PrimaryKey, Indexed, Counter
-from coodie.aio.document import Document, CounterDocument
+from coodie.fields import PrimaryKey, ClusteringKey, Indexed, Counter
+from coodie.aio.document import Document, CounterDocument, MaterializedView
 from coodie.exceptions import (
     DocumentNotFound,
     MultipleDocumentsFound,
@@ -506,3 +506,104 @@ def test_table_name_snake_case():
             keyspace = "test_ks"
 
     assert MyAsyncSpecialDocument.table_name() == "my_async_special_document"
+
+
+# ------------------------------------------------------------------
+# Phase 12: Materialized View (async)
+# ------------------------------------------------------------------
+
+
+class AsyncProductsByBrand(MaterializedView):
+    brand: Annotated[str, PrimaryKey()]
+    id: Annotated[UUID, ClusteringKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    price: float = 0.0
+
+    class Settings:
+        name = "async_products_by_brand"
+        keyspace = "test_ks"
+        __base_table__ = "async_products"
+
+
+async def test_materialized_view_sync_view(registered_mock_driver):
+    """12.3 – sync_view() generates CREATE MATERIALIZED VIEW."""
+    await AsyncProductsByBrand.sync_view()
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert (
+        "CREATE MATERIALIZED VIEW IF NOT EXISTS test_ks.async_products_by_brand" in stmt
+    )
+    assert "AS SELECT * FROM test_ks.async_products" in stmt
+    assert '"brand" IS NOT NULL' in stmt
+    assert '"id" IS NOT NULL' in stmt
+    assert params == []
+
+
+async def test_materialized_view_drop_view(registered_mock_driver):
+    """12.3 – drop_view() generates DROP MATERIALIZED VIEW."""
+    await AsyncProductsByBrand.drop_view()
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert stmt == "DROP MATERIALIZED VIEW IF EXISTS test_ks.async_products_by_brand"
+    assert params == []
+
+
+async def test_materialized_view_save_raises(registered_mock_driver):
+    """12.3 – save() is forbidden on materialized views."""
+    mv = AsyncProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        await mv.save()
+
+
+async def test_materialized_view_insert_raises(registered_mock_driver):
+    """12.3 – insert() is forbidden on materialized views."""
+    mv = AsyncProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        await mv.insert()
+
+
+async def test_materialized_view_delete_raises(registered_mock_driver):
+    """12.3 – delete() is forbidden on materialized views."""
+    mv = AsyncProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        await mv.delete()
+
+
+async def test_materialized_view_update_raises(registered_mock_driver):
+    """12.3 – update() is forbidden on materialized views."""
+    mv = AsyncProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        await mv.update(name="X")
+
+
+async def test_materialized_view_find(registered_mock_driver):
+    """12.3 – find() works on materialized views (read operations allowed)."""
+    from coodie.aio.query import QuerySet
+
+    qs = AsyncProductsByBrand.find(brand="Acme")
+    assert isinstance(qs, QuerySet)
+
+
+async def test_materialized_view_find_one(registered_mock_driver):
+    """12.3 – find_one() works on materialized views."""
+    pid = uuid4()
+    registered_mock_driver.set_return_rows(
+        [{"brand": "Acme", "id": pid, "name": "Widget", "price": 9.99}]
+    )
+    doc = await AsyncProductsByBrand.find_one(brand="Acme")
+    assert isinstance(doc, AsyncProductsByBrand)
+    assert doc.brand == "Acme"
+
+
+async def test_materialized_view_no_base_table_raises():
+    """12.3 – Missing __base_table__ raises InvalidQueryError."""
+
+    class AsyncBadView(MaterializedView):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
+        class Settings:
+            name = "bad_view"
+            keyspace = "test_ks"
+
+    with pytest.raises(InvalidQueryError, match="__base_table__"):
+        AsyncBadView._get_base_table()

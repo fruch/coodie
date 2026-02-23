@@ -6,8 +6,8 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import Field
 
-from coodie.fields import PrimaryKey, Indexed, Counter
-from coodie.sync.document import Document, CounterDocument
+from coodie.fields import PrimaryKey, ClusteringKey, Indexed, Counter
+from coodie.sync.document import Document, CounterDocument, MaterializedView
 from coodie.exceptions import (
     DocumentNotFound,
     MultipleDocumentsFound,
@@ -558,3 +558,142 @@ def test_table_name_snake_case():
             keyspace = "test_ks"
 
     assert MySpecialDocument.table_name() == "my_special_document"
+
+
+# ------------------------------------------------------------------
+# Phase 12: Materialized View
+# ------------------------------------------------------------------
+
+
+class ProductsByBrand(MaterializedView):
+    brand: Annotated[str, PrimaryKey()]
+    id: Annotated[UUID, ClusteringKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    price: float = 0.0
+
+    class Settings:
+        name = "products_by_brand"
+        keyspace = "test_ks"
+        __base_table__ = "products"
+
+
+def test_materialized_view_sync_view(registered_mock_driver):
+    """12.3 – sync_view() generates CREATE MATERIALIZED VIEW."""
+    ProductsByBrand.sync_view()
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS test_ks.products_by_brand" in stmt
+    assert "AS SELECT * FROM test_ks.products" in stmt
+    assert '"brand" IS NOT NULL' in stmt
+    assert '"id" IS NOT NULL' in stmt
+    assert params == []
+
+
+def test_materialized_view_drop_view(registered_mock_driver):
+    """12.3 – drop_view() generates DROP MATERIALIZED VIEW."""
+    ProductsByBrand.drop_view()
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert stmt == "DROP MATERIALIZED VIEW IF EXISTS test_ks.products_by_brand"
+    assert params == []
+
+
+def test_materialized_view_save_raises(registered_mock_driver):
+    """12.3 – save() is forbidden on materialized views."""
+    mv = ProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        mv.save()
+
+
+def test_materialized_view_insert_raises(registered_mock_driver):
+    """12.3 – insert() is forbidden on materialized views."""
+    mv = ProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        mv.insert()
+
+
+def test_materialized_view_delete_raises(registered_mock_driver):
+    """12.3 – delete() is forbidden on materialized views."""
+    mv = ProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        mv.delete()
+
+
+def test_materialized_view_update_raises(registered_mock_driver):
+    """12.3 – update() is forbidden on materialized views."""
+    mv = ProductsByBrand(brand="Acme")
+    with pytest.raises(InvalidQueryError, match="read-only"):
+        mv.update(name="X")
+
+
+def test_materialized_view_find(registered_mock_driver):
+    """12.3 – find() works on materialized views (read operations allowed)."""
+    from coodie.sync.query import QuerySet
+
+    qs = ProductsByBrand.find(brand="Acme")
+    assert isinstance(qs, QuerySet)
+
+
+def test_materialized_view_find_one(registered_mock_driver):
+    """12.3 – find_one() works on materialized views."""
+    pid = uuid4()
+    registered_mock_driver.set_return_rows(
+        [{"brand": "Acme", "id": pid, "name": "Widget", "price": 9.99}]
+    )
+    doc = ProductsByBrand.find_one(brand="Acme")
+    assert isinstance(doc, ProductsByBrand)
+    assert doc.brand == "Acme"
+
+
+def test_materialized_view_no_base_table_raises():
+    """12.3 – Missing __base_table__ raises InvalidQueryError."""
+
+    class BadView(MaterializedView):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+
+        class Settings:
+            name = "bad_view"
+            keyspace = "test_ks"
+
+    with pytest.raises(InvalidQueryError, match="__base_table__"):
+        BadView._get_base_table()
+
+
+def test_materialized_view_custom_where_clause(registered_mock_driver):
+    """12.3 – Custom __where_clause__ is used."""
+
+    class CustomWhereView(MaterializedView):
+        brand: Annotated[str, PrimaryKey()]
+        id: Annotated[UUID, ClusteringKey()] = Field(default_factory=uuid4)
+        name: str = ""
+
+        class Settings:
+            name = "custom_where_view"
+            keyspace = "test_ks"
+            __base_table__ = "products"
+            __where_clause__ = (
+                '"brand" IS NOT NULL AND "id" IS NOT NULL AND "brand" = \'Acme\''
+            )
+
+    CustomWhereView.sync_view()
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "\"brand\" = 'Acme'" in stmt
+
+
+def test_materialized_view_custom_columns(registered_mock_driver):
+    """12.3 – Custom __view_columns__ selects specific columns."""
+
+    class ColumnsView(MaterializedView):
+        brand: Annotated[str, PrimaryKey()]
+        id: Annotated[UUID, ClusteringKey()] = Field(default_factory=uuid4)
+        name: str = ""
+
+        class Settings:
+            name = "columns_view"
+            keyspace = "test_ks"
+            __base_table__ = "products"
+            __view_columns__ = ["brand", "id", "name"]
+
+    ColumnsView.sync_view()
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT "brand", "id", "name" FROM test_ks.products' in stmt

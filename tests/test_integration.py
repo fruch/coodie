@@ -24,8 +24,13 @@ import pytest_asyncio
 from pydantic import Field, field_validator
 
 from coodie.aio.document import Document as AsyncDocument
+from coodie.aio.document import MaterializedView as AsyncMaterializedView
 from coodie.drivers import _registry, init_coodie
-from coodie.exceptions import DocumentNotFound, MultipleDocumentsFound
+from coodie.exceptions import (
+    DocumentNotFound,
+    InvalidQueryError,
+    MultipleDocumentsFound,
+)
 from coodie.fields import (
     Ascii,
     BigInt,
@@ -40,6 +45,7 @@ from coodie.fields import (
     VarInt,
 )
 from coodie.sync.document import Document as SyncDocument
+from coodie.sync.document import MaterializedView as SyncMaterializedView
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +265,34 @@ class AsyncReview(AsyncDocument):
         keyspace = "test_ks"
 
 
+class SyncProductsByBrand(SyncMaterializedView):
+    """Materialized view on SyncProduct indexed by brand."""
+
+    brand: Annotated[str, PrimaryKey()]
+    id: Annotated[UUID, ClusteringKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    price: float = 0.0
+
+    class Settings:
+        name = "it_sync_products_by_brand"
+        keyspace = "test_ks"
+        __base_table__ = "it_sync_products"
+
+
+class AsyncProductsByBrand(AsyncMaterializedView):
+    """Async materialized view on AsyncProduct indexed by brand."""
+
+    brand: Annotated[str, PrimaryKey()]
+    id: Annotated[UUID, ClusteringKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    price: float = 0.0
+
+    class Settings:
+        name = "it_async_products_by_brand"
+        keyspace = "test_ks"
+        __base_table__ = "it_async_products"
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -266,6 +300,26 @@ class AsyncReview(AsyncDocument):
 # Minimum Murmur3 token value — used for token-range queries that should match
 # every row (TOKEN(pk) > MIN_TOKEN covers the full ring).
 MIN_MURMUR3_TOKEN = -(2**63)
+
+
+def _retry_sync(fn, retries=5, delay=1):
+    """Retry a sync callable until it returns a truthy result."""
+    for attempt in range(retries):
+        result = fn()
+        if result:
+            return result
+        time.sleep(delay)
+    return fn()
+
+
+async def _retry_async(fn, retries=5, delay=1):
+    """Retry an async callable until it returns a truthy result."""
+    for attempt in range(retries):
+        result = await fn()
+        if result:
+            return result
+        await asyncio.sleep(delay)
+    return await fn()
 
 
 # ===========================================================================
@@ -2225,3 +2279,143 @@ class TestAsyncExtended:
         assert len(results) <= 2
 
         await QuerySet(AsyncEvent).filter(partition_a=pa, partition_b=pb).delete()
+
+
+# ===========================================================================
+# Materialized View integration tests
+# ===========================================================================
+
+
+@pytest.mark.integration
+class TestSyncMaterializedView:
+    """Sync materialized view integration tests."""
+
+    def test_sync_view_creates_view(self, coodie_driver: object) -> None:
+        """sync_view() should create the materialized view without raising."""
+        SyncProduct.sync_table()
+        SyncProductsByBrand.sync_view()
+
+    def test_insert_base_row_queryable_via_view(self, coodie_driver: object) -> None:
+        """Insert into the base table; query via the MV."""
+        SyncProduct.sync_table()
+        SyncProductsByBrand.sync_view()
+
+        pid = uuid4()
+        brand = f"mvbrand_{uuid4().hex[:6]}"
+        SyncProduct(id=pid, name="MVWidget", brand=brand, price=42.0).save()
+
+        # Materialized views are eventually consistent — retry until populated
+        results = _retry_sync(lambda: SyncProductsByBrand.find(brand=brand).all())
+        assert len(results) >= 1
+        match = [r for r in results if r.id == pid]
+        assert len(match) == 1
+        assert match[0].name == "MVWidget"
+        assert match[0].price == 42.0
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_find_one_via_view(self, coodie_driver: object) -> None:
+        """find_one() should work on materialized views."""
+        SyncProduct.sync_table()
+        SyncProductsByBrand.sync_view()
+
+        pid = uuid4()
+        brand = f"mvone_{uuid4().hex[:6]}"
+        SyncProduct(id=pid, name="MVOne", brand=brand, price=10.0).save()
+
+        doc = _retry_sync(lambda: SyncProductsByBrand.find_one(brand=brand))
+        assert doc is not None
+        assert doc.brand == brand
+        assert doc.name == "MVOne"
+
+        SyncProduct(id=pid, name="").delete()
+
+    def test_write_operations_raise(self, coodie_driver: object) -> None:
+        """save/insert/delete/update should raise on materialized views."""
+        mv = SyncProductsByBrand(brand="test")
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            mv.save()
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            mv.insert()
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            mv.delete()
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            mv.update(name="X")
+
+    def test_drop_view(self, coodie_driver: object) -> None:
+        """drop_view() should drop the materialized view without raising."""
+        SyncProduct.sync_table()
+        SyncProductsByBrand.sync_view()
+        SyncProductsByBrand.drop_view()
+        # Re-create for any subsequent tests
+        SyncProductsByBrand.sync_view()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+class TestAsyncMaterializedView:
+    """Async materialized view integration tests."""
+
+    async def test_sync_view_creates_view(self, coodie_driver: object) -> None:
+        """sync_view() should create the materialized view without raising."""
+        await AsyncProduct.sync_table()
+        await AsyncProductsByBrand.sync_view()
+
+    async def test_insert_base_row_queryable_via_view(
+        self, coodie_driver: object
+    ) -> None:
+        """Insert into the base table; query via the MV."""
+        await AsyncProduct.sync_table()
+        await AsyncProductsByBrand.sync_view()
+
+        pid = uuid4()
+        brand = f"mvbrand_async_{uuid4().hex[:6]}"
+        await AsyncProduct(id=pid, name="AsyncMVWidget", brand=brand, price=42.0).save()
+
+        # Materialized views are eventually consistent — retry until populated
+        results = await _retry_async(
+            lambda: AsyncProductsByBrand.find(brand=brand).all()
+        )
+        assert len(results) >= 1
+        match = [r for r in results if r.id == pid]
+        assert len(match) == 1
+        assert match[0].name == "AsyncMVWidget"
+        assert match[0].price == 42.0
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_find_one_via_view(self, coodie_driver: object) -> None:
+        """find_one() should work on materialized views."""
+        await AsyncProduct.sync_table()
+        await AsyncProductsByBrand.sync_view()
+
+        pid = uuid4()
+        brand = f"mvone_async_{uuid4().hex[:6]}"
+        await AsyncProduct(id=pid, name="AsyncMVOne", brand=brand, price=10.0).save()
+
+        doc = await _retry_async(lambda: AsyncProductsByBrand.find_one(brand=brand))
+        assert doc is not None
+        assert doc.brand == brand
+        assert doc.name == "AsyncMVOne"
+
+        await AsyncProduct(id=pid, name="").delete()
+
+    async def test_write_operations_raise(self, coodie_driver: object) -> None:
+        """save/insert/delete/update should raise on materialized views."""
+        mv = AsyncProductsByBrand(brand="test")
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            await mv.save()
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            await mv.insert()
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            await mv.delete()
+        with pytest.raises(InvalidQueryError, match="read-only"):
+            await mv.update(name="X")
+
+    async def test_drop_view(self, coodie_driver: object) -> None:
+        """drop_view() should drop the materialized view without raising."""
+        await AsyncProduct.sync_table()
+        await AsyncProductsByBrand.sync_view()
+        await AsyncProductsByBrand.drop_view()
+        # Re-create for any subsequent tests
+        await AsyncProductsByBrand.sync_view()

@@ -37,3 +37,15 @@ def test_counter_document_public_method_parity():
         f"sync-only: {sync_methods - async_methods}\n"
         f"async-only: {async_methods - sync_methods}"
     )
+
+
+def test_materialized_view_public_method_parity():
+    """Both sync and async MaterializedView must expose the same set of public method names."""
+    sync_methods = public_methods(sync_doc.MaterializedView)
+    async_methods = public_methods(aio_doc.MaterializedView)
+
+    assert sync_methods == async_methods, (
+        f"MaterializedView API drift detected!\n"
+        f"sync-only: {sync_methods - async_methods}\n"
+        f"async-only: {async_methods - sync_methods}"
+    )

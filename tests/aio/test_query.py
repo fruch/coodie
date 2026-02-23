@@ -256,3 +256,85 @@ async def test_chaining_preserves_execution_options(registered_mock_driver):
     await qs.all()
     assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
     assert registered_mock_driver.last_timeout == 5.0
+
+
+# ------------------------------------------------------------------
+# Phase 11: QuerySet Enhancements (async)
+# ------------------------------------------------------------------
+
+
+def test_only_returns_new_queryset(registered_mock_driver):
+    qs = QuerySet(AsyncItem).only("id", "name")
+    assert qs._only_val == ["id", "name"]
+
+
+async def test_only_generates_column_projection(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).only("id", "name").all()
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT "id", "name" FROM' in stmt
+
+
+def test_defer_returns_new_queryset(registered_mock_driver):
+    qs = QuerySet(AsyncItem).defer("rating")
+    assert qs._defer_val == ["rating"]
+
+
+async def test_defer_excludes_columns(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).defer("rating").all()
+    stmt, _ = registered_mock_driver.executed[0]
+    assert '"rating"' not in stmt
+    assert '"id"' in stmt
+    assert '"name"' in stmt
+
+
+async def test_values_list_returns_tuples(registered_mock_driver):
+    registered_mock_driver.set_return_rows(
+        [
+            {"id": uuid4(), "name": "A", "rating": 5},
+            {"id": uuid4(), "name": "B", "rating": 3},
+        ]
+    )
+    results = await QuerySet(AsyncItem).values_list("name", "rating").all()
+    assert results == [("A", 5), ("B", 3)]
+
+
+def test_values_list_preserves_through_chaining(registered_mock_driver):
+    qs = QuerySet(AsyncItem).values_list("name").filter(rating__gte=3).limit(5)
+    assert qs._values_list_val == ["name"]
+
+
+def test_per_partition_limit_returns_new_queryset(registered_mock_driver):
+    qs = QuerySet(AsyncItem).per_partition_limit(5)
+    assert qs._per_partition_limit_val == 5
+
+
+async def test_per_partition_limit_in_cql(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).per_partition_limit(3).all()
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "PER PARTITION LIMIT 3" in stmt
+
+
+async def test_like_filter(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).filter(name__like="Al%").all()
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"name" LIKE ?' in stmt
+    assert params == ["Al%"]
+
+
+def test_only_preserved_through_chaining(registered_mock_driver):
+    qs = QuerySet(AsyncItem).only("id", "name").filter(rating__gte=3).limit(5)
+    assert qs._only_val == ["id", "name"]
+
+
+def test_defer_preserved_through_chaining(registered_mock_driver):
+    qs = QuerySet(AsyncItem).defer("rating").filter(name="foo").limit(10)
+    assert qs._defer_val == ["rating"]
+
+
+def test_per_partition_limit_preserved_through_chaining(registered_mock_driver):
+    qs = QuerySet(AsyncItem).per_partition_limit(5).filter(name="foo").limit(10)
+    assert qs._per_partition_limit_val == 5

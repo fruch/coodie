@@ -116,6 +116,11 @@ def test_parse_filter_kwargs_in():
     assert result == [("id", "IN", [1, 2, 3])]
 
 
+def test_parse_filter_kwargs_like():
+    result = parse_filter_kwargs({"name__like": "Al%"})
+    assert result == [("name", "LIKE", "Al%")]
+
+
 def test_build_where_clause_empty():
     clause, params = build_where_clause([])
     assert clause == ""
@@ -159,6 +164,24 @@ def test_build_select_order_by_desc():
 def test_build_select_allow_filtering():
     cql, _ = build_select("products", "ks", allow_filtering=True)
     assert "ALLOW FILTERING" in cql
+
+
+def test_build_select_per_partition_limit():
+    cql, _ = build_select("products", "ks", per_partition_limit=5)
+    assert "PER PARTITION LIMIT 5" in cql
+
+
+def test_build_select_with_columns():
+    cql, _ = build_select("products", "ks", columns=["id", "name"])
+    assert 'SELECT "id", "name" FROM ks.products' == cql
+
+
+def test_build_select_like_filter():
+    cql, params = build_select(
+        "products", "ks", where=[("name", "LIKE", "Al%")]
+    )
+    assert '"name" LIKE ?' in cql
+    assert params == ["Al%"]
 
 
 def test_build_count():

@@ -40,6 +40,10 @@ class QuerySet:
         timestamp_val: int | None = None,
         consistency_val: str | None = None,
         timeout_val: float | None = None,
+        only_val: list[str] | None = None,
+        defer_val: list[str] | None = None,
+        values_list_val: list[str] | None = None,
+        per_partition_limit_val: int | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -52,6 +56,10 @@ class QuerySet:
         self._timestamp_val = timestamp_val
         self._consistency_val = consistency_val
         self._timeout_val = timeout_val
+        self._only_val = only_val
+        self._defer_val = defer_val
+        self._values_list_val = values_list_val
+        self._per_partition_limit_val = per_partition_limit_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -69,6 +77,10 @@ class QuerySet:
             timestamp_val=self._timestamp_val,
             consistency_val=self._consistency_val,
             timeout_val=self._timeout_val,
+            only_val=self._only_val,
+            defer_val=self._defer_val,
+            values_list_val=self._values_list_val,
+            per_partition_limit_val=self._per_partition_limit_val,
         )
         defaults.update(overrides)
         return QuerySet(self._doc_cls, **defaults)
@@ -127,9 +139,17 @@ class QuerySet:
             overrides["timeout_val"] = timeout
         return self._clone(**overrides)
 
-    # ------------------------------------------------------------------
-    # Terminal methods
-    # ------------------------------------------------------------------
+    def only(self, *columns: str) -> QuerySet:
+        return self._clone(only_val=list(columns))
+
+    def defer(self, *columns: str) -> QuerySet:
+        return self._clone(defer_val=list(columns))
+
+    def values_list(self, *columns: str) -> QuerySet:
+        return self._clone(values_list_val=list(columns))
+
+    def per_partition_limit(self, n: int) -> QuerySet:
+        return self._clone(per_partition_limit_val=n)
 
     def _get_driver(self) -> Any:
         from coodie.drivers import get_driver
@@ -142,18 +162,32 @@ class QuerySet:
     def _keyspace(self) -> str:
         return self._doc_cls._get_keyspace()
 
-    def all(self) -> list[Document]:
+    def _resolve_columns(self) -> list[str] | None:
+        if self._only_val:
+            return self._only_val
+        if self._defer_val:
+            all_cols = list(self._doc_cls.model_fields.keys())
+            return [c for c in all_cols if c not in self._defer_val]
+        return None
+
+    def all(self) -> list[Document] | list[tuple[Any, ...]]:
+        columns = self._resolve_columns()
         cql, params = build_select(
             self._table(),
             self._keyspace(),
+            columns=columns,
             where=self._where or None,
             limit=self._limit_val,
             order_by=self._order_by_val or None,
             allow_filtering=self._allow_filtering_val,
+            per_partition_limit=self._per_partition_limit_val,
         )
         rows = self._get_driver().execute(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val
         )
+        if self._values_list_val is not None:
+            vl_cols = self._values_list_val
+            return [tuple(row.get(c) for c in vl_cols) for row in rows]
         disc_col = _find_discriminator_column(self._doc_cls)
         if disc_col is not None:
             base = _resolve_polymorphic_base(self._doc_cls) or self._doc_cls

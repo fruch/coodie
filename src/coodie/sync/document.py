@@ -10,6 +10,8 @@ from coodie.cql_builder import (
     build_update,
     build_counter_update,
     build_drop_table,
+    build_create_materialized_view,
+    build_drop_materialized_view,
     parse_update_kwargs,
 )
 
@@ -385,3 +387,99 @@ def _parse_lwt_result(rows: list[dict[str, Any]]) -> LWTResult:
     applied = row.get("[applied]", True)
     existing = {k: v for k, v in row.items() if k != "[applied]"} or None
     return LWTResult(applied=applied, existing=existing)
+
+
+class MaterializedView(Document):
+    """Base class for synchronous materialized view documents (read-only).
+
+    Subclasses must define ``Settings`` with:
+
+    * ``__base_table__`` — the base table name (required).
+    * ``__view_columns__`` — columns to select (defaults to ``["*"]``).
+    * ``__where_clause__`` — the ``WHERE`` clause (defaults to auto-generated
+      ``IS NOT NULL`` for all primary-key/clustering columns).
+    * ``__clustering_order__`` — optional ``{column: "ASC"|"DESC"}`` dict.
+
+    The view name defaults to the model's table name.
+    """
+
+    @classmethod
+    def _get_base_table(cls) -> str:
+        settings = getattr(cls, "Settings", None)
+        base = getattr(settings, "__base_table__", None) if settings else None
+        if not base:
+            raise InvalidQueryError(
+                f"{cls.__name__}.Settings must define __base_table__"
+            )
+        return base
+
+    @classmethod
+    def _get_view_columns(cls) -> list[str]:
+        settings = getattr(cls, "Settings", None)
+        return getattr(settings, "__view_columns__", ["*"]) if settings else ["*"]
+
+    @classmethod
+    def _get_where_clause(cls) -> str:
+        settings = getattr(cls, "Settings", None)
+        explicit = getattr(settings, "__where_clause__", None) if settings else None
+        if explicit:
+            return explicit
+        # Auto-generate: all PK + CK columns IS NOT NULL
+        schema = cls._schema()
+        pk_ck_cols = [c for c in schema if c.primary_key or c.clustering_key]
+        return " AND ".join(f'"{c.name}" IS NOT NULL' for c in pk_ck_cols)
+
+    @classmethod
+    def _get_clustering_order(cls) -> dict[str, str] | None:
+        settings = getattr(cls, "Settings", None)
+        return getattr(settings, "__clustering_order__", None) if settings else None
+
+    @classmethod
+    def sync_view(cls) -> None:
+        """Create the materialized view in the database."""
+        schema = cls._schema()
+        pk_cols = sorted(
+            [c for c in schema if c.primary_key],
+            key=lambda c: c.partition_key_index,
+        )
+        ck_cols = sorted(
+            [c for c in schema if c.clustering_key],
+            key=lambda c: c.clustering_key_index,
+        )
+        cql = build_create_materialized_view(
+            view_name=cls._get_table(),
+            keyspace=cls._get_keyspace(),
+            base_table=cls._get_base_table(),
+            columns=cls._get_view_columns(),
+            primary_key_columns=[c.name for c in pk_cols],
+            clustering_columns=[c.name for c in ck_cols] or None,
+            where_clause=cls._get_where_clause(),
+            clustering_order=cls._get_clustering_order(),
+        )
+        cls._get_driver().execute(cql, [])
+
+    @classmethod
+    def drop_view(cls) -> None:
+        """Drop the materialized view."""
+        cql = build_drop_materialized_view(cls._get_table(), cls._get_keyspace())
+        cls._get_driver().execute(cql, [])
+
+    def save(self, **kwargs: Any) -> None:  # type: ignore[override]
+        raise InvalidQueryError(
+            "Materialized views are read-only. Use the base table to write data."
+        )
+
+    def insert(self, **kwargs: Any) -> None:  # type: ignore[override]
+        raise InvalidQueryError(
+            "Materialized views are read-only. Use the base table to write data."
+        )
+
+    def delete(self, **kwargs: Any) -> LWTResult | None:  # type: ignore[override]
+        raise InvalidQueryError(
+            "Materialized views are read-only. Use the base table to write data."
+        )
+
+    def update(self, **kwargs: Any) -> LWTResult | None:  # type: ignore[override]
+        raise InvalidQueryError(
+            "Materialized views are read-only. Use the base table to write data."
+        )

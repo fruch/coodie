@@ -1,6 +1,13 @@
 __version__ = "0.0.1"
 
-from coodie.aio import Document, CounterDocument, QuerySet, init_coodie, execute_raw
+from coodie.aio import (
+    Document,
+    CounterDocument,
+    MaterializedView,
+    QuerySet,
+    init_coodie,
+    execute_raw,
+)
 from coodie.batch import BatchQuery, AsyncBatchQuery
 from coodie.exceptions import (
     CoodieError,
@@ -30,6 +37,7 @@ from coodie.results import LWTResult, PagedResult
 __all__ = [
     "Document",
     "CounterDocument",
+    "MaterializedView",
     "QuerySet",
     "init_coodie",
     "execute_raw",

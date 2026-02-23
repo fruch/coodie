@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from coodie.sync.document import Document, CounterDocument
+from coodie.sync.document import Document, CounterDocument, MaterializedView
 from coodie.sync.query import QuerySet
 from coodie.batch import BatchQuery
 from coodie.drivers import init_coodie
@@ -27,6 +27,7 @@ def execute_raw(stmt: str, params: list[Any] | None = None) -> list[dict[str, An
 __all__ = [
     "Document",
     "CounterDocument",
+    "MaterializedView",
     "QuerySet",
     "BatchQuery",
     "init_coodie",

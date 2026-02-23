@@ -1457,7 +1457,7 @@ class TestSyncExtended:
             f'SELECT "id", "label" FROM {ks}.{tbl} WHERE "id" = ?', [rid]
         )
         assert rows
-        # acsylla returns UUIDs as strings
+        # str() comparison works for both drivers (acsylla returns str, others uuid.UUID)
         assert str(rows[0]["id"]) == str(rid)
         assert rows[0].get("label") is None
 

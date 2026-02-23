@@ -297,7 +297,239 @@ Regressions in any benchmark > 5% must be investigated before merging.
 
 ---
 
-## 7. Notes
+## 7. General Speed Improvements
+
+Beyond the operation-specific optimizations above, several cross-cutting techniques
+can improve coodie's overall throughput and memory efficiency.
+
+### 7.1 `__slots__` on internal classes
+
+**Where**: `QuerySet`, `ColumnDefinition`, `PagedResult`, `LWTResult`, driver classes.
+
+Python's `__slots__` eliminates the per-instance `__dict__`, which reduces memory
+by ~40-60 bytes per object and speeds up attribute access by ~10-20%.
+
+```python
+# QuerySet — created on every chained call (.filter().limit().all())
+class QuerySet:
+    __slots__ = (
+        "_doc_cls", "_where", "_limit_val", "_order_by_val",
+        "_allow_filtering_val", "_if_not_exists_val", "_if_exists_val",
+        "_ttl_val", "_timestamp_val", "_consistency_val", "_timeout_val",
+        "_only_val", "_defer_val", "_values_list_val",
+        "_per_partition_limit_val", "_fetch_size_val", "_paging_state_val",
+    )
+```
+
+`QuerySet` is the highest-impact target — every chained method (`.filter()`,
+`.limit()`, `.all()`) creates a new instance via `_clone()`. Removing `__dict__`
+overhead on each clone directly speeds up query chains.
+
+`ColumnDefinition` is already a `@dataclass` — adding `@dataclass(slots=True)`
+(Python 3.10+) or `__slots__` eliminates dict overhead for schema introspection.
+
+**Note**: Pydantic v2 `BaseModel` does **not** support `__slots__` on the model
+itself (it uses its own `__dict__` for field storage). However, the internal
+`model_config = ConfigDict(...)` can be tuned (see §7.3).
+
+**Estimated impact**: ~5-10% faster query chain construction, ~30% less memory for
+large result sets (fewer `QuerySet` dicts in flight).
+
+### 7.2 `__slots__` on driver classes
+
+```python
+class CassandraDriver(AbstractDriver):
+    __slots__ = ("_session", "_default_keyspace", "_prepared", "_last_paging_state")
+```
+
+Driver instances are long-lived singletons, so memory savings are marginal. The
+real benefit is faster attribute access on the hot path (`self._prepare()`,
+`self._session.execute()`).
+
+**Estimated impact**: ~2-5% faster per-operation driver access.
+
+### 7.3 Pydantic `model_config` tuning
+
+coodie's `Document` base class currently only sets `arbitrary_types_allowed = True`.
+Additional Pydantic v2 config options can improve performance:
+
+```python
+class Document(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        # Disable revalidation — trust data from Cassandra
+        revalidate_instances="never",
+        # Forbid extra fields — enables faster __init__
+        extra="forbid",
+        # Use enum values directly — skip .value conversion
+        use_enum_values=True,
+        # Populate by field name for direct dict construction
+        populate_by_name=True,
+    )
+```
+
+Key wins:
+- **`revalidate_instances="never"`**: Skips re-validation when models are nested.
+  coodie models are flat (no nested Documents), but this prevents accidental overhead.
+- **`extra="forbid"`**: Pydantic can skip the "extra fields" check path entirely,
+  making `__init__` faster.
+- **`use_enum_values=True`**: Avoids `.value` attribute lookup for enum-typed fields.
+
+**Estimated impact**: ~5-10% faster model construction from DB rows.
+
+### 7.4 Lazy parsing for large documents (Beanie pattern)
+
+Beanie ODM offers `lazy_parse=True` on queries, deferring Pydantic validation
+until a field is actually accessed. This is highly effective for large documents
+where only a few fields are read.
+
+coodie could implement this via a `LazyDocument` proxy:
+
+```python
+class LazyDocument:
+    """Proxy that defers Pydantic parsing until field access."""
+    __slots__ = ("_doc_cls", "_raw_data", "_parsed")
+
+    def __init__(self, doc_cls, raw_data):
+        self._doc_cls = doc_cls
+        self._raw_data = raw_data
+        self._parsed = None
+
+    def __getattr__(self, name):
+        if self._parsed is None:
+            self._parsed = self._doc_cls(**self._raw_data)
+        return getattr(self._parsed, name)
+```
+
+Usage: `QuerySet.all(lazy=True)` returns `list[LazyDocument]` instead of
+`list[Document]`, skipping Pydantic construction entirely until needed.
+
+**Estimated impact**: Near-zero cost for queries where only PK fields are read
+(common in exists-checks, pagination, or status dashboards).
+
+### 7.5 LRU cache for `get_type_hints()` calls
+
+`get_type_hints()` is called on every:
+- `_find_discriminator_column()` — every `save()`, `find()`, `_rows_to_docs()`
+- `coerce_row_none_collections()` — every row construction
+- `build_schema()` — first call only (already cached)
+
+Since type hints never change at runtime, cache the result:
+
+```python
+import functools
+
+@functools.lru_cache(maxsize=128)
+def _cached_type_hints(cls: type) -> dict[str, Any]:
+    try:
+        return typing.get_type_hints(cls, include_extras=True)
+    except Exception:
+        return getattr(cls, "__annotations__", {})
+```
+
+Then replace all `get_type_hints(cls, include_extras=True)` calls with
+`_cached_type_hints(cls)`.
+
+**Estimated impact**: Eliminates the #1 per-call overhead in `save()` and `find()`.
+~15-25% faster for polymorphic models, ~5-10% for regular models (removes
+`typing` module introspection on every call).
+
+### 7.6 Projection support (Beanie pattern)
+
+Beanie's `projection_model` returns only requested fields, reducing both network
+transfer and parsing cost. coodie already has `.only("col1", "col2")` but still
+constructs the full model.
+
+Enhance with projection models:
+
+```python
+class ProductNameOnly(BaseModel):
+    name: str
+    price: float
+
+# Returns list[ProductNameOnly] — lighter, faster
+products = Product.objects.project(ProductNameOnly).all()
+```
+
+This avoids validating/defaulting unused fields entirely.
+
+**Estimated impact**: 2-5× faster for wide tables where only a few columns are needed.
+
+### 7.7 Pre-compute collection coercion map per class
+
+`coerce_row_none_collections()` currently calls `get_type_hints()` and scans
+all annotations on **every row**. Pre-compute a set of collection-typed field names:
+
+```python
+@functools.lru_cache(maxsize=128)
+def _collection_fields(cls: type) -> set[str]:
+    """Return field names that have collection types (list, set, dict, tuple)."""
+    hints = _cached_type_hints(cls)
+    result = set()
+    for name, ann in hints.items():
+        base = _unwrap_annotation(ann)
+        origin = typing.get_origin(base) or base
+        if origin in (list, set, dict, tuple, frozenset):
+            result.add(name)
+    return result
+```
+
+Then coercion becomes a simple set lookup per row:
+
+```python
+def coerce_row_none_collections(doc_cls, row):
+    for key in _collection_fields(doc_cls):
+        if row.get(key) is None:
+            row[key] = _COLLECTION_ORIGINS[...]()
+    return row
+```
+
+**Estimated impact**: ~10-15% faster row construction for models with collections.
+
+### 7.8 `model_validate()` instead of `**dict` construction
+
+Pydantic v2's `model_validate()` accepts mappings directly and is optimized
+internally (compiled Rust validators). Using it instead of `Model(**dict)`:
+
+```python
+# Current (slower)
+self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
+
+# Proposed (faster — Pydantic compiled path)
+self._doc_cls.model_validate(coerce_row_none_collections(self._doc_cls, row))
+```
+
+**Estimated impact**: ~5-10% faster model construction (Pydantic's optimized path).
+
+---
+
+## 8. Updated Priority Matrix (including general improvements)
+
+| Phase | Task | Effort | Impact | Priority |
+|-------|------|--------|--------|----------|
+| 1 | 3.1 Optimize `_rows_to_dicts()` | Small | High | **P0** |
+| 1 | 3.2 Cache discriminator metadata | Small | Medium | **P0** |
+| 2 | 3.4 Table metadata cache | Small | Critical | **P0** |
+| 1 | 7.5 LRU cache for `get_type_hints()` | Small | High | **P0** |
+| 1 | 7.7 Pre-compute collection coercion map | Small | Medium | **P0** |
+| 1 | 7.1 `__slots__` on QuerySet | Small | Medium | **P1** |
+| 1 | 7.3 Pydantic `model_config` tuning | Small | Medium | **P1** |
+| 1 | 7.8 Use `model_validate()` | Small | Low-Med | **P1** |
+| 1 | 3.3 Module-level `get_driver` import | Small | Low | P1 |
+| 2 | 3.5 Skip column introspection on create | Medium | Medium | P1 |
+| 3 | 3.7 Skip intermediate dict on reads | Medium | High | **P1** |
+| 3 | 3.6 Skip intermediate dict on writes | Medium | Medium | P1 |
+| 1 | 7.2 `__slots__` on driver classes | Small | Low | P2 |
+| 3 | 3.8 CQL query string cache | Medium | Low | P2 |
+| 4 | 3.10 Reduce `_clone()` overhead | Medium | Medium | P2 |
+| 4 | 3.9 Pre-compile filter patterns | Small | Low | P2 |
+| 5 | 3.11 Native async for CassandraDriver | Large | High | P2 |
+| 3 | 7.4 Lazy parsing (LazyDocument) | Medium | High | P2 |
+| 3 | 7.6 Projection model support | Medium | Medium | P2 |
+
+---
+
+## 9. Notes
 
 - coodie's Pydantic-based model system is **already 6× faster** than cqlengine for
   pure Python model construction. The overhead is in the ORM ↔ driver interface.
@@ -307,3 +539,7 @@ Regressions in any benchmark > 5% must be investigated before merging.
   unnecessary dict conversions.
 - The filter-secondary-index benchmark (4.2× slower) likely includes Pydantic model
   construction overhead for multiple rows — task 3.7 directly addresses this.
+- Tasks 7.1 (`__slots__`) and 7.5 (type hints cache) are low-risk, high-reward
+  changes that can be done first as they require no API changes.
+- Beanie's `lazy_parse` and `projection_model` patterns are powerful but require
+  API additions — schedule for Phase 3 after core performance is optimized.

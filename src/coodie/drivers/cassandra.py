@@ -112,7 +112,7 @@ class CassandraDriver(AbstractDriver):
             "WHERE keyspace_name = %s AND table_name = %s",
             (keyspace, table),
         )
-        return {row.column_name for row in rows}
+        return {r["column_name"] for r in self._rows_to_dicts(rows)}
 
     def close(self) -> None:
         self._session.cluster.shutdown()

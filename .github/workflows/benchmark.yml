@@ -1,0 +1,46 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Weekly — every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: benchmark-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-groups
+          uv pip install -e ".[scylla]"
+
+      - name: Run benchmarks
+        run: |
+          uv run pytest benchmarks/ \
+            -v \
+            --benchmark-enable \
+            --benchmark-sort=mean \
+            --benchmark-json=benchmark-results.json
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.json
+          retention-days: 90

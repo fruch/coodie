@@ -35,9 +35,11 @@
    - [4.18 Batch Operations](#418-batch-operations)
    - [4.19 Advanced Patterns & Recipes](#419-advanced-patterns--recipes)
    - [4.20 Migration from cqlengine](#420-migration-from-cqlengine)
-5. [Tooling & Build](#5-tooling--build)
-6. [Writing Style Guide](#6-writing-style-guide)
-7. [Milestones](#7-milestones)
+5. [README Structure & Content](#5-readme-structure--content)
+6. [Contribution Guide (Separate Document)](#6-contribution-guide-separate-document)
+7. [Tooling & Build](#7-tooling--build)
+8. [Writing Style Guide](#8-writing-style-guide)
+9. [Milestones](#9-milestones)
 
 ---
 
@@ -925,7 +927,175 @@ class User(Document):
 
 ---
 
-## 5. Tooling & Build
+## 5. README Structure & Content
+
+> The README is the front door of the project. It should answer
+> "What is this?", "Why should I care?", and "How do I start?"
+> in under 60 seconds of reading.
+
+### 5.1 README Sections (in order)
+
+1. **Logo + Badge Bar** — project logo, CI status, PyPI version, coverage, license badges (already present).
+2. **One-Liner Description** — `coodie` = Cassandra / ScyllaDB + Beanie (hoodie) — a Pydantic-based ODM.
+3. **Feature Comparison Table** — side-by-side comparison with **beanie** and **cqlengine** (see §5.2).
+4. **Quick Start** — minimal copy-pastable commands to go from zero to first query (see §5.3).
+5. **Installation** — `pip install coodie` with driver extras.
+6. **Feature Highlights** — bullet list of key features (Pydantic v2, sync/async, schema sync, etc.).
+7. **Links** — documentation, contributing guide, changelog, license.
+8. **Contributors** — all-contributors table (already present).
+9. **Credits** — Cookiecutter acknowledgement (already present).
+
+### 5.2 Feature Comparison Table
+
+The README **must** include a comparison table that helps users quickly understand
+how coodie differs from beanie (MongoDB ODM) and cqlengine (legacy Cassandra ORM).
+
+Planned table structure:
+
+| Feature | coodie | beanie | cqlengine |
+|---|---|---|---|
+| **Database** | Cassandra / ScyllaDB | MongoDB | Cassandra |
+| **Schema Definition** | Pydantic v2 `BaseModel` | Pydantic v2 `BaseModel` | Custom `columns.*` classes |
+| **Type Hints** | Native `Annotated[]` markers | Native Pydantic types | ❌ No type hints |
+| **Async Support** | ✅ First-class (`coodie.aio`) | ✅ First-class (motor) | ❌ Sync only |
+| **Sync Support** | ✅ (`coodie.sync`) | ❌ Async only | ✅ Sync only |
+| **Query API** | Chainable `QuerySet` | Chainable `FindMany` | Chainable `QuerySet` |
+| **Schema Migration** | `sync_table()` (idempotent) | ❌ Manual | `sync_table()` |
+| **LWT (Compare-and-Set)** | ✅ `if_not_exists()` / `if_exists()` | N/A (MongoDB txns) | ✅ via `iff()` |
+| **Batch Operations** | ✅ `BatchQuery` context manager | ❌ N/A | ✅ `BatchQuery` |
+| **Counter Columns** | ✅ `Counter()` annotation | ❌ N/A | ✅ `columns.Counter` |
+| **TTL Support** | ✅ Per-save TTL | ❌ MongoDB TTL indexes | ✅ Per-save TTL |
+| **Pagination** | ✅ Token-based `PagedResult` | ✅ Cursor-based | ❌ Manual paging state |
+| **Multiple Drivers** | ✅ scylla-driver, cassandra-driver, acsylla | motor (pymongo async) | cassandra-driver only |
+| **Polymorphic Models** | ✅ `Discriminator` field | ❌ Manual | ❌ Manual |
+| **Python Version** | 3.11+ | 3.8+ | 3.6+ (but driver issues on 3.13+) |
+
+> **Note:** This table should be kept up to date as features land. Mark planned
+> features with 🔜 and missing features with ❌.
+
+### 5.3 Quick Start Commands
+
+The README **must** have a copy-pastable quick start block that a developer can
+run in their terminal to go from zero to a working example. No hunting for
+commands across multiple sections.
+
+Planned quick start block:
+
+```bash
+# 1. Install coodie
+pip install coodie
+
+# 2. Start a local ScyllaDB (or Cassandra) instance
+docker run --name scylla -d -p 9042:9042 scylladb/scylla --smp 1
+
+# 3. Wait for ScyllaDB to be ready (takes ~30s)
+docker exec -it scylla cqlsh -e "DESCRIBE CLUSTER" 2>/dev/null \
+  || echo "Waiting for ScyllaDB..." && sleep 30
+
+# 4. Create a keyspace
+docker exec -it scylla cqlsh -e \
+  "CREATE KEYSPACE IF NOT EXISTS my_ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};"
+```
+
+Followed immediately by a minimal Python script:
+
+```python
+from coodie.sync import Document, init_coodie
+from coodie.fields import PrimaryKey
+from pydantic import Field
+from typing import Annotated
+from uuid import UUID, uuid4
+
+# Connect
+init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
+
+# Define
+class User(Document):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    email: str
+
+    class Settings:
+        name = "users"
+
+# Sync schema & insert
+User.sync_table()
+user = User(id=uuid4(), name="Alice", email="alice@example.com")
+user.save()
+
+# Query
+print(User.find(name="Alice").allow_filtering().all())
+```
+
+> **Design rule:** The quick start must fit in a single terminal screen
+> (~40 lines) and require zero prior Cassandra knowledge.
+
+---
+
+## 6. Contribution Guide (Separate Document)
+
+> The contribution guide should live as a **standalone `CONTRIBUTING.md`** in the
+> repository root (one already exists). This section plans what it should contain
+> and how it should be improved.
+
+### 6.1 Goals
+
+- Make it trivially easy for a first-time contributor to set up the dev environment
+- Provide clear, copy-pastable commands for every step
+- Reduce "how do I run tests?" questions to zero
+- Cover both code and non-code contributions
+
+### 6.2 Planned Sections
+
+1. **Prerequisites** — Python 3.11+, uv (preferred) or pip, Docker (for integration tests)
+2. **Quick Setup (Copy-Paste Block)**
+
+   ```bash
+   # Fork & clone
+   git clone git@github.com:<your-username>/coodie.git
+   cd coodie
+
+   # Install dependencies with uv (recommended)
+   uv sync --all-extras
+
+   # Or with pip
+   pip install -e ".[dev,test,scylla]"
+
+   # Install pre-commit hooks
+   pre-commit install
+
+   # Run unit tests (no database needed)
+   python -m pytest tests/ --no-cov -v
+
+   # Run linters
+   ruff check src/ tests/
+   ruff format --check src/ tests/
+   ```
+
+3. **Running Integration Tests** — how to start ScyllaDB via Docker / testcontainers,
+   driver selection (`--driver-type`), expected test duration
+4. **Commit Convention** — Conventional Commits format with examples
+   (`feat(aio): ...`, `fix(cql_builder): ...`, `docs: ...`)
+5. **Pull Request Workflow** — open early as draft, include tests, update docs,
+   ensure CI passes
+6. **Code Style** — enforced by ruff (via pre-commit), no manual style guide needed
+7. **Adding a New Feature** — checklist: implement, add tests, add docs entry,
+   update `documentation-plan.md` if needed
+8. **Non-Code Contributions** — bug reports, feature requests, documentation,
+   examples, blog posts
+9. **Release Process** — tag-based publishing via Trusted Publishing (reference
+   existing section in `CONTRIBUTING.md`)
+
+### 6.3 Key Principles
+
+- Every command block must be **copy-pastable as-is**
+- Use `uv` as the primary tool (with `pip` fallback)
+- Minimize "works on my machine" issues by documenting exact versions/tools
+- Keep it short — link to detailed docs rather than duplicating content
+
+---
+
+## 7. Tooling & Build
 
 | Tool | Purpose |
 |------|---------|
@@ -944,7 +1114,7 @@ make clean html    # Clean build — like clearing your browser cache but useful
 
 ---
 
-## 6. Writing Style Guide
+## 8. Writing Style Guide
 
 ### Tone
 - **Conversational** but technically precise
@@ -975,9 +1145,12 @@ make clean html    # Clean build — like clearing your browser cache but useful
 
 ---
 
-## 7. Milestones
+## 9. Milestones
 
 ### Phase 1: Foundation (Core Docs)
+- [ ] README overhaul: add comparison table (coodie vs beanie vs cqlengine)
+- [ ] README overhaul: add copy-pastable quick start commands
+- [ ] Update `CONTRIBUTING.md` with uv-based setup and copy-pastable commands
 - [ ] Installation & quickstart guide
 - [ ] Defining Documents (models) guide
 - [ ] Field types reference with all type mappings

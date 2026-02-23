@@ -12,6 +12,7 @@ from coodie.cql_builder import (
     build_create_table,
     build_delete,
     build_drop_materialized_view,
+    build_drop_keyspace,
     build_drop_table,
     build_insert,
     build_select,
@@ -671,3 +672,35 @@ def test_build_create_materialized_view_with_clustering_order():
 def test_build_drop_materialized_view():
     cql = build_drop_materialized_view("products_by_brand", "ks")
     assert cql == "DROP MATERIALIZED VIEW IF EXISTS ks.products_by_brand"
+
+
+# ------------------------------------------------------------------
+# Phase 13: Keyspace Management
+# ------------------------------------------------------------------
+
+
+def test_build_create_keyspace_network_topology():
+    cql = build_create_keyspace("ks", dc_replication_map={"dc1": 3, "dc2": 2})
+    assert "CREATE KEYSPACE IF NOT EXISTS ks" in cql
+    assert "NetworkTopologyStrategy" in cql
+    assert "'dc1': '3'" in cql
+    assert "'dc2': '2'" in cql
+
+
+def test_build_create_keyspace_network_topology_single_dc():
+    cql = build_create_keyspace("ks", dc_replication_map={"us-east": 3})
+    assert "NetworkTopologyStrategy" in cql
+    assert "'us-east': '3'" in cql
+
+
+def test_build_create_keyspace_network_topology_overrides_strategy():
+    cql = build_create_keyspace(
+        "ks", strategy="SimpleStrategy", dc_replication_map={"dc1": 3}
+    )
+    assert "NetworkTopologyStrategy" in cql
+    assert "SimpleStrategy" not in cql
+
+
+def test_build_drop_keyspace():
+    cql = build_drop_keyspace("my_ks")
+    assert cql == "DROP KEYSPACE IF EXISTS my_ks"

@@ -72,6 +72,7 @@ class AcsyllaDriver(AbstractDriver):
         self._default_keyspace = default_keyspace
         self._prepared: dict[str, Any] = {}
         self._loop = loop or asyncio.new_event_loop()
+        self._last_paging_state: bytes | None = None
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -103,6 +104,8 @@ class AcsyllaDriver(AbstractDriver):
         params: list[Any],
         consistency: str | None = None,
         timeout: float | None = None,
+        fetch_size: int | None = None,
+        paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
         prepared = await self._prepare(stmt)
         bind_kwargs: dict[str, Any] = {}
@@ -110,8 +113,17 @@ class AcsyllaDriver(AbstractDriver):
             bind_kwargs["consistency"] = consistency
         if timeout is not None:
             bind_kwargs["timeout"] = timeout
+        if fetch_size is not None:
+            bind_kwargs["page_size"] = fetch_size
         statement = prepared.bind(params, **bind_kwargs)
+        if paging_state is not None:
+            statement.set_page_state(paging_state)
         result = await self._session.execute(statement)
+        if fetch_size is not None:
+            has_more = result.has_more_pages()
+            self._last_paging_state = result.page_state() if has_more else None
+        else:
+            self._last_paging_state = None
         return self._rows_to_dicts(result)
 
     async def sync_table_async(
@@ -150,9 +162,18 @@ class AcsyllaDriver(AbstractDriver):
         params: list[Any],
         consistency: str | None = None,
         timeout: float | None = None,
+        fetch_size: int | None = None,
+        paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
         return self._loop.run_until_complete(
-            self.execute_async(stmt, params, consistency=consistency, timeout=timeout)
+            self.execute_async(
+                stmt,
+                params,
+                consistency=consistency,
+                timeout=timeout,
+                fetch_size=fetch_size,
+                paging_state=paging_state,
+            )
         )
 
     def sync_table(

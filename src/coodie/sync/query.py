@@ -11,7 +11,7 @@ from coodie.cql_builder import (
     parse_filter_kwargs,
     parse_update_kwargs,
 )
-from coodie.results import LWTResult
+from coodie.results import LWTResult, PagedResult
 from coodie.schema import (
     _find_discriminator_column,
     _resolve_polymorphic_base,
@@ -44,6 +44,8 @@ class QuerySet:
         defer_val: list[str] | None = None,
         values_list_val: list[str] | None = None,
         per_partition_limit_val: int | None = None,
+        fetch_size_val: int | None = None,
+        paging_state_val: bytes | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -60,6 +62,8 @@ class QuerySet:
         self._defer_val = defer_val
         self._values_list_val = values_list_val
         self._per_partition_limit_val = per_partition_limit_val
+        self._fetch_size_val = fetch_size_val
+        self._paging_state_val = paging_state_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -81,6 +85,8 @@ class QuerySet:
             defer_val=self._defer_val,
             values_list_val=self._values_list_val,
             per_partition_limit_val=self._per_partition_limit_val,
+            fetch_size_val=self._fetch_size_val,
+            paging_state_val=self._paging_state_val,
         )
         defaults.update(overrides)
         return QuerySet(self._doc_cls, **defaults)
@@ -151,6 +157,16 @@ class QuerySet:
     def per_partition_limit(self, n: int) -> QuerySet:
         return self._clone(per_partition_limit_val=n)
 
+    def fetch_size(self, n: int) -> QuerySet:
+        return self._clone(fetch_size_val=n)
+
+    def page(self, paging_state: bytes | None) -> QuerySet:
+        return self._clone(paging_state_val=paging_state)
+
+    # ------------------------------------------------------------------
+    # Terminal methods
+    # ------------------------------------------------------------------
+
     def _get_driver(self) -> Any:
         from coodie.drivers import get_driver
 
@@ -188,6 +204,9 @@ class QuerySet:
         if self._values_list_val is not None:
             vl_cols = self._values_list_val
             return [tuple(row.get(c) for c in vl_cols) for row in rows]
+        return self._rows_to_docs(rows)
+
+    def _rows_to_docs(self, rows: list[dict[str, Any]]) -> list[Document]:
         disc_col = _find_discriminator_column(self._doc_cls)
         if disc_col is not None:
             base = _resolve_polymorphic_base(self._doc_cls) or self._doc_cls
@@ -205,6 +224,28 @@ class QuerySet:
             self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
             for row in rows
         ]
+
+    def paged_all(self) -> PagedResult:
+        """Execute query returning a :class:`PagedResult` with documents and paging state."""
+        cql, params = build_select(
+            self._table(),
+            self._keyspace(),
+            where=self._where or None,
+            limit=self._limit_val,
+            order_by=self._order_by_val or None,
+            allow_filtering=self._allow_filtering_val,
+        )
+        driver = self._get_driver()
+        rows = driver.execute(
+            cql,
+            params,
+            consistency=self._consistency_val,
+            timeout=self._timeout_val,
+            fetch_size=self._fetch_size_val,
+            paging_state=self._paging_state_val,
+        )
+        paging_state = getattr(driver, "_last_paging_state", None)
+        return PagedResult(data=self._rows_to_docs(rows), paging_state=paging_state)
 
     def first(self) -> Document | None:
         results = self.limit(1).all()

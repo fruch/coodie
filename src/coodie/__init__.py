@@ -7,6 +7,8 @@ from coodie.aio import (
     QuerySet,
     init_coodie,
     execute_raw,
+    create_keyspace,
+    drop_keyspace,
 )
 from coodie.batch import BatchQuery, AsyncBatchQuery
 from coodie.exceptions import (
@@ -41,6 +43,8 @@ __all__ = [
     "QuerySet",
     "init_coodie",
     "execute_raw",
+    "create_keyspace",
+    "drop_keyspace",
     "BatchQuery",
     "AsyncBatchQuery",
     "CoodieError",

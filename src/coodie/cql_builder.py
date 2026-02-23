@@ -9,12 +9,24 @@ def build_create_keyspace(
     keyspace: str,
     replication_factor: int = 1,
     strategy: str = "SimpleStrategy",
+    dc_replication_map: dict[str, int] | None = None,
 ) -> str:
+    if dc_replication_map is not None:
+        strategy = "NetworkTopologyStrategy"
+        dc_parts = ", ".join(f"'{dc}': '{rf}'" for dc, rf in dc_replication_map.items())
+        return (
+            f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
+            f"WITH replication = {{'class': '{strategy}', {dc_parts}}}"
+        )
     return (
         f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
         f"WITH replication = {{'class': '{strategy}', "
         f"'replication_factor': '{replication_factor}'}}"
     )
+
+
+def build_drop_keyspace(keyspace: str) -> str:
+    return f"DROP KEYSPACE IF EXISTS {keyspace}"
 
 
 def build_create_table(

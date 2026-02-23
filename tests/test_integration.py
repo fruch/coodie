@@ -1012,6 +1012,93 @@ class TestAsyncRawCQL:
         assert rows == []
 
 
+@pytest.mark.integration
+class TestSyncKeyspaceManagement:
+    """Test sync create_keyspace / drop_keyspace against a real ScyllaDB container."""
+
+    def test_create_and_drop_keyspace(self, coodie_driver: object) -> None:
+        """create_keyspace + drop_keyspace round-trips a keyspace."""
+        from coodie.sync import create_keyspace, drop_keyspace, execute_raw
+
+        ks = "it_sync_ks_test"
+        drop_keyspace(ks)
+
+        create_keyspace(ks, replication_factor=1)
+        rows = execute_raw(
+            "SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name = ?",
+            [ks],
+        )
+        assert len(rows) == 1
+        assert rows[0]["keyspace_name"] == ks
+
+        drop_keyspace(ks)
+        rows = execute_raw(
+            "SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name = ?",
+            [ks],
+        )
+        assert rows == []
+
+    def test_create_keyspace_idempotent(self, coodie_driver: object) -> None:
+        """Calling create_keyspace twice must not raise (IF NOT EXISTS)."""
+        from coodie.sync import create_keyspace, drop_keyspace
+
+        ks = "it_sync_ks_idem"
+        drop_keyspace(ks)
+        create_keyspace(ks, replication_factor=1)
+        create_keyspace(ks, replication_factor=1)
+        drop_keyspace(ks)
+
+    def test_drop_keyspace_idempotent(self, coodie_driver: object) -> None:
+        """Calling drop_keyspace on a non-existent keyspace must not raise."""
+        from coodie.sync import drop_keyspace
+
+        drop_keyspace("it_sync_ks_nonexistent")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="session")
+class TestAsyncKeyspaceManagement:
+    """Test async create_keyspace / drop_keyspace against a real ScyllaDB container."""
+
+    async def test_create_and_drop_keyspace(self, coodie_driver: object) -> None:
+        """create_keyspace + drop_keyspace round-trips a keyspace."""
+        from coodie.aio import create_keyspace, drop_keyspace, execute_raw
+
+        ks = "it_async_ks_test"
+        await drop_keyspace(ks)
+
+        await create_keyspace(ks, replication_factor=1)
+        rows = await execute_raw(
+            "SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name = ?",
+            [ks],
+        )
+        assert len(rows) == 1
+        assert rows[0]["keyspace_name"] == ks
+
+        await drop_keyspace(ks)
+        rows = await execute_raw(
+            "SELECT keyspace_name FROM system_schema.keyspaces WHERE keyspace_name = ?",
+            [ks],
+        )
+        assert rows == []
+
+    async def test_create_keyspace_idempotent(self, coodie_driver: object) -> None:
+        """Calling create_keyspace twice must not raise (IF NOT EXISTS)."""
+        from coodie.aio import create_keyspace, drop_keyspace
+
+        ks = "it_async_ks_idem"
+        await drop_keyspace(ks)
+        await create_keyspace(ks, replication_factor=1)
+        await create_keyspace(ks, replication_factor=1)
+        await drop_keyspace(ks)
+
+    async def test_drop_keyspace_idempotent(self, coodie_driver: object) -> None:
+        """Calling drop_keyspace on a non-existent keyspace must not raise."""
+        from coodie.aio import drop_keyspace
+
+        await drop_keyspace("it_async_ks_nonexistent")
+
+
 # ===========================================================================
 # Additional models for broader type / feature coverage
 # ===========================================================================

@@ -96,7 +96,9 @@ When a benchmark shows coodie is slower than cqlengine:
 
 ## CI Integration
 
-The `benchmark.yml` GitHub Actions workflow runs benchmarks on pushes to `main`
-and on a weekly schedule.  Results are exported as JSON artifacts and can be
-tracked over time using
+The `benchmark.yml` GitHub Actions workflow runs benchmarks on pushes to `main`,
+on a weekly schedule, and on pull requests labeled with **`benchmark`**.  Results
+are exported as JSON artifacts and can be tracked over time using
 [github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark).
+
+To run benchmarks on a PR, add the `benchmark` label to the pull request.

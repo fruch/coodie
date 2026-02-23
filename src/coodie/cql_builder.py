@@ -104,6 +104,7 @@ def parse_filter_kwargs(
         "in": "IN",
         "contains": "CONTAINS",
         "contains_key": "CONTAINS KEY",
+        "like": "LIKE",
     }
     result = []
     for key, value in kwargs.items():

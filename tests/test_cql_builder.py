@@ -526,3 +526,68 @@ def test_create_table_no_options():
     cql = build_create_table("products", "ks", cols, table_options=None)
     assert "default_time_to_live" not in cql
     assert "gc_grace_seconds" not in cql
+
+
+# ------------------------------------------------------------------
+# Phase 10: Token-range query support
+# ------------------------------------------------------------------
+
+
+def test_parse_filter_kwargs_token_gt():
+    result = parse_filter_kwargs({"id__token__gt": 100})
+    assert result == [("id", "TOKEN >", 100)]
+
+
+def test_parse_filter_kwargs_token_gte():
+    result = parse_filter_kwargs({"id__token__gte": 100})
+    assert result == [("id", "TOKEN >=", 100)]
+
+
+def test_parse_filter_kwargs_token_lt():
+    result = parse_filter_kwargs({"id__token__lt": 200})
+    assert result == [("id", "TOKEN <", 200)]
+
+
+def test_parse_filter_kwargs_token_lte():
+    result = parse_filter_kwargs({"id__token__lte": 200})
+    assert result == [("id", "TOKEN <=", 200)]
+
+
+def test_parse_filter_kwargs_token_range():
+    result = parse_filter_kwargs({"id__token__gt": 100, "id__token__lte": 200})
+    assert ("id", "TOKEN >", 100) in result
+    assert ("id", "TOKEN <=", 200) in result
+
+
+def test_build_where_clause_token():
+    clause, params = build_where_clause([("id", "TOKEN >", 100)])
+    assert clause == 'WHERE TOKEN("id") > ?'
+    assert params == [100]
+
+
+def test_build_where_clause_token_range():
+    clause, params = build_where_clause(
+        [("id", "TOKEN >", 100), ("id", "TOKEN <=", 200)]
+    )
+    assert 'TOKEN("id") > ?' in clause
+    assert 'TOKEN("id") <= ?' in clause
+    assert params == [100, 200]
+
+
+def test_build_select_with_token_filter():
+    cql, params = build_select(
+        "products",
+        "ks",
+        where=[("id", "TOKEN >", 100), ("id", "TOKEN <=", 200)],
+        allow_filtering=True,
+    )
+    assert 'TOKEN("id") > ?' in cql
+    assert 'TOKEN("id") <= ?' in cql
+    assert params == [100, 200]
+    assert "ALLOW FILTERING" in cql
+
+
+def test_parse_filter_kwargs_mixed_token_and_regular():
+    result = parse_filter_kwargs({"id__token__gt": 100, "name": "Alice"})
+    assert ("id", "TOKEN >", 100) in result
+    assert ("name", "=", "Alice") in result

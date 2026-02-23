@@ -25,7 +25,7 @@ from coodie.fields import (
     TinyInt,
     VarInt,
 )
-from coodie.results import LWTResult
+from coodie.results import LWTResult, PagedResult
 
 __all__ = [
     "Document",
@@ -55,4 +55,5 @@ __all__ = [
     "Time",
     "Frozen",
     "LWTResult",
+    "PagedResult",
 ]

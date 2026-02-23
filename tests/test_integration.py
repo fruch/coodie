@@ -263,6 +263,10 @@ class AsyncReview(AsyncDocument):
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Minimum Murmur3 token value — used for token-range queries that should match
+# every row (TOKEN(pk) > MIN_TOKEN covers the full ring).
+MIN_MURMUR3_TOKEN = -(2**63)
+
 
 # ===========================================================================
 # Synchronous integration tests
@@ -466,6 +470,88 @@ class TestSyncIntegration:
 
         SyncProduct(id=pid, name="").delete()
         SyncReview.find(product_id=pid).delete()
+
+    # --- Phase 10: Pagination & Token Queries ---
+
+    def test_paged_all_pagination(
+        self, coodie_driver: object, driver_type: str
+    ) -> None:
+        """paged_all() with fetch_size returns PagedResult and paginates."""
+        from coodie.results import PagedResult
+
+        brand = f"PageBrand_{uuid4().hex[:8]}"
+        ids = [uuid4() for _ in range(5)]
+        for pid in ids:
+            SyncProduct(id=pid, name="PageTest", brand=brand).save()
+
+        # fetch 2 at a time
+        result = (
+            SyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
+        )
+        assert isinstance(result, PagedResult)
+        assert len(result.data) > 0
+        for doc in result.data:
+            assert isinstance(doc, SyncProduct)
+
+        # collect all pages
+        all_docs = list(result.data)
+        while result.paging_state is not None:
+            result = (
+                SyncProduct.find(brand=brand)
+                .fetch_size(2)
+                .page(result.paging_state)
+                .allow_filtering()
+                .paged_all()
+            )
+            assert isinstance(result, PagedResult)
+            all_docs.extend(result.data)
+
+        # We should have retrieved at least our 5 inserted docs
+        found_ids = {d.id for d in all_docs}
+        for pid in ids:
+            assert pid in found_ids
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_fetch_size_limits_page(
+        self, coodie_driver: object, driver_type: str
+    ) -> None:
+        """fetch_size(n) limits the number of rows returned per page."""
+        from coodie.results import PagedResult
+
+        brand = f"FetchBrand_{uuid4().hex[:8]}"
+        ids = [uuid4() for _ in range(4)]
+        for pid in ids:
+            SyncProduct(id=pid, name="FetchSizeTest", brand=brand).save()
+
+        result = (
+            SyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
+        )
+        assert isinstance(result, PagedResult)
+        assert len(result.data) <= 2
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
+
+    def test_token_range_query(self, coodie_driver: object, driver_type: str) -> None:
+        """Token-range filter queries execute without error."""
+        ids = [uuid4() for _ in range(3)]
+        for pid in ids:
+            SyncProduct(id=pid, name="TokenTest").save()
+
+        # Token queries with allow_filtering
+        results = (
+            SyncProduct.find(id__token__gt=MIN_MURMUR3_TOKEN).allow_filtering().all()
+        )
+        assert isinstance(results, list)
+        # All inserted items should be found (token > min_token)
+        found_ids = {r.id for r in results}
+        for pid in ids:
+            assert pid in found_ids
+
+        for pid in ids:
+            SyncProduct(id=pid, name="").delete()
 
 
 # ===========================================================================
@@ -676,6 +762,90 @@ class TestAsyncIntegration:
         from coodie.aio.query import QuerySet
 
         await QuerySet(AsyncReview).filter(product_id=pid).delete()
+
+    # --- Phase 10: Pagination & Token Queries ---
+
+    async def test_paged_all_pagination(
+        self, coodie_driver: object, driver_type: str
+    ) -> None:
+        """paged_all() with fetch_size returns PagedResult and paginates."""
+        from coodie.results import PagedResult
+
+        brand = f"AsyncPageBrand_{uuid4().hex[:8]}"
+        ids = [uuid4() for _ in range(5)]
+        for pid in ids:
+            await AsyncProduct(id=pid, name="AsyncPageTest", brand=brand).save()
+
+        # fetch 2 at a time
+        result = await (
+            AsyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
+        )
+        assert isinstance(result, PagedResult)
+        assert len(result.data) > 0
+        for doc in result.data:
+            assert isinstance(doc, AsyncProduct)
+
+        # collect all pages
+        all_docs = list(result.data)
+        while result.paging_state is not None:
+            result = await (
+                AsyncProduct.find(brand=brand)
+                .fetch_size(2)
+                .page(result.paging_state)
+                .allow_filtering()
+                .paged_all()
+            )
+            assert isinstance(result, PagedResult)
+            all_docs.extend(result.data)
+
+        # We should have retrieved at least our 5 inserted docs
+        found_ids = {d.id for d in all_docs}
+        for pid in ids:
+            assert pid in found_ids
+
+        for pid in ids:
+            await AsyncProduct(id=pid, name="").delete()
+
+    async def test_fetch_size_limits_page(
+        self, coodie_driver: object, driver_type: str
+    ) -> None:
+        """fetch_size(n) limits the number of rows returned per page."""
+        from coodie.results import PagedResult
+
+        brand = f"AsyncFetchBrand_{uuid4().hex[:8]}"
+        ids = [uuid4() for _ in range(4)]
+        for pid in ids:
+            await AsyncProduct(id=pid, name="AsyncFetchSizeTest", brand=brand).save()
+
+        result = await (
+            AsyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
+        )
+        assert isinstance(result, PagedResult)
+        assert len(result.data) <= 2
+
+        for pid in ids:
+            await AsyncProduct(id=pid, name="").delete()
+
+    async def test_token_range_query(
+        self, coodie_driver: object, driver_type: str
+    ) -> None:
+        """Token-range filter queries execute without error."""
+        ids = [uuid4() for _ in range(3)]
+        for pid in ids:
+            await AsyncProduct(id=pid, name="AsyncTokenTest").save()
+
+        # Token queries with allow_filtering
+        results = await (
+            AsyncProduct.find(id__token__gt=MIN_MURMUR3_TOKEN).allow_filtering().all()
+        )
+        assert isinstance(results, list)
+        # All inserted items should be found (token > min_token)
+        found_ids = {r.id for r in results}
+        for pid in ids:
+            assert pid in found_ids
+
+        for pid in ids:
+            await AsyncProduct(id=pid, name="").delete()
 
 
 # ===========================================================================

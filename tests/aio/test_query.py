@@ -338,3 +338,71 @@ def test_defer_preserved_through_chaining(registered_mock_driver):
 def test_per_partition_limit_preserved_through_chaining(registered_mock_driver):
     qs = QuerySet(AsyncItem).per_partition_limit(5).filter(name="foo").limit(10)
     assert qs._per_partition_limit_val == 5
+
+
+# ------------------------------------------------------------------
+# Phase 10: Pagination & Token Queries (async)
+# ------------------------------------------------------------------
+
+
+def test_fetch_size_chain(registered_mock_driver):
+    qs = QuerySet(AsyncItem).fetch_size(100)
+    assert qs._fetch_size_val == 100
+
+
+def test_page_chain(registered_mock_driver):
+    state = b"\x00\x01\x02"
+    qs = QuerySet(AsyncItem).page(state)
+    assert qs._paging_state_val == state
+
+
+def test_page_none_resets(registered_mock_driver):
+    qs = QuerySet(AsyncItem).page(b"\x00").page(None)
+    assert qs._paging_state_val is None
+
+
+async def test_fetch_size_passed_to_driver(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).fetch_size(50).paged_all()
+    assert registered_mock_driver.last_fetch_size == 50
+
+
+async def test_paging_state_passed_to_driver(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    state = b"\x00\x01\x02"
+    await QuerySet(AsyncItem).page(state).paged_all()
+    assert registered_mock_driver.last_paging_state == state
+
+
+def test_fetch_size_preserved_through_chaining(registered_mock_driver):
+    qs = QuerySet(AsyncItem).fetch_size(100).filter(rating__gte=3).limit(10)
+    assert qs._fetch_size_val == 100
+
+
+async def test_paged_all_returns_paged_result(registered_mock_driver):
+    from coodie.results import PagedResult
+
+    registered_mock_driver.set_return_rows([{"id": uuid4(), "name": "A", "rating": 5}])
+    registered_mock_driver.set_paging_state(b"\xab\xcd")
+    result = await QuerySet(AsyncItem).fetch_size(1).paged_all()
+    assert isinstance(result, PagedResult)
+    assert len(result.data) == 1
+    assert isinstance(result.data[0], AsyncItem)
+    assert result.paging_state == b"\xab\xcd"
+
+
+async def test_paged_all_none_paging_state_when_exhausted(registered_mock_driver):
+    from coodie.results import PagedResult
+
+    registered_mock_driver.set_return_rows([{"id": uuid4(), "name": "A", "rating": 5}])
+    result = await QuerySet(AsyncItem).fetch_size(100).paged_all()
+    assert isinstance(result, PagedResult)
+    assert result.paging_state is None
+
+
+async def test_token_filter_generates_correct_cql(registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await QuerySet(AsyncItem).filter(id__token__gt=100).allow_filtering().all()
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'TOKEN("id") > ?' in stmt
+    assert 100 in params

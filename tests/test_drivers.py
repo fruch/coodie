@@ -96,6 +96,73 @@ def test_mock_driver_defaults_none_timeout(mock_driver):
 
 
 # ------------------------------------------------------------------
+# Phase 6: init_coodie / init_coodie_async tests
+# ------------------------------------------------------------------
+
+
+def test_init_coodie_with_session():
+    _registry.clear()
+    mock_session = MagicMock()
+    mock_session.cluster = MagicMock()
+    driver = init_coodie(session=mock_session, keyspace="ks")
+    assert get_driver() is driver
+    _registry.clear()
+
+
+def test_init_coodie_cassandra_alias():
+    _registry.clear()
+    mock_session = MagicMock()
+    mock_session.cluster = MagicMock()
+    driver = init_coodie(session=mock_session, keyspace="ks", driver_type="cassandra")
+    assert get_driver() is driver
+    _registry.clear()
+
+
+def test_init_coodie_unknown_driver_type():
+    _registry.clear()
+    with pytest.raises(ConfigurationError, match="Unknown driver_type"):
+        init_coodie(driver_type="unknown", keyspace="ks")
+    _registry.clear()
+
+
+def test_init_coodie_acsylla_requires_session():
+    _registry.clear()
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        with pytest.raises(ConfigurationError, match="pre-created acsylla session"):
+            init_coodie(driver_type="acsylla", keyspace="ks")
+    _registry.clear()
+
+
+def test_init_coodie_acsylla_with_session():
+    _registry.clear()
+    mock_session = MagicMock()
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        driver = init_coodie(session=mock_session, keyspace="ks", driver_type="acsylla")
+    assert get_driver() is driver
+    _registry.clear()
+
+
+async def test_init_coodie_async_acsylla_with_hosts():
+    _registry.clear()
+    mock_acsylla = MagicMock()
+    mock_cluster = MagicMock()
+    mock_session = MagicMock()
+    mock_acsylla.create_cluster = MagicMock(return_value=mock_cluster)
+    mock_cluster.create_session = AsyncMock(return_value=mock_session)
+
+    with patch.dict("sys.modules", {"acsylla": mock_acsylla}):
+        driver = await init_coodie_async(
+            hosts=["127.0.0.1"],
+            keyspace="ks",
+            driver_type="acsylla",
+        )
+    assert get_driver() is driver
+    mock_acsylla.create_cluster.assert_called_once()
+    mock_cluster.create_session.assert_awaited_once_with(keyspace="ks")
+    _registry.clear()
+
+
+# ------------------------------------------------------------------
 # Phase 6: CassandraDriver with mock Session
 # ------------------------------------------------------------------
 
@@ -156,9 +223,9 @@ def test_cassandra_driver_execute_with_timeout(
 ):
     mock_cassandra_session.execute.return_value = []
     cassandra_driver.execute("SELECT * FROM test_ks.t", [], timeout=5.0)
-    mock_cassandra_session.execute.assert_called_with(
-        mock_cassandra_session.prepare.return_value, [], timeout=5.0
-    )
+    # CassandraDriver always binds params first, then passes bound statement
+    bound = mock_cassandra_session.prepare.return_value.bind.return_value
+    mock_cassandra_session.execute.assert_called_with(bound, timeout=5.0)
 
 
 def test_cassandra_driver_rows_to_dicts_none():
@@ -239,7 +306,7 @@ async def test_cassandra_driver_execute_async(cassandra_driver, mock_cassandra_s
 
     result_rows = [Row(id="1", name="Alice")]
 
-    def fake_execute_async(stmt, params=None, timeout=None):
+    def fake_execute_async(stmt, **kwargs):
         future = MagicMock()
 
         def add_callbacks(on_success, on_error):
@@ -361,68 +428,43 @@ def test_acsylla_driver_rows_to_dicts():
         assert result == [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
 
 
-# ------------------------------------------------------------------
-# Phase 6: init_coodie / init_coodie_async tests
-# ------------------------------------------------------------------
+async def test_acsylla_driver_execute_async_with_paging(
+    acsylla_driver, mock_acsylla_session
+):
+    """AcsyllaDriver passes page_size to bind() and reads paging state from result."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "1"}, {"id": "2"}]))
+    mock_result.has_more_pages.return_value = True
+    mock_result.page_state.return_value = b"next-page-token"
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
+
+    rows = await acsylla_driver.execute_async(
+        "SELECT * FROM test_ks.t", [], fetch_size=2
+    )
+    assert rows == [{"id": "1"}, {"id": "2"}]
+    assert acsylla_driver._last_paging_state == b"next-page-token"
+
+    # Verify page_size was passed to bind via the prepared mock
+    prepared = mock_acsylla_session.create_prepared.return_value
+    prepared.bind.assert_called_with([], page_size=2)
 
 
-def test_init_coodie_with_session():
-    _registry.clear()
-    mock_session = MagicMock()
-    mock_session.cluster = MagicMock()
-    driver = init_coodie(session=mock_session, keyspace="ks")
-    assert get_driver() is driver
-    _registry.clear()
+async def test_acsylla_driver_execute_async_with_paging_state(
+    acsylla_driver, mock_acsylla_session
+):
+    """AcsyllaDriver sets page_state on statement when paging_state is provided."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "3"}]))
+    mock_result.has_more_pages.return_value = False
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
 
+    rows = await acsylla_driver.execute_async(
+        "SELECT * FROM test_ks.t", [], fetch_size=2, paging_state=b"page-token"
+    )
+    assert rows == [{"id": "3"}]
+    assert acsylla_driver._last_paging_state is None
 
-def test_init_coodie_cassandra_alias():
-    _registry.clear()
-    mock_session = MagicMock()
-    mock_session.cluster = MagicMock()
-    driver = init_coodie(session=mock_session, keyspace="ks", driver_type="cassandra")
-    assert get_driver() is driver
-    _registry.clear()
-
-
-def test_init_coodie_unknown_driver_type():
-    _registry.clear()
-    with pytest.raises(ConfigurationError, match="Unknown driver_type"):
-        init_coodie(driver_type="unknown", keyspace="ks")
-    _registry.clear()
-
-
-def test_init_coodie_acsylla_requires_session():
-    _registry.clear()
-    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
-        with pytest.raises(ConfigurationError, match="pre-created acsylla session"):
-            init_coodie(driver_type="acsylla", keyspace="ks")
-    _registry.clear()
-
-
-def test_init_coodie_acsylla_with_session():
-    _registry.clear()
-    mock_session = MagicMock()
-    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
-        driver = init_coodie(session=mock_session, keyspace="ks", driver_type="acsylla")
-    assert get_driver() is driver
-    _registry.clear()
-
-
-async def test_init_coodie_async_acsylla_with_hosts():
-    _registry.clear()
-    mock_acsylla = MagicMock()
-    mock_cluster = MagicMock()
-    mock_session = MagicMock()
-    mock_acsylla.create_cluster = MagicMock(return_value=mock_cluster)
-    mock_cluster.create_session = AsyncMock(return_value=mock_session)
-
-    with patch.dict("sys.modules", {"acsylla": mock_acsylla}):
-        driver = await init_coodie_async(
-            hosts=["127.0.0.1"],
-            keyspace="ks",
-            driver_type="acsylla",
-        )
-    assert get_driver() is driver
-    mock_acsylla.create_cluster.assert_called_once()
-    mock_cluster.create_session.assert_awaited_once_with(keyspace="ks")
-    _registry.clear()
+    # Verify set_page_state was called on the statement
+    prepared = mock_acsylla_session.create_prepared.return_value
+    statement = prepared.bind.return_value
+    statement.set_page_state.assert_called_once_with(b"page-token")

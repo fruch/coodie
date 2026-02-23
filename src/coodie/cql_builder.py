@@ -106,8 +106,22 @@ def parse_filter_kwargs(
         "contains_key": "CONTAINS KEY",
         "like": "LIKE",
     }
+    token_operators = {
+        "token__gt": "TOKEN >",
+        "token__gte": "TOKEN >=",
+        "token__lt": "TOKEN <",
+        "token__lte": "TOKEN <=",
+    }
     result = []
     for key, value in kwargs.items():
+        # Check for __token__<op> pattern first (two-level suffix)
+        parts2 = key.rsplit("__", 2)
+        if len(parts2) == 3:
+            col, mid, op = parts2
+            token_key = f"{mid}__{op}"
+            if token_key in token_operators:
+                result.append((col, token_operators[token_key], value))
+                continue
         parts = key.rsplit("__", 1)
         if len(parts) == 2 and parts[1] in operators:
             col, op_key = parts
@@ -126,7 +140,11 @@ def build_where_clause(
     parts = []
     params: list[Any] = []
     for col, op, value in filter_triples:
-        if op == "IN":
+        if op.startswith("TOKEN "):
+            actual_op = op[len("TOKEN ") :]
+            parts.append(f'TOKEN("{col}") {actual_op} ?')
+            params.append(value)
+        elif op == "IN":
             placeholders = ", ".join("?" * len(value))
             parts.append(f'"{col}" IN ({placeholders})')
             params.extend(value)

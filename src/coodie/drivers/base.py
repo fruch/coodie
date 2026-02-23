@@ -18,6 +18,8 @@ class AbstractDriver(ABC):
         params: list[Any],
         consistency: str | None = None,
         timeout: float | None = None,
+        fetch_size: int | None = None,
+        paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
         """Execute *stmt* with *params*; return rows as a list of dicts."""
 
@@ -46,6 +48,8 @@ class AbstractDriver(ABC):
         params: list[Any],
         consistency: str | None = None,
         timeout: float | None = None,
+        fetch_size: int | None = None,
+        paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
         """Async version of :meth:`execute`."""
 

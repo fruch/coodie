@@ -330,8 +330,7 @@ async def test_acsylla_driver_execute_async_with_consistency(
         "SELECT * FROM test_ks.t", [], consistency="LOCAL_QUORUM"
     )
     prepared = await mock_acsylla_session.create_prepared("SELECT * FROM test_ks.t")
-    bound = prepared.bind.return_value
-    bound.set_consistency.assert_called_with("LOCAL_QUORUM")
+    prepared.bind.assert_called_with([], consistency="LOCAL_QUORUM")
 
 
 async def test_acsylla_driver_sync_table_async(acsylla_driver, mock_acsylla_session):

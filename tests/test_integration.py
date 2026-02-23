@@ -185,7 +185,7 @@ async def coodie_driver(
         )
     yield driver
     _registry.clear()
-    driver.close()
+    await driver.close_async()
 
 
 # ---------------------------------------------------------------------------

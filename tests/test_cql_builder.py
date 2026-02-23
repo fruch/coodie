@@ -177,9 +177,7 @@ def test_build_select_with_columns():
 
 
 def test_build_select_like_filter():
-    cql, params = build_select(
-        "products", "ks", where=[("name", "LIKE", "Al%")]
-    )
+    cql, params = build_select("products", "ks", where=[("name", "LIKE", "Al%")])
     assert '"name" LIKE ?' in cql
     assert params == ["Al%"]
 

@@ -105,10 +105,13 @@ class AcsyllaDriver(AbstractDriver):
         timeout: float | None = None,
     ) -> list[dict[str, Any]]:
         prepared = await self._prepare(stmt)
-        statement = prepared.bind(params)
+        bind_kwargs: dict[str, Any] = {}
         if consistency is not None:
-            statement.set_consistency(consistency)
-        result = await self._session.execute(statement, timeout=timeout)
+            bind_kwargs["consistency"] = consistency
+        if timeout is not None:
+            bind_kwargs["timeout"] = timeout
+        statement = prepared.bind(params, **bind_kwargs)
+        result = await self._session.execute(statement)
         return self._rows_to_dicts(result)
 
     async def sync_table_async(

@@ -39,14 +39,14 @@ uv run pytest -m integration -v --timeout=120 --driver-type=acsylla
 ## Known limitations
 
 - **cassandra-driver** does not work on Python 3.13+ (`ImportError: OperationType`).
-- **acsylla** extended CQL type binding (BigInt, SmallInt, etc.) is not yet supported;
-  those tests are skipped automatically.
 - **acsylla** has no address translator — the test fixture connects via the
   Docker container's internal IP on port 9042.
 - **acsylla** sessions are event-loop-bound. Integration tests use
   `asyncio_default_fixture_loop_scope = "session"` and
   `@pytest.mark.asyncio(loop_scope="session")` so all async tests and the
   session-scoped fixture share the same loop.
+- **acsylla** returns UUIDs as strings; comparisons in raw driver results
+  (e.g. `values_list()`) should use `str()` for cross-driver compatibility.
 
 ## CI workflow
 

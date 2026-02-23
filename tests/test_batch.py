@@ -71,7 +71,7 @@ def test_batch_query_context_manager(registered_mock_driver):
 
     assert len(registered_mock_driver.executed) == 1
     stmt, params = registered_mock_driver.executed[0]
-    assert "BEGIN LOGGED BATCH" in stmt
+    assert "BEGIN BATCH" in stmt
     assert "APPLY BATCH" in stmt
     assert params == ["1", "2"]
 
@@ -176,7 +176,7 @@ def test_full_batch_workflow(registered_mock_driver):
 
     assert len(registered_mock_driver.executed) == 1
     stmt, params = registered_mock_driver.executed[0]
-    assert "BEGIN LOGGED BATCH" in stmt
+    assert "BEGIN BATCH" in stmt
     assert "APPLY BATCH" in stmt
     assert stmt.count("INSERT INTO") == 3
 
@@ -200,7 +200,7 @@ async def test_async_batch_query_context_manager(registered_mock_driver):
 
     assert len(registered_mock_driver.executed) == 1
     stmt, params = registered_mock_driver.executed[0]
-    assert "BEGIN LOGGED BATCH" in stmt
+    assert "BEGIN BATCH" in stmt
     assert "APPLY BATCH" in stmt
     assert params == ["1", "2"]
 
@@ -295,7 +295,7 @@ async def test_async_full_batch_workflow(registered_mock_driver):
 
     assert len(registered_mock_driver.executed) == 1
     stmt, params = registered_mock_driver.executed[0]
-    assert "BEGIN LOGGED BATCH" in stmt
+    assert "BEGIN BATCH" in stmt
     assert "APPLY BATCH" in stmt
     assert stmt.count("INSERT INTO") == 3
 

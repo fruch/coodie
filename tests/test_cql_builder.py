@@ -266,7 +266,7 @@ def test_build_batch():
         ("INSERT INTO ks.t (id) VALUES (?)", ["2"]),
     ]
     cql, params = build_batch(stmts)
-    assert "BEGIN LOGGED BATCH" in cql
+    assert "BEGIN BATCH" in cql
     assert "APPLY BATCH" in cql
     assert params == ["1", "2"]
 

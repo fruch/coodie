@@ -446,12 +446,13 @@ def build_batch(
     if batch_type is not None:
         bt = batch_type.upper()
     else:
-        bt = "LOGGED" if logged else "UNLOGGED"
+        bt = "" if logged else "UNLOGGED"
     all_params: list[Any] = []
     stmt_lines = []
     for stmt, p in statements:
         stmt_lines.append(stmt + ";")
         all_params.extend(p)
     inner = "\n  ".join(stmt_lines)
-    cql = f"BEGIN {bt} BATCH\n  {inner}\nAPPLY BATCH"
+    prefix = f"BEGIN {bt} BATCH" if bt else "BEGIN BATCH"
+    cql = f"{prefix}\n  {inner}\nAPPLY BATCH"
     return cql, all_params

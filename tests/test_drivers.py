@@ -407,11 +407,22 @@ async def test_acsylla_driver_sync_table_async(acsylla_driver, mock_acsylla_sess
         ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
         ColumnDefinition(name="email", cql_type="text", index=True),
     ]
-    mock_acsylla_session.execute = AsyncMock(return_value=None)
+    # The introspection query returns existing columns as dicts;
+    # session.execute must return an iterable result for both DDL (no rows)
+    # and the system_schema SELECT (column_name rows).
+    introspection_result = MagicMock()
+    introspection_result.__iter__ = MagicMock(
+        return_value=iter([{"column_name": "id"}, {"column_name": "email"}])
+    )
+    ddl_result = MagicMock()
+    ddl_result.__iter__ = MagicMock(return_value=iter([]))
+    mock_acsylla_session.execute = AsyncMock(
+        side_effect=[ddl_result, introspection_result, ddl_result]
+    )
     await acsylla_driver.sync_table_async("users", "test_ks", cols)
     calls = mock_acsylla_session.execute.await_args_list
-    # At least CREATE TABLE and CREATE INDEX (wrapped in Statement objects)
-    assert len(calls) >= 2
+    # CREATE TABLE + introspection query + CREATE INDEX
+    assert len(calls) >= 3
 
 
 async def test_acsylla_driver_close_async(acsylla_driver, mock_acsylla_session):

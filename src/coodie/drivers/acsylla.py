@@ -126,6 +126,15 @@ class AcsyllaDriver(AbstractDriver):
             self._last_paging_state = None
         return self._rows_to_dicts(result)
 
+    async def _get_existing_columns_async(self, table: str, keyspace: str) -> set[str]:
+        """Introspect the existing column names via system_schema."""
+        stmt = (
+            "SELECT column_name FROM system_schema.columns "
+            "WHERE keyspace_name = ? AND table_name = ?"
+        )
+        rows = await self.execute_async(stmt, [keyspace, table])
+        return {row["column_name"] for row in rows}
+
     async def sync_table_async(
         self,
         table: str,
@@ -139,6 +148,15 @@ class AcsyllaDriver(AbstractDriver):
             table, keyspace, cols, table_options=table_options
         )
         await self._session.execute(self._cql_to_statement(create_cql))
+
+        # Introspect existing columns and add missing ones
+        existing = await self._get_existing_columns_async(table, keyspace)
+        for col in cols:
+            if col.name not in existing:
+                alter = (
+                    f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
+                )
+                await self._session.execute(self._cql_to_statement(alter))
 
         # Secondary indexes
         for col in cols:

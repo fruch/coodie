@@ -39,6 +39,9 @@ uv run pytest -m integration -v --timeout=120 --driver-type=acsylla
 ## Known limitations
 
 - **cassandra-driver** does not work on Python 3.13+ (`ImportError: OperationType`).
+- **acsylla** prepared binding does not support extended CQL types (BigInt,
+  SmallInt, TinyInt, VarInt, Double, Ascii, TimeUUID, Time) or frozen
+  collections; those tests are skipped automatically.
 - **acsylla** has no address translator — the test fixture connects via the
   Docker container's internal IP on port 9042.
 - **acsylla** sessions are event-loop-bound. Integration tests use

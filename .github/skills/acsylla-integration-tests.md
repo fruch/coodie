@@ -40,23 +40,24 @@ uv run pytest -m integration -v --timeout=120 --driver-type=acsylla \
 
 ## What is tested
 
-All integration tests run against acsylla — no tests are skipped for
-feature gaps. This includes:
+Most integration tests run against acsylla. Extended CQL types and frozen
+collections are skipped because acsylla's prepared statement binding does not
+support those types yet.
 
-| Feature area              | Tests                                          |
-|---------------------------|-------------------------------------------------|
-| CRUD operations           | save, find, update, delete, insert IF NOT EXISTS |
-| Extended CQL types        | BigInt, SmallInt, TinyInt, VarInt, Double, Ascii, TimeUUID, Time |
-| Frozen collections        | `frozen<list>`, `frozen<set>`, `frozen<map>`   |
-| Batch writes              | `BatchQuery` / `AsyncBatchQuery` context managers |
-| ALTER TABLE migration     | `sync_table()` adds new columns to existing tables |
-| Composite partition keys  | Multi-column partition and clustering keys       |
-| Clustering order          | ASC / DESC ordering                             |
-| Secondary indexes         | Index creation and filtered queries              |
-| Paging                    | Server-side paging with `fetch_size` / `page_state` |
-| QuerySet enhancements     | `.only()`, `.defer()`, `.values_list()`, `.per_partition_limit()` |
-| Polymorphic models        | Single-table inheritance with discriminator      |
-| Materialized views        | `sync_view()` / `drop_view()` DDL               |
+| Feature area              | Tests                                          | acsylla |
+|---------------------------|-------------------------------------------------|---------|
+| CRUD operations           | save, find, update, delete, insert IF NOT EXISTS | ✅      |
+| Extended CQL types        | BigInt, SmallInt, TinyInt, VarInt, Double, Ascii, TimeUUID, Time | ⏭️ skipped |
+| Frozen collections        | `frozen<list>`, `frozen<set>`, `frozen<map>`   | ⏭️ skipped |
+| Batch writes              | `BatchQuery` / `AsyncBatchQuery` context managers | ✅      |
+| ALTER TABLE migration     | `sync_table()` adds new columns to existing tables | ✅      |
+| Composite partition keys  | Multi-column partition and clustering keys       | ✅      |
+| Clustering order          | ASC / DESC ordering                             | ✅      |
+| Secondary indexes         | Index creation and filtered queries              | ✅      |
+| Paging                    | Server-side paging with `fetch_size` / `page_state` | ✅      |
+| QuerySet enhancements     | `.only()`, `.defer()`, `.values_list()`, `.per_partition_limit()` | ✅      |
+| Polymorphic models        | Single-table inheritance with discriminator      | ✅      |
+| Materialized views        | `sync_view()` / `drop_view()` DDL               | ✅      |
 
 ## How the acsylla fixture works
 

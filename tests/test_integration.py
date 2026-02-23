@@ -1474,6 +1474,8 @@ class TestSyncExtended:
 
     def test_bigint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """BigInt (bigint) column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, big_val=2**40).save()
@@ -1484,6 +1486,8 @@ class TestSyncExtended:
 
     def test_smallint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """SmallInt (smallint) column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, small_val=32000).save()
@@ -1494,6 +1498,8 @@ class TestSyncExtended:
 
     def test_tinyint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """TinyInt (tinyint) column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, tiny_val=127).save()
@@ -1504,6 +1510,8 @@ class TestSyncExtended:
 
     def test_varint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """VarInt (varint) column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, var_val=10**30).save()
@@ -1514,6 +1522,8 @@ class TestSyncExtended:
 
     def test_double_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """Double (double) column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, dbl_val=3.141592653589793).save()
@@ -1524,6 +1534,8 @@ class TestSyncExtended:
 
     def test_ascii_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """Ascii (ascii) column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, ascii_val="hello").save()
@@ -1534,6 +1546,8 @@ class TestSyncExtended:
 
     def test_timeuuid_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """TimeUUID (timeuuid) column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         from uuid import uuid1
 
         SyncExtendedTypes.sync_table()
@@ -1547,6 +1561,8 @@ class TestSyncExtended:
 
     def test_time_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """CQL time column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         t = dt_time(13, 45, 30)
@@ -1563,6 +1579,8 @@ class TestSyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """frozen<list<text>> column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, frozen_list=["a", "b", "c"]).save()
@@ -1575,6 +1593,8 @@ class TestSyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """frozen<set<int>> column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, frozen_set={10, 20, 30}).save()
@@ -1587,6 +1607,8 @@ class TestSyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """frozen<map<text, int>> column survives a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         SyncExtendedTypes.sync_table()
         rid = uuid4()
         SyncExtendedTypes(id=rid, frozen_map={"x": 1, "y": 2}).save()
@@ -1599,6 +1621,8 @@ class TestSyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """All extended type fields set together survive a save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         from uuid import uuid1
 
         SyncExtendedTypes.sync_table()
@@ -1851,6 +1875,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """BigInt (bigint) column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, big_val=2**40).save()
@@ -1863,6 +1889,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """SmallInt (smallint) column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, small_val=32000).save()
@@ -1875,6 +1903,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """TinyInt (tinyint) column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, tiny_val=127).save()
@@ -1887,6 +1917,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """VarInt (varint) column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, var_val=10**30).save()
@@ -1899,6 +1931,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """Double (double) column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, dbl_val=3.141592653589793).save()
@@ -1911,6 +1945,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """Ascii (ascii) column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, ascii_val="hello").save()
@@ -1923,6 +1959,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """TimeUUID (timeuuid) column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         from uuid import uuid1
 
         await AsyncExtendedTypes.sync_table()
@@ -1938,6 +1976,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """CQL time column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         t = dt_time(13, 45, 30)
@@ -1954,6 +1994,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """frozen<list<text>> column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, frozen_list=["a", "b", "c"]).save()
@@ -1966,6 +2008,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """frozen<set<int>> column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, frozen_set={10, 20, 30}).save()
@@ -1978,6 +2022,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """frozen<map<text, int>> column survives an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         await AsyncExtendedTypes.sync_table()
         rid = uuid4()
         await AsyncExtendedTypes(id=rid, frozen_map={"x": 1, "y": 2}).save()
@@ -1990,6 +2036,8 @@ class TestAsyncExtended:
         self, coodie_driver: object, driver_type: str
     ) -> None:
         """All extended type fields set together survive an async save/load round-trip."""
+        if driver_type == "acsylla":
+            pytest.skip("acsylla prepared binding does not support extended CQL types")
         from uuid import uuid1
 
         await AsyncExtendedTypes.sync_table()

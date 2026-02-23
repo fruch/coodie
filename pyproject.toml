@@ -51,6 +51,7 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=3.0",
     "pytest-asyncio>=0.21",
+    "pytest-benchmark>=5.1.0",
     "pytest-timeout>=2.0",
     "testcontainers>=4.0",
     "pre-commit>=4.5.1,<5",
@@ -64,11 +65,16 @@ version_variable = "src/coodie/__init__.py:__version__"
 build_command = "uv build"
 
 [tool.pytest.ini_options]
-addopts = "-v -Wdefault --cov=coodie --cov-report=term-missing:skip-covered -m 'not integration'"
+addopts = "-v -Wdefault --cov=coodie --cov-report=term-missing:skip-covered -m 'not integration' --benchmark-disable"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
-markers = ["integration: marks tests as integration tests (deselect with '-m not integration')"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m not integration')",
+    "benchmark: marks tests as benchmark tests (enable with --benchmark-enable)",
+]
+python_files = ["test_*.py", "bench_*.py"]
 pythonpath = ["src"]
+testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true

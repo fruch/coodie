@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    types: [labeled, opened, synchronize]
   schedule:
     # Weekly — every Monday at 06:00 UTC
     - cron: "0 6 * * 1"
@@ -14,6 +16,9 @@ concurrency:
 
 jobs:
   benchmark:
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'benchmark')
     runs-on: ubuntu-latest
     permissions:
       contents: read

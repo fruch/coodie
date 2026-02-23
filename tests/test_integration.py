@@ -1570,7 +1570,8 @@ class TestSyncExtended:
         results = QuerySet(SyncProduct).filter(id=pid).values_list("id", "name").all()
         assert len(results) >= 1
         assert isinstance(results[0], tuple)
-        matching = [r for r in results if r[0] == pid]
+        # Use str() for comparison: acsylla returns UUIDs as strings
+        matching = [r for r in results if str(r[0]) == str(pid)]
         assert len(matching) == 1
         assert matching[0][1] == "VLTest"
 
@@ -2026,7 +2027,8 @@ class TestAsyncExtended:
         )
         assert len(results) >= 1
         assert isinstance(results[0], tuple)
-        matching = [r for r in results if r[0] == pid]
+        # Use str() for comparison: acsylla returns UUIDs as strings
+        matching = [r for r in results if str(r[0]) == str(pid)]
         assert len(matching) == 1
         assert matching[0][1] == "VLAsync"
 

@@ -34,7 +34,7 @@
 | ~~`tests/aio/test_query.py`~~ | ~~408~~ | ✅ Merged into `tests/test_query.py` |
 | ~~`tests/sync/test_polymorphic.py`~~ | ~~320~~ | ✅ Merged into `tests/test_polymorphic.py` (319 lines) |
 | ~~`tests/aio/test_polymorphic.py`~~ | ~~183~~ | ✅ Merged into `tests/test_polymorphic.py` |
-| `tests/test_integration.py` | 2,435 | Monolithic; every sync class has an async twin |
+| `tests/test_integration.py` | ~~2,435~~ | ✅ Split into `tests/integration/` (1663 lines, 7 files) |
 | **Total** | **~5,547** | |
 
 ---
@@ -330,9 +330,10 @@ These are tiny and can be merged trivially.
 
 ## 5. Task 4 — Split `test_integration.py`
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 **Effort:** Medium
-**Target:** ~2,435 → 5 files, each < 400 lines
+**Target:** ~2,435 → 5 files, each < 500 lines
+**Result:** 1 file (2297 lines) → 7 files (1663 lines, −28%). Test count increased from 118 → 130.
 
 ### 5.1 Create package structure
 
@@ -371,16 +372,16 @@ parametrized fixture:
 | `TestSyncExtended` + `TestAsyncExtended` | `TestExtended` | `test_extended.py` |
 | `TestSyncMaterializedView` + `TestAsyncMaterializedView` | `TestMaterializedView` | `test_views.py` |
 
-### 5.4 Estimated line counts after split
+### 5.4 Actual line counts after split
 
-| File | Estimated lines |
-|------|----------------|
-| `conftest.py` | ~250 (fixtures + models) |
-| `test_basic.py` | ~300 (merged CRUD tests) |
-| `test_raw_cql.py` | ~80 (merged raw CQL) |
-| `test_keyspace.py` | ~80 (merged keyspace) |
-| `test_extended.py` | ~350 (merged extended + collections + batch) |
-| `test_views.py` | ~120 (merged materialized view) |
+| File | Lines |
+|------|-------|
+| `conftest.py` | 612 (fixtures + models + helpers) |
+| `test_basic.py` | 378 (merged CRUD + QuerySet enhancements) |
+| `test_raw_cql.py` | 59 (merged raw CQL) |
+| `test_keyspace.py` | 57 (merged keyspace) |
+| `test_extended.py` | 474 (merged extended + collections + batch) |
+| `test_views.py` | 83 (merged materialized view) |
 
 ### 5.5 Update `pyproject.toml` test configuration
 

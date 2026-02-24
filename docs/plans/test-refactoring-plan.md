@@ -41,9 +41,9 @@
 
 ## 2. Task 1 — Parametrize `test_types.py`
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 **Effort:** Low
-**Target:** ~242 → ~130 lines
+**Target:** ~242 → ~130 lines (achieved ~179 after ruff formatting)
 
 ### 2.1 Collapse `python_type_to_cql_type_str` basic type tests
 
@@ -142,9 +142,9 @@ def test_coerce_row_none_collections(field, input_val, expected):
 
 ## 3. Task 2 — Parametrize `test_cql_builder.py`
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 **Effort:** Low–Medium
-**Target:** ~706 → ~500 lines
+**Target:** ~706 → ~500 lines (achieved ~689 after ruff formatting)
 
 ### 3.1 Collapse `parse_filter_kwargs` operator variants
 

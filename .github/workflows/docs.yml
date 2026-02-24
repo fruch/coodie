@@ -3,7 +3,7 @@ name: Docs
 on:
   push:
     branches:
-      - main
+      - master
   pull_request:
 
 concurrency:
@@ -28,7 +28,7 @@ jobs:
       - name: Build docs
         run: uv run sphinx-build -b html docs/source docs/build/html
       - name: Upload artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/build/html

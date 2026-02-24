@@ -489,12 +489,12 @@ communicates that it is an internal/system table.
 
 ### Phase A: Enhanced `sync_table` (Tier 1 improvements)
 
-| Task | Description | Priority |
-|---|---|---|
-| A.1 | Add `dry_run=True` parameter returning planned CQL statements | High |
-| A.2 | Detect and warn on schema drift (DB columns not in model) | High |
-| A.3 | Apply table option changes via `ALTER TABLE … WITH` | Medium |
-| A.4 | Detect and drop removed indexes (with flag) | Medium |
+| Task | Description | Priority | Status |
+|---|---|---|---|
+| A.1 | Add `dry_run=True` parameter returning planned CQL statements | High | ✅ Done |
+| A.2 | Detect and warn on schema drift (DB columns not in model) | High | ✅ Done |
+| A.3 | Apply table option changes via `ALTER TABLE … WITH` | Medium | ✅ Done |
+| A.4 | Detect and drop removed indexes (with flag) | Medium | ✅ Done |
 
 ### Phase B: Migration Framework Core (Tier 2)
 

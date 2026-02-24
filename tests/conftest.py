@@ -99,11 +99,29 @@ class MockDriver:
         self._last_paging_state = self._pop_paging_state()
         return self._pop_rows()
 
-    def sync_table(self, table: str, keyspace: str, cols: Any, table_options: Any = None) -> None:
+    def sync_table(
+        self,
+        table: str,
+        keyspace: str,
+        cols: Any,
+        table_options: Any = None,
+        dry_run: bool = False,
+        drop_removed_indexes: bool = False,
+    ) -> list[str]:
         self.executed.append((f"SYNC_TABLE {keyspace}.{table}", []))
+        return []
 
-    async def sync_table_async(self, table: str, keyspace: str, cols: Any, table_options: Any = None) -> None:
+    async def sync_table_async(
+        self,
+        table: str,
+        keyspace: str,
+        cols: Any,
+        table_options: Any = None,
+        dry_run: bool = False,
+        drop_removed_indexes: bool = False,
+    ) -> list[str]:
         self.executed.append((f"SYNC_TABLE {keyspace}.{table}", []))
+        return []
 
     def close(self) -> None:
         pass

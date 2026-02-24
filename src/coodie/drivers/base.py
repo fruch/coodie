@@ -30,8 +30,14 @@ class AbstractDriver(ABC):
         keyspace: str,
         cols: list[Any],  # list[ColumnDefinition]
         table_options: dict[str, Any] | None = None,
-    ) -> None:
-        """Idempotent CREATE TABLE + ALTER TABLE ADD for new columns."""
+        dry_run: bool = False,
+        drop_removed_indexes: bool = False,
+    ) -> list[str]:
+        """Idempotent CREATE TABLE + ALTER TABLE ADD for new columns.
+
+        Returns the list of CQL statements that were (or would be) executed.
+        When *dry_run* is ``True`` the database is not modified.
+        """
 
     @abstractmethod
     def close(self) -> None:
@@ -60,7 +66,9 @@ class AbstractDriver(ABC):
         keyspace: str,
         cols: list[Any],  # list[ColumnDefinition]
         table_options: dict[str, Any] | None = None,
-    ) -> None:
+        dry_run: bool = False,
+        drop_removed_indexes: bool = False,
+    ) -> list[str]:
         """Async version of :meth:`sync_table`."""
 
     @abstractmethod

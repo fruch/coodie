@@ -608,3 +608,207 @@ async def test_acsylla_driver_execute_async_with_paging_state(acsylla_driver, mo
     prepared = mock_acsylla_session.create_prepared.return_value
     statement = prepared.bind.return_value
     statement.set_page_state.assert_called_once_with(b"page-token")
+
+
+# ------------------------------------------------------------------
+# Phase A: Enhanced sync_table — dry_run, drift, options, indexes
+# ------------------------------------------------------------------
+
+
+def test_cassandra_driver_sync_table_returns_planned_cql(cassandra_driver, mock_cassandra_session):
+    """sync_table should return the list of planned CQL statements."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id")],  # system_schema.columns
+        None,  # ALTER TABLE ADD "name"
+    ]
+    planned = cassandra_driver.sync_table("my_table", "test_ks", cols)
+    assert isinstance(planned, list)
+    assert any("CREATE TABLE" in s for s in planned)
+    assert any("ALTER TABLE" in s and '"name"' in s for s in planned)
+
+
+def test_cassandra_driver_sync_table_dry_run(cassandra_driver, mock_cassandra_session):
+    """dry_run=True should return CQL without executing DDL."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    # Only the introspection query (system_schema.columns) should be called
+    mock_cassandra_session.execute.side_effect = [
+        [SysRow(column_name="id")],  # system_schema.columns
+    ]
+    planned = cassandra_driver.sync_table("my_table", "test_ks", cols, dry_run=True)
+    assert isinstance(planned, list)
+    assert any("CREATE TABLE" in s for s in planned)
+    assert any("ALTER TABLE" in s and '"name"' in s for s in planned)
+    # Only 1 execute call: the system_schema introspection
+    assert mock_cassandra_session.execute.call_count == 1
+    assert "system_schema" in str(mock_cassandra_session.execute.call_args_list[0])
+
+
+def test_cassandra_driver_sync_table_schema_drift_warning(cassandra_driver, mock_cassandra_session, caplog):
+    """Should warn when DB has columns not in the model."""
+    import logging
+
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id"), SysRow(column_name="old_column")],  # system_schema
+    ]
+    with caplog.at_level(logging.WARNING, logger="coodie"):
+        cassandra_driver.sync_table("my_table", "test_ks", cols)
+    assert "Schema drift detected" in caplog.text
+    assert "old_column" in caplog.text
+
+
+def test_cassandra_driver_sync_table_no_drift_no_warning(cassandra_driver, mock_cassandra_session, caplog):
+    """No warning when all DB columns are in the model."""
+    import logging
+
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id"), SysRow(column_name="name")],  # system_schema
+    ]
+    with caplog.at_level(logging.WARNING, logger="coodie"):
+        cassandra_driver.sync_table("my_table", "test_ks", cols)
+    assert "Schema drift" not in caplog.text
+
+
+def test_cassandra_driver_sync_table_table_options_change(cassandra_driver, mock_cassandra_session):
+    """Should detect changed table options and ALTER TABLE WITH."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    TableRow = namedtuple("TableRow", ["default_time_to_live"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id")],  # system_schema.columns
+        [TableRow(default_time_to_live=0)],  # system_schema.tables
+        None,  # ALTER TABLE WITH
+    ]
+    planned = cassandra_driver.sync_table("my_table", "test_ks", cols, table_options={"default_time_to_live": 3600})
+    assert any("ALTER TABLE" in s and "default_time_to_live = 3600" in s for s in planned)
+
+
+def test_cassandra_driver_sync_table_table_options_no_change(cassandra_driver, mock_cassandra_session):
+    """Should not ALTER TABLE when options match."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    TableRow = namedtuple("TableRow", ["default_time_to_live"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id")],  # system_schema.columns
+        [TableRow(default_time_to_live=3600)],  # system_schema.tables
+    ]
+    planned = cassandra_driver.sync_table("my_table", "test_ks", cols, table_options={"default_time_to_live": 3600})
+    # No ALTER TABLE WITH in the planned statements
+    assert not any("ALTER TABLE" in s and "WITH" in s for s in planned)
+
+
+def test_cassandra_driver_sync_table_drop_removed_indexes(cassandra_driver, mock_cassandra_session):
+    """Should drop indexes not in model when drop_removed_indexes=True."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="email", cql_type="text", index=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    IndexRow = namedtuple("IndexRow", ["index_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id"), SysRow(column_name="email")],  # system_schema.columns
+        None,  # CREATE INDEX email
+        [IndexRow(index_name="my_table_email_idx"), IndexRow(index_name="my_table_old_idx")],  # indexes
+        None,  # DROP INDEX old_idx
+    ]
+    planned = cassandra_driver.sync_table("my_table", "test_ks", cols, drop_removed_indexes=True)
+    assert any("DROP INDEX" in s and "my_table_old_idx" in s for s in planned)
+    # The current model index should NOT be dropped
+    assert not any("DROP INDEX" in s and "my_table_email_idx" in s for s in planned)
+
+
+def test_cassandra_driver_sync_table_no_drop_indexes_by_default(cassandra_driver, mock_cassandra_session):
+    """Should NOT drop indexes when drop_removed_indexes is False (default)."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id")],  # system_schema.columns
+    ]
+    planned = cassandra_driver.sync_table("my_table", "test_ks", cols)
+    assert not any("DROP INDEX" in s for s in planned)
+
+
+async def test_acsylla_driver_sync_table_dry_run(acsylla_driver, mock_acsylla_session):
+    """AcsyllaDriver dry_run=True returns CQL without executing DDL."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    # Introspection queries go through execute_async (prepared), not raw session.execute
+    introspection_result = MagicMock()
+    introspection_result.__iter__ = MagicMock(return_value=iter([{"column_name": "id"}]))
+    mock_acsylla_session.execute = AsyncMock(return_value=introspection_result)
+
+    planned = await acsylla_driver.sync_table_async("my_table", "test_ks", cols, dry_run=True)
+    assert isinstance(planned, list)
+    assert any("CREATE TABLE" in s for s in planned)
+    assert any("ALTER TABLE" in s and '"name"' in s for s in planned)
+
+
+async def test_acsylla_driver_sync_table_schema_drift_warning(acsylla_driver, mock_acsylla_session, caplog):
+    """AcsyllaDriver should warn on schema drift."""
+    import logging
+
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    ddl_result = MagicMock()
+    ddl_result.__iter__ = MagicMock(return_value=iter([]))
+    introspection_result = MagicMock()
+    introspection_result.__iter__ = MagicMock(return_value=iter([{"column_name": "id"}, {"column_name": "legacy_col"}]))
+    mock_acsylla_session.execute = AsyncMock(side_effect=[ddl_result, introspection_result])
+
+    with caplog.at_level(logging.WARNING, logger="coodie"):
+        await acsylla_driver.sync_table_async("my_table", "test_ks", cols)
+    assert "Schema drift detected" in caplog.text
+    assert "legacy_col" in caplog.text

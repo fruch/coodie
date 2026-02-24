@@ -3,9 +3,9 @@
 > **Goal:** Expand the demo suite from a single FastAPI app into a collection of
 > standalone, colorful demo applications — each in its own folder — covering
 > Django integration, Flask integration, Cassandra-specific features (TTL,
-> counters, LWT, batch, collections, materialized views), migration patterns
-> inspired by scylladb/argus, and built-in sample-data generation with options
-> for real-data feeds.
+> counters, LWT, batch, collections, materialized views, vector search), migration
+> patterns inspired by scylladb/argus, and built-in sample-data generation with
+> options for real-data feeds.
 
 ---
 
@@ -21,8 +21,9 @@
    - [4.4 Data Generation & Feeds](#44-data-generation--feeds)
 5. [Demo Directory Structure](#5-demo-directory-structure)
 6. [Implementation Phases](#6-implementation-phases)
-7. [Shared Infrastructure](#7-shared-infrastructure)
-8. [References](#8-references)
+7. [Vector Search — Library Development Scope](#7-vector-search--library-development-scope)
+8. [Shared Infrastructure](#8-shared-infrastructure)
+9. [References](#9-references)
 
 ---
 
@@ -36,7 +37,8 @@ The repository has a single demo application:
 
 The existing demo is well-structured with a dark-theme HTMX UI, but covers only
 basic CRUD via the async API. No Django, Flask, sync API, TTL, counters, LWT,
-batch, collections, materialized views, or migration workflows are demonstrated.
+batch, collections, materialized views, vector search, or migration workflows
+are demonstrated.
 
 ---
 
@@ -102,6 +104,7 @@ Legend:
 | Materialized Views | `MaterializedView`, `sync_view()`, read-only queries | ❌ |
 | Time-Series Analytics | Clustering keys with DESC order, `per_partition_limit()`, `paged_all()` | ❌ |
 | Polymorphic Models | Single-table inheritance, discriminator column | ❌ |
+| Vector Similarity Search | `vector<float, N>` column, vector index, ANN queries, embeddings | ❌ |
 
 **Gap summary — Cassandra features:**
 - TTL → short-lived session/token store showing data that auto-expires
@@ -112,6 +115,9 @@ Legend:
 - Materialized Views → product-by-category view auto-maintained by Cassandra
 - Time-Series → IoT sensor data with time-bucketed partitions and pagination
 - Polymorphic → content management with Article / Video / Podcast subtypes
+- Vector Search → semantic product/document similarity search using embeddings,
+  ANN (Approximate Nearest Neighbor) queries, and cosine similarity index;
+  inspired by argus's `SCTErrorEventEmbedding` model
 
 ### 4.3 Migration & Real-World Patterns
 
@@ -231,6 +237,12 @@ demos/
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
+├── vector-search/                     # NEW: Vector similarity search
+│   ├── README.md
+│   ├── pyproject.toml
+│   ├── main.py
+│   ├── models.py
+│   └── seed.py
 ├── argus-tracker/                     # NEW: Argus-inspired complex models
 │   ├── README.md
 │   ├── pyproject.toml
@@ -312,47 +324,115 @@ demos/
 | 5.4 | Each demo gets `seed.py`, colorful UI, and README |
 | 5.5 | Manual end-to-end test for each demo |
 
-### Phase 6: Time-Series & Polymorphic Demos (Priority: Medium)
+### Phase 6: Vector Similarity Search Demo (Priority: High)
+
+**Goal:** Add vector column support to coodie's type system and showcase it with a semantic search demo.
+
+> **Note:** This phase requires library-level development in coodie itself
+> (not just demo code), because coodie currently has **no vector support**.
+> The scoped development work is listed below.
+
+#### 6a. coodie library development (pre-requisites)
+
+| Task | Description |
+|---|---|
+| 6a.1 | Add a `Vector(dimensions=N)` field annotation to `coodie/fields.py` that maps to the CQL `vector<float, N>` type |
+| 6a.2 | Update `coodie/schema.py` type mapping to emit `vector<float, N>` in CREATE TABLE DDL |
+| 6a.3 | Add `VectorIndex(similarity_function="COSINE")` annotation (or `Settings` option) to emit `CREATE INDEX ... USING 'vector_index' WITH OPTIONS = {'similarity_function': '...'}` |
+| 6a.4 | Support ANN queries: `Model.find().order_by_ann(embedding_field, query_vector).limit(N)` or equivalent QuerySet method that emits `ORDER BY field ANN OF [...]` CQL |
+| 6a.5 | Validate vector dimensions on save (list length must match declared dimensions) |
+| 6a.6 | Unit tests for vector type mapping, DDL generation, ANN query building, and dimension validation |
+| 6a.7 | Integration tests with ScyllaDB: create table with vector column, insert embeddings, ANN query returns nearest neighbors |
+
+#### 6b. Vector search demo
+
+| Task | Description |
+|---|---|
+| 6b.1 | Create `demos/vector-search/` — semantic product search using sentence-transformer embeddings (384-dim or smaller) |
+| 6b.2 | Define `ProductEmbedding` model with `vector<float, N>` column, partition key, and vector index with cosine similarity |
+| 6b.3 | `seed.py` generates product descriptions and computes embeddings (using a small model like `all-MiniLM-L6-v2` or pre-computed vectors from a JSON feed) |
+| 6b.4 | Build a search UI: user enters a text query → compute embedding → ANN query → display ranked results with similarity scores |
+| 6b.5 | Colorful dark-theme UI with similarity score badges and result cards |
+| 6b.6 | README documents the CQL behind the scenes (`CREATE INDEX ... USING 'vector_index'`, `ORDER BY ... ANN OF`) |
+| 6b.7 | Manual end-to-end test: seed → search → verify ranked results |
+
+### Phase 7: Time-Series & Polymorphic Demos (Priority: Medium)
 
 **Goal:** Showcase advanced data-modeling patterns.
 
 | Task | Description |
 |---|---|
-| 6.1 | Create `demos/timeseries-iot/` — sensor readings with time-bucketed partitions, `per_partition_limit()`, `paged_all()` |
-| 6.2 | Create `demos/polymorphic-cms/` — content management with `Article`/`Video`/`Podcast` subtypes via single-table inheritance |
-| 6.3 | Each demo gets `seed.py`, colorful UI, and README |
-| 6.4 | Manual end-to-end test for each demo |
+| 7.1 | Create `demos/timeseries-iot/` — sensor readings with time-bucketed partitions, `per_partition_limit()`, `paged_all()` |
+| 7.2 | Create `demos/polymorphic-cms/` — content management with `Article`/`Video`/`Podcast` subtypes via single-table inheritance |
+| 7.3 | Each demo gets `seed.py`, colorful UI, and README |
+| 7.4 | Manual end-to-end test for each demo |
 
-### Phase 7: Argus-Inspired Tracker & Migration Guide (Priority: Medium)
+### Phase 8: Argus-Inspired Tracker & Migration Guide (Priority: Medium)
 
 **Goal:** Demonstrate complex real-world patterns from scylladb/argus and provide a cqlengine migration walkthrough.
 
 | Task | Description |
 |---|---|
-| 7.1 | Create `demos/argus-tracker/` — scaled-down test tracker with User, TestRun (composite PK + clustering), Event (compound partition), Notification (TimeUUID) models |
-| 7.2 | Include batch event ingestion, prepared-statement caching patterns, and partition-scoped queries |
-| 7.3 | Create `demos/migration-guide/` — side-by-side `cqlengine_models.py` and `coodie_models.py` with a `migrate.py` script that syncs tables and a `verify.py` that checks data round-trip |
-| 7.4 | Reference argus model patterns: composite partition keys, clustering DESC, multiple secondary indexes, List/Map collections |
-| 7.5 | Each demo gets README with step-by-step walkthrough |
-| 7.6 | Manual end-to-end test for each demo |
+| 8.1 | Create `demos/argus-tracker/` — scaled-down test tracker with User, TestRun (composite PK + clustering), Event (compound partition), Notification (TimeUUID) models |
+| 8.2 | Include batch event ingestion, prepared-statement caching patterns, and partition-scoped queries |
+| 8.3 | Create `demos/migration-guide/` — side-by-side `cqlengine_models.py` and `coodie_models.py` with a `migrate.py` script that syncs tables and a `verify.py` that checks data round-trip |
+| 8.4 | Reference argus model patterns: composite partition keys, clustering DESC, multiple secondary indexes, List/Map collections |
+| 8.5 | Each demo gets README with step-by-step walkthrough |
+| 8.6 | Manual end-to-end test for each demo |
 
-### Phase 8: Top-Level README & Polish (Priority: Low)
+### Phase 9: Top-Level README & Polish (Priority: Low)
 
 **Goal:** Tie all demos together with an index README and ensure consistent quality.
 
 | Task | Description |
 |---|---|
-| 8.1 | Write `demos/README.md` with a table listing all demos, their focus area, and quick-start links |
-| 8.2 | Add a `docker-compose.yml` at `demos/` level for shared ScyllaDB instance |
-| 8.3 | Ensure every demo has consistent color theming, README structure, and seed.py interface |
-| 8.4 | Update the top-level `README.md` to link to the new `demos/` directory |
-| 8.5 | Final review of all demos for consistency and correctness |
+| 9.1 | Write `demos/README.md` with a table listing all demos, their focus area, and quick-start links |
+| 9.2 | Add a `docker-compose.yml` at `demos/` level for shared ScyllaDB instance |
+| 9.3 | Ensure every demo has consistent color theming, README structure, and seed.py interface |
+| 9.4 | Update the top-level `README.md` to link to the new `demos/` directory |
+| 9.5 | Final review of all demos for consistency and correctness |
 
 ---
 
-## 7. Shared Infrastructure
+## 7. Vector Search — Library Development Scope
 
-### 7.1 Docker Compose (shared ScyllaDB)
+Phase 6 above requires adding vector support to coodie's core library **before**
+the demo can be built. This section summarizes the scope of that work.
+
+coodie currently has **no vector type, no vector index support, and no ANN query
+syntax**. ScyllaDB (and Cassandra 5.0+) support the `vector<T, N>` CQL type
+and `ORDER BY ... ANN OF [...]` queries for approximate nearest-neighbor search.
+
+The argus project (`scylladb/argus`) implements a custom `Vector` column class
+extending cqlengine's `columns.List` that emits `vector<float, 384>` DDL and
+uses `CREATE INDEX ... USING 'vector_index' WITH OPTIONS = {'similarity_function': 'COSINE'}`
+for cosine-similarity indexes.
+
+### What coodie needs
+
+| Area | What to Add | CQL Equivalent |
+|---|---|---|
+| **Field type** | `Vector(dimensions=N)` annotation in `fields.py` | `vector<float, N>` column type |
+| **Schema DDL** | Type mapping in `schema.py` for CREATE TABLE | `embedding vector<float, 384>` |
+| **Index DDL** | `VectorIndex(similarity="COSINE")` annotation or Settings hook | `CREATE INDEX ... USING 'vector_index' WITH OPTIONS = {'similarity_function': 'COSINE'}` |
+| **Query builder** | `order_by_ann(field, query_vector)` on QuerySet | `ORDER BY embedding ANN OF [0.1, 0.2, ...]` |
+| **Validation** | Dimension check on save (list length == declared N) | — |
+| **Driver support** | Verify both cassandra-driver and acsylla handle `vector<float, N>` binding | — |
+
+### Estimated complexity
+
+- **Fields + schema**: Low — similar to adding any new CQL type annotation
+- **Vector index DDL**: Medium — requires a new index creation path (not a
+  standard secondary index)
+- **ANN query syntax**: Medium — new QuerySet method that emits non-standard
+  `ORDER BY` clause
+- **Driver compatibility**: Unknown — needs testing with both drivers
+
+---
+
+## 8. Shared Infrastructure
+
+### 8.1 Docker Compose (shared ScyllaDB)
 
 All demos share a single ScyllaDB container via `demos/docker-compose.yml`:
 
@@ -365,7 +445,7 @@ services:
     command: --smp 1 --memory 512M --developer-mode 1
 ```
 
-### 7.2 Seed Script Convention
+### 8.2 Seed Script Convention
 
 Every `seed.py` follows a common pattern:
 
@@ -384,7 +464,7 @@ if __name__ == "__main__":
     seed()
 ```
 
-### 7.3 Color Theme Convention
+### 8.3 Color Theme Convention
 
 All demos with a web UI use a dark-theme palette consistent with the existing
 FastAPI demo:
@@ -403,7 +483,7 @@ Each demo may add 1–2 custom accent colors to differentiate its identity.
 
 ---
 
-## 8. References
+## 9. References
 
 - [Existing FastAPI demo](../../demo/) — current single-demo implementation
 - [scylladb/argus](https://github.com/scylladb/argus) — production Flask + cqlengine app with complex models, UDTs, batch writes, composite keys
@@ -415,3 +495,5 @@ Each demo may add 1–2 custom accent colors to differentiate its identity.
 - [coodie documentation plan](documentation-plan.md) — documentation milestones and style guide
 - [coodie feature-parity plan](cqlengine-feature-parity.md) — full feature gap analysis against cqlengine
 - [coodie benchmarks: argus models](../../benchmarks/models_argus_coodie.py) — existing benchmark models inspired by argus patterns
+- [ScyllaDB vector search docs](https://cloud.docs.scylladb.com/stable/vector-search/work-with-vector-search.html) — CQL syntax for `vector<T, N>` type, vector indexes, and ANN queries
+- [argus vector models: argus_ai.py](https://github.com/scylladb/argus/blob/master/argus/backend/models/argus_ai.py) — production `Vector` column type, `SCTErrorEventEmbedding` with 384-dim cosine-similarity index

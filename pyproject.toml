@@ -37,7 +37,7 @@ docs = [
 
 [project.urls]
 Homepage = "https://github.com/fruch/coodie"
-Documentation = "https://coodie.readthedocs.io"
+Documentation = "https://fruch.github.io/coodie/"
 Repository = "https://github.com/fruch/coodie"
 "Bug Tracker" = "https://github.com/fruch/coodie/issues"
 Changelog = "https://github.com/fruch/coodie/blob/main/CHANGELOG.md"

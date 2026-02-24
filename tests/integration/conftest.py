@@ -521,7 +521,12 @@ async def _retry(fn, retries=5, delay=1):
 
 
 @pytest.fixture(params=["sync", "async"])
-def variant(request):
+def variant(request, driver_type):
+    if request.param == "sync" and driver_type == "acsylla":
+        pytest.skip(
+            "acsylla sync bridge uses loop.run_until_complete() which "
+            "conflicts with pytest-asyncio's already-running event loop"
+        )
     return request.param
 
 

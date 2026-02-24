@@ -4,13 +4,13 @@ Every test is parametrised over ``variant`` ("sync" / "async") so that a
 single test body exercises both the synchronous and asynchronous code paths.
 """
 
-from typing import Annotated, Optional
+from typing import Annotated
 from uuid import UUID, uuid4
 
 import pytest
 from pydantic import Field
 
-from coodie.fields import PrimaryKey, ClusteringKey, Indexed, Counter
+from coodie.fields import PrimaryKey, ClusteringKey
 from coodie.exceptions import (
     DocumentNotFound,
     MultipleDocumentsFound,

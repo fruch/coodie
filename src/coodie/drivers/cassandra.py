@@ -9,6 +9,8 @@ from coodie.drivers.base import AbstractDriver
 class CassandraDriver(AbstractDriver):
     """Driver backed by cassandra-driver / scylla-driver."""
 
+    __slots__ = ("_session", "_default_keyspace", "_prepared", "_last_paging_state")
+
     def __init__(
         self,
         session: Any,
@@ -32,15 +34,16 @@ class CassandraDriver(AbstractDriver):
     def _rows_to_dicts(result_set: Any) -> list[dict[str, Any]]:
         if result_set is None:
             return []
-        rows = []
-        for row in result_set:
-            if hasattr(row, "_asdict"):
-                rows.append(dict(row._asdict()))
-            elif hasattr(row, "__dict__"):
-                rows.append({k: v for k, v in row.__dict__.items() if not k.startswith("_")})
-            else:
-                rows.append(dict(row))
-        return rows
+        rows = list(result_set)
+        if not rows:
+            return []
+        sample = rows[0]
+        if hasattr(sample, "_asdict"):
+            return [dict(r._asdict()) for r in rows]
+        elif isinstance(sample, dict):
+            return rows
+        else:
+            return [{k: v for k, v in r.__dict__.items() if not k.startswith("_")} for r in rows]
 
     # ------------------------------------------------------------------
     # Synchronous interface

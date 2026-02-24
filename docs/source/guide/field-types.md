@@ -36,7 +36,7 @@ Sometimes you need a CQL type that doesn't map one-to-one to a Python type.
 Use type override markers inside `Annotated[]`:
 
 ```python
-from coodie.fields import BigInt, SmallInt, TinyInt, VarInt, Double, Ascii, TimeUUID, Time, Frozen
+from coodie.fields import BigInt, SmallInt, TinyInt, VarInt, Double, Ascii, TimeUUID, Time, Frozen, Static
 
 class SensorReading(Document):
     sensor_id: Annotated[UUID, PrimaryKey()]
@@ -99,8 +99,48 @@ and indexing:
 | `ClusteringKey()` | Clustering column | `order` (`"ASC"` or `"DESC"`), `clustering_key_index` (default `0`) |
 | `Indexed()` | Secondary index | `index_name` (optional) |
 | `Counter()` | Counter column | — |
+| `Static()` | Static column (shared across partition) | — |
 
 See {doc}`keys-and-indexes` for detailed usage of keys and indexes.
+
+## Static Columns
+
+In Cassandra, a **static column** is shared across all rows within the same
+partition. This is useful when you have data that belongs to the partition
+as a whole, not to individual clustering rows.
+
+Use `Static()` to mark a column as static:
+
+```python
+from coodie.fields import PrimaryKey, ClusteringKey, Static
+
+class SensorReading(Document):
+    sensor_id: Annotated[str, PrimaryKey()]
+    reading_time: Annotated[str, ClusteringKey()]
+    sensor_name: Annotated[str, Static()] = ""   # shared across partition
+    value: float = 0.0
+```
+
+This produces:
+
+```sql
+CREATE TABLE sensor_reading (
+    sensor_id text,
+    reading_time text,
+    sensor_name text STATIC,
+    value float,
+    PRIMARY KEY (sensor_id, reading_time)
+);
+```
+
+Every row for the same `sensor_id` shares the same `sensor_name` value.
+Updating `sensor_name` on any row updates it for all rows in that partition.
+
+```{note}
+Static columns require at least one clustering column in the table.
+A table with only a partition key and no clustering key cannot have
+static columns.
+```
 
 ## Combining Markers
 

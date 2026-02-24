@@ -85,6 +85,21 @@ def test_create_table_no_pk_raises():
         build_create_table("t", "ks", cols)
 
 
+def test_create_table_with_static_column():
+    cols = [
+        make_col(name="sensor_id", cql_type="text", primary_key=True),
+        make_col(name="reading_time", cql_type="text", clustering_key=True),
+        make_col(name="sensor_name", cql_type="text", static=True),
+        make_col(name="value", cql_type="float"),
+    ]
+    cql = build_create_table("sensor_readings", "ks", cols)
+    assert '"sensor_name" text STATIC' in cql
+    assert '"value" float' in cql
+    # Non-static columns should not have STATIC keyword
+    assert '"value" float STATIC' not in cql
+    assert '"sensor_id" text STATIC' not in cql
+
+
 def test_create_index():
     col = make_col(name="brand", cql_type="text", index=True)
     cql = build_create_index("products", "ks", col)

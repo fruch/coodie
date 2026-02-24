@@ -80,6 +80,15 @@ class Time:
 
 
 @dataclass(frozen=True)
+class Static:
+    """Annotated marker: declares a column as ``STATIC``.
+
+    Static columns are shared across all rows within a partition.
+    They can only appear on tables that have at least one clustering column.
+    """
+
+
+@dataclass(frozen=True)
 class Frozen:
     """Annotated marker: wraps a collection or UDT type with ``frozen<>``."""
 

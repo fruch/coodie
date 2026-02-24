@@ -34,7 +34,10 @@ def build_create_table(
 ) -> str:
     col_defs = []
     for col in cols:
-        col_defs.append(f'"{col.name}" {col.cql_type}')
+        col_def = f'"{col.name}" {col.cql_type}'
+        if col.static:
+            col_def += " STATIC"
+        col_defs.append(col_def)
 
     # Partition key columns (ordered by partition_key_index)
     pk_cols = [c for c in cols if c.primary_key]

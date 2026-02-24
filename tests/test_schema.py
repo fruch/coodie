@@ -13,6 +13,7 @@ from coodie.fields import (
     Frozen,
     Indexed,
     PrimaryKey,
+    Static,
     TimeUUID,
     Counter,
 )
@@ -209,3 +210,30 @@ def test_column_definition_has_slots():
     """ColumnDefinition should use __slots__ via @dataclass(slots=True)."""
     col = ColumnDefinition(name="x", cql_type="text")
     assert not hasattr(col, "__dict__")
+
+
+# ---- Static column tests ----
+
+
+class StaticDoc(BaseModel):
+    sensor_id: Annotated[str, PrimaryKey()]
+    reading_time: Annotated[str, ClusteringKey()]
+    sensor_name: Annotated[str, Static()] = ""
+    value: float = 0.0
+
+    class Settings:
+        name = "static_docs"
+        keyspace = "test_ks"
+
+
+def test_build_schema_static_column():
+    schema = build_schema(StaticDoc)
+    col = next(c for c in schema if c.name == "sensor_name")
+    assert col.static is True
+    assert col.cql_type == "text"
+
+
+def test_build_schema_non_static_column_default():
+    schema = build_schema(StaticDoc)
+    col = next(c for c in schema if c.name == "value")
+    assert col.static is False

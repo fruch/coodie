@@ -450,7 +450,7 @@ parametrized test since the model and assertion differ.
 
 ## 7. Task 6 — Deduplicate ScyllaDB testcontainer fixtures with benchmarks
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 **Effort:** Medium
 **Depends on:** Task 4, PR #31 (benchmarks)
 
@@ -639,11 +639,11 @@ uv run pytest benchmarks/ -v --benchmark-enable --driver-type=cassandra
 
 Before merging, verify:
 
-- [ ] `tests/conftest_scylla.py` contains the single source of truth for `scylla_container`, `LocalhostTranslator`, `create_cql_session`, and `create_acsylla_session`
-- [ ] `tests/integration/conftest.py` imports (not copies) the shared fixtures
-- [ ] `benchmarks/conftest.py` imports (not copies) the shared fixtures
-- [ ] `benchmarks/conftest.py` supports `--driver-type` for all three backends (scylla, cassandra, acsylla)
-- [ ] No duplicate `DockerContainer("scylladb/scylla:latest")` code exists outside `conftest_scylla.py`
+- [x] `tests/conftest_scylla.py` contains the single source of truth for `scylla_container`, `LocalhostTranslator`, `create_cql_session`, and `create_acsylla_session`
+- [x] `tests/integration/conftest.py` imports (not copies) the shared fixtures
+- [x] `benchmarks/conftest.py` imports (not copies) the shared fixtures
+- [x] `benchmarks/conftest.py` supports `--driver-type` for all three backends (scylla, cassandra, acsylla)
+- [x] No duplicate `DockerContainer("scylladb/scylla:latest")` code exists outside `conftest_scylla.py`
 - [ ] Integration tests pass: `uv run pytest -m integration -v --timeout=120`
 - [ ] Integration tests pass with acsylla: `uv run pytest -m integration -v --timeout=120 --driver-type=acsylla`
 - [ ] Benchmarks pass: `uv run pytest benchmarks/ -v --benchmark-enable` (requires Docker)

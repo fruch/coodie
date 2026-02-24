@@ -1,67 +1,150 @@
-<table border="0" cellspacing="0" cellpadding="0"><tr>
-  <td valign="top" width="170">
-    <img src="docs/images/logo.png" alt="coodie logo" width="150">
-  </td>
-  <td valign="middle">
-    <h1>coodie</h1>
-    <a href="https://github.com/fruch/coodie/actions/workflows/ci.yml">
-      <img src="https://img.shields.io/github/actions/workflow/status/fruch/coodie/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status">
-    </a>
-    <a href="https://fruch.github.io/coodie/">
-      <img src="https://img.shields.io/github/actions/workflow/status/fruch/coodie/docs.yml?branch=main&label=Docs&logo=github&style=flat-square" alt="Documentation Status">
-    </a>
-    <a href="https://codecov.io/gh/fruch/coodie">
-      <img src="https://img.shields.io/codecov/c/github/fruch/coodie.svg?logo=codecov&logoColor=fff&style=flat-square" alt="Test coverage percentage">
-    </a>
-    <br>
-    <a href="https://github.com/astral-sh/uv">
-      <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json&style=flat-square" alt="uv">
-    </a>
-    <a href="https://github.com/astral-sh/ruff">
-      <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat-square" alt="Ruff">
-    </a>
-    <a href="https://github.com/pre-commit/pre-commit">
-      <img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=flat-square" alt="pre-commit">
-    </a>
-    <br>
-    <a href="https://pypi.org/project/coodie/">
-      <img src="https://img.shields.io/pypi/v/coodie.svg?logo=python&logoColor=fff&style=flat-square" alt="PyPI Version">
-    </a>
-    <img src="https://img.shields.io/pypi/pyversions/coodie.svg?style=flat-square&logo=python&amp;logoColor=fff" alt="Supported Python versions">
-    <img src="https://img.shields.io/pypi/l/coodie.svg?style=flat-square" alt="License">
-  </td>
-</tr></table>
+<div align="center">
 
-**coodie** = Cassandra / ScyllaDB + Beanie (hoodie) — a Pydantic-based ODM for Cassandra and ScyllaDB,
-inspired by [Beanie](https://github.com/BeanieODM/beanie). Define your data models as Python classes,
-and coodie handles schema synchronisation, serialisation, and query building.
+<img src="docs/images/logo.png" alt="coodie logo" width="200">
 
-## Features
+# coodie
 
-- **Pydantic v2** model definitions with full type-checking support
-- **Sync and async APIs** — use `coodie.sync` for blocking code or `coodie` / `coodie.aio` for `asyncio`
-- **Declarative schema** — annotate fields with `PrimaryKey`, `ClusteringKey`, `Indexed`, or `Counter`
-- **Chainable `QuerySet`** — `.filter()`, `.limit()`, `.order_by()`, `.allow_filtering()`
-- **Automatic table management** — `sync_table()` creates or evolves the table idempotently
-- **ScyllaDB & Cassandra** — backed by `scylla-driver`
+**The modern Pydantic-based ODM for Cassandra & ScyllaDB**
 
-## Installation
+*Cassandra + Beanie (hoodie) = **coodie** 🧥*
 
-Install this via pip (or your favourite package manager):
+[![CI Status](https://img.shields.io/github/actions/workflow/status/fruch/coodie/ci.yml?branch=main&label=CI&logo=github&style=for-the-badge)](https://github.com/fruch/coodie/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/fruch/coodie/docs.yml?branch=main&label=Docs&logo=github&style=for-the-badge)](https://fruch.github.io/coodie/)
+[![Coverage](https://img.shields.io/codecov/c/github/fruch/coodie.svg?logo=codecov&logoColor=fff&style=for-the-badge)](https://codecov.io/gh/fruch/coodie)
+[![PyPI](https://img.shields.io/pypi/v/coodie.svg?logo=python&logoColor=fff&style=for-the-badge)](https://pypi.org/project/coodie/)
+[![Python](https://img.shields.io/pypi/pyversions/coodie.svg?style=for-the-badge&logo=python&logoColor=fff)](https://pypi.org/project/coodie/)
+[![License](https://img.shields.io/pypi/l/coodie.svg?style=for-the-badge)](https://github.com/fruch/coodie/blob/main/LICENSE)
+
+<p>
+<a href="https://fruch.github.io/coodie/">📖 Documentation</a> •
+<a href="#-quick-start">🚀 Quick Start</a> •
+<a href="https://github.com/fruch/coodie/blob/main/CONTRIBUTING.md">🤝 Contributing</a> •
+<a href="https://github.com/fruch/coodie/blob/main/CHANGELOG.md">📋 Changelog</a>
+</p>
+
+</div>
+
+---
+
+Define your data models as Python classes, and coodie handles schema synchronization,
+serialization, and query building — with both **sync** and **async** APIs.
+
+## ✨ Feature Highlights
+
+<table>
+<tr>
+<td width="50%">
+
+🧬 **Pydantic v2 Models** — full type-checking & validation\
+⚡ **Sync & Async** — `coodie.sync` for blocking, `coodie.aio` for asyncio\
+🔗 **Chainable QuerySet** — `.filter()` · `.limit()` · `.order_by()`
+
+</td>
+<td width="50%">
+
+🔄 **Automatic Schema Sync** — `sync_table()` creates & evolves tables\
+🏗️ **Batch & LWT** — `BatchQuery` + `if_not_exists()` support\
+🎯 **Multi-Driver** — scylla-driver · cassandra-driver · acsylla
+
+</td>
+</tr>
+</table>
+
+## 🔍 How Does coodie Compare?
+
+| Feature | **coodie** | **beanie** | **cqlengine** |
+|---|:---:|:---:|:---:|
+| **Database** | Cassandra / ScyllaDB | MongoDB | Cassandra |
+| **Schema Definition** | Pydantic v2 `BaseModel` | Pydantic v2 `BaseModel` | Custom `columns.*` classes |
+| **Type Hints** | ✅ Native `Annotated[]` | ✅ Native Pydantic | ❌ No type hints |
+| **Async Support** | ✅ First-class | ✅ First-class | ❌ Sync only |
+| **Sync Support** | ✅ `coodie.sync` | ❌ Async only | ✅ Sync only |
+| **Query API** | Chainable `QuerySet` | Chainable `FindMany` | Chainable `QuerySet` |
+| **Schema Migration** | ✅ `sync_table()` | ❌ Manual | ✅ `sync_table()` |
+| **LWT (Compare-and-Set)** | ✅ `if_not_exists()` | N/A | ✅ `iff()` |
+| **Batch Operations** | ✅ `BatchQuery` | ❌ | ✅ `BatchQuery` |
+| **Counter Columns** | ✅ `Counter()` | ❌ | ✅ `columns.Counter` |
+| **TTL Support** | ✅ Per-save TTL | ❌ | ✅ Per-save TTL |
+| **Pagination** | ✅ Token-based `PagedResult` | ✅ Cursor-based | ❌ Manual |
+| **Multiple Drivers** | ✅ 3 drivers | motor only | cassandra-driver only |
+| **Polymorphic Models** | ✅ `Discriminator` | ❌ | ❌ |
+| **Python Version** | 3.10+ | 3.8+ | 3.6+ |
+
+## 📦 Installation
 
 ```bash
 pip install coodie
 ```
 
-## Quickstart
+Choose a driver extra for your cluster:
 
-### Define a document
+```bash
+pip install "coodie[scylla]"      # ScyllaDB / Cassandra (recommended)
+pip install "coodie[cassandra]"   # Cassandra via cassandra-driver
+pip install "coodie[acsylla]"     # Async-native via acsylla
+```
+
+## 🚀 Quick Start
+
+**1. Start a local ScyllaDB** (or use an existing cluster):
+
+```bash
+docker run --name scylla -d -p 9042:9042 scylladb/scylla --smp 1
+
+# Wait for it to be ready (~30s), then create a keyspace
+docker exec -it scylla cqlsh -e \
+  "CREATE KEYSPACE IF NOT EXISTS my_ks
+   WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};"
+```
+
+**2. Install coodie:**
+
+```bash
+pip install "coodie[scylla]"
+```
+
+**3. Write your first script:**
+
+```python
+from coodie.sync import Document, init_coodie
+from coodie.fields import PrimaryKey
+from pydantic import Field
+from typing import Annotated
+from uuid import UUID, uuid4
+
+# Connect
+init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
+
+# Define a model
+class User(Document):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    email: str
+
+    class Settings:
+        name = "users"
+
+# Sync schema & insert
+User.sync_table()
+user = User(name="Alice", email="alice@example.com")
+user.save()
+
+# Query
+print(User.find(name="Alice").allow_filtering().all())
+```
+
+> 💡 **Async?** Just swap `coodie.sync` for `coodie.aio` and add `await` — that's it!
+
+## 📖 Usage
+
+<details>
+<summary><b>Define a Document</b></summary>
 
 ```python
 from typing import Annotated
 from uuid import UUID, uuid4
 from pydantic import Field
-from coodie import Document, init_coodie, PrimaryKey, ClusteringKey, Indexed
+from coodie import Document, PrimaryKey, ClusteringKey, Indexed
 
 class Product(Document):
     id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
@@ -75,47 +158,44 @@ class Product(Document):
         keyspace = "my_ks"
 ```
 
-### Async usage (`coodie` / `coodie.aio`)
+</details>
+
+<details>
+<summary><b>Async API</b> — <code>coodie</code> / <code>coodie.aio</code></summary>
 
 ```python
 import asyncio
 from coodie import init_coodie
-# Product is defined in the section above
 
 async def main():
     await init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
-
-    # Create / evolve the table
     await Product.sync_table()
 
-    # Insert a document
     p = Product(name="Gadget", brand="Acme", price=9.99)
     await p.save()
 
-    # Query
     results = await Product.find(brand="Acme").limit(10).all()
     for product in results:
         print(product.name, product.price)
 
-    # Fetch a single document by primary key (raises DocumentNotFound if missing)
     gadget = await Product.get(id=p.id)
-
-    # Delete
     await gadget.delete()
 
 asyncio.run(main())
 ```
 
-### Sync usage (`coodie.sync`)
+</details>
+
+<details>
+<summary><b>Sync API</b> — <code>coodie.sync</code></summary>
 
 ```python
 from coodie.sync import Document, init_coodie
 
 class Product(Document):
-    ...  # same field definitions as above
+    ...  # same field definitions
 
 init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
-
 Product.sync_table()
 
 p = Product(name="Widget", price=4.99)
@@ -125,10 +205,13 @@ results = Product.find(brand="Acme").allow_filtering().all()
 one = Product.find_one(name="Widget")
 ```
 
-### QuerySet chaining
+</details>
+
+<details>
+<summary><b>QuerySet Chaining</b></summary>
 
 ```python
-# async
+# Filter, sort, and limit
 products = (
     await Product.find()
     .filter(brand="Acme")
@@ -137,60 +220,42 @@ products = (
     .all()
 )
 
-# count
+# Count
 n = await Product.find(brand="Acme").allow_filtering().count()
 
-# async iteration
+# Async iteration
 async for p in Product.find(brand="Acme"):
     print(p)
 
-# delete matching rows
+# Delete matching rows
 await Product.find(brand="Discontinued").allow_filtering().delete()
 ```
 
-### Field annotations
+</details>
+
+<details>
+<summary><b>Field Annotations Reference</b></summary>
 
 | Annotation | Purpose |
 |---|---|
-| `PrimaryKey(partition_key_index=0)` | Partition key column (use `partition_key_index` for composite keys) |
+| `PrimaryKey(partition_key_index=0)` | Partition key column (composite keys via index) |
 | `ClusteringKey(order="ASC", clustering_key_index=0)` | Clustering column |
 | `Indexed(index_name=None)` | Secondary index |
 | `Counter()` | Counter column |
+| `Discriminator()` | Polymorphic model discriminator |
 
-## Versioning
+</details>
 
-The package version is derived automatically from git tags using
-[hatch-vcs](https://github.com/ofek/hatch-vcs) (backed by
-[setuptools-scm](https://github.com/pypa/setuptools_scm)).
+## 📚 Learn More
 
-| Situation | Example version |
+| Resource | Link |
 |---|---|
-| Exactly on tag `v1.2.3` | `1.2.3` |
-| 4 commits after `v1.2.3` | `1.2.3.dev4+gabcdef1` |
-| No tags in history | `0.1.dev2+gd2cd605` |
-
-```python
-import coodie
-print(coodie.__version__)   # e.g. "1.2.3"
-```
-
-### Creating a new release
-
-1. Make sure your changes are merged to `main` and CI is green.
-2. Create and push an annotated git tag — the tag name drives the new version:
-
-   ```bash
-   git tag -a v1.2.3 -m "Release v1.2.3"
-   git push origin v1.2.3
-   ```
-
-3. The CI release workflow picks up the tag, builds the wheel/sdist, and publishes
-   to PyPI automatically.
-
-> **Note:** `uv_build` would be the preferred build backend (it is used for all
-> other projects in this repo), but it does not yet support VCS-based dynamic
-> versioning. We will switch back once
-> [astral-sh/uv#14037](https://github.com/astral-sh/uv/issues/14037) lands.
+| 📖 **Full Documentation** | [fruch.github.io/coodie](https://fruch.github.io/coodie/) |
+| 🚀 **Quick Start Guide** | [Installation & Quickstart](https://fruch.github.io/coodie/quickstart.html) |
+| 🔄 **Migrating from cqlengine** | [Migration Guide](https://fruch.github.io/coodie/migration/from-cqlengine.html) |
+| 🤝 **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 📋 **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
+| 🐛 **Bug Reports** | [GitHub Issues](https://github.com/fruch/coodie/issues) |
 
 ## Contributors ✨
 

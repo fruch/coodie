@@ -573,32 +573,78 @@ def scylla_session(scylla_container, driver_type):
     cluster.shutdown()
 ```
 
-### 7.4 Update benchmarks `conftest.py`
+### 7.4 Update benchmarks `conftest.py` — add `driver_type` support
+
+The current benchmarks only use `cassandra-driver`. They should support the
+same `--driver-type` option as integration tests (`scylla`, `cassandra`,
+`acsylla`) so benchmarks can be run against any driver backend.
 
 ```python
 # benchmarks/conftest.py
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from tests.conftest_scylla import scylla_container, create_cql_session  # noqa: F401
+from tests.conftest_scylla import scylla_container, create_cql_session, create_acsylla_session  # noqa: F401
+
+# Reuse the same --driver-type option from tests/conftest.py
+# (pytest_addoption and driver_type fixture are inherited from the root conftest)
 
 @pytest.fixture(scope="session")
-def cql_session(scylla_container):
+def cql_session(scylla_container, driver_type):
+    """CQL session — skipped when driver_type is acsylla."""
+    if driver_type == "acsylla":
+        yield None
+        return
     session, cluster = create_cql_session(scylla_container, "bench_ks")
     session.set_keyspace("bench_ks")
     yield session
     cluster.shutdown()
+
+@pytest.fixture(scope="session")
+def coodie_connection(cql_session, scylla_container, driver_type):
+    """Register the coodie driver — supports all driver backends."""
+    from coodie.drivers import _registry, init_coodie
+
+    _registry.clear()
+    if driver_type == "acsylla":
+        # Create acsylla session + AcsyllaDriver (same pattern as integration tests)
+        driver = await create_acsylla_session(scylla_container, "bench_ks")
+    else:
+        driver = init_coodie(session=cql_session, keyspace="bench_ks", driver_type=driver_type)
+    yield driver
+    _registry.clear()
+```
+
+The shared `create_acsylla_session` helper in `conftest_scylla.py` should
+encapsulate the acsylla cluster/session creation and `AcsyllaDriver`
+registration logic currently duplicated in `tests/test_integration.py`'s
+`coodie_driver` fixture.
+
+**Benchmark run commands with driver selection:**
+
+```bash
+# Default (scylla-driver)
+uv run pytest benchmarks/ -v --benchmark-enable
+
+# With acsylla driver
+uv run pytest benchmarks/ -v --benchmark-enable --driver-type=acsylla
+
+# With cassandra-driver
+uv run pytest benchmarks/ -v --benchmark-enable --driver-type=cassandra
 ```
 
 ### 7.5 Audit checklist
 
 Before merging, verify:
 
-- [ ] `tests/conftest_scylla.py` contains the single source of truth for `scylla_container`, `LocalhostTranslator`, and `create_cql_session`
+- [ ] `tests/conftest_scylla.py` contains the single source of truth for `scylla_container`, `LocalhostTranslator`, `create_cql_session`, and `create_acsylla_session`
 - [ ] `tests/integration/conftest.py` imports (not copies) the shared fixtures
 - [ ] `benchmarks/conftest.py` imports (not copies) the shared fixtures
+- [ ] `benchmarks/conftest.py` supports `--driver-type` for all three backends (scylla, cassandra, acsylla)
 - [ ] No duplicate `DockerContainer("scylladb/scylla:latest")` code exists outside `conftest_scylla.py`
 - [ ] Integration tests pass: `uv run pytest -m integration -v --timeout=120`
+- [ ] Integration tests pass with acsylla: `uv run pytest -m integration -v --timeout=120 --driver-type=acsylla`
 - [ ] Benchmarks pass: `uv run pytest benchmarks/ -v --benchmark-enable` (requires Docker)
+- [ ] Benchmarks pass with acsylla: `uv run pytest benchmarks/ -v --benchmark-enable --driver-type=acsylla`
 - [ ] Both `test_ks` and `bench_ks` keyspaces are created correctly (different keyspaces to avoid interference)
 
 ---

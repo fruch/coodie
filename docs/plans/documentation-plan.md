@@ -1150,12 +1150,12 @@ make clean html    # Clean build — like clearing your browser cache but useful
 ### Phase 1: Foundation (Core Docs)
 - [ ] README overhaul: add comparison table (coodie vs beanie vs cqlengine)
 - [ ] README overhaul: add copy-pastable quick start commands
-- [ ] Update `CONTRIBUTING.md` with uv-based setup and copy-pastable commands
-- [ ] Installation & quickstart guide
-- [ ] Defining Documents (models) guide
-- [ ] Field types reference with all type mappings
-- [ ] Primary keys & clustering keys guide
-- [ ] CRUD operations guide
+- [x] Update `CONTRIBUTING.md` with uv-based setup and copy-pastable commands
+- [x] Installation & quickstart guide
+- [x] Defining Documents (models) guide
+- [x] Field types reference with all type mappings
+- [x] Primary keys & clustering keys guide
+- [x] CRUD operations guide
 
 ### Phase 2: Querying & Data (Intermediate Docs)
 - [ ] QuerySet & chaining guide

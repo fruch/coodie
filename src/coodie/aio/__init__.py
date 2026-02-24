@@ -8,9 +8,7 @@ from coodie.batch import AsyncBatchQuery
 from coodie.drivers import init_coodie_async as init_coodie
 
 
-async def execute_raw(
-    stmt: str, params: list[Any] | None = None
-) -> list[dict[str, Any]]:
+async def execute_raw(stmt: str, params: list[Any] | None = None) -> list[dict[str, Any]]:
     """Execute a raw CQL statement asynchronously.
 
     Example::

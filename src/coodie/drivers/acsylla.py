@@ -63,10 +63,7 @@ class AcsyllaDriver(AbstractDriver):
         try:
             import acsylla  # type: ignore[import-untyped]
         except ImportError as exc:
-            raise ImportError(
-                "acsylla is required for AcsyllaDriver. "
-                "Install it with: pip install acsylla"
-            ) from exc
+            raise ImportError("acsylla is required for AcsyllaDriver. Install it with: pip install acsylla") from exc
         self._acsylla = acsylla
         self._session = session
         self._default_keyspace = default_keyspace
@@ -128,10 +125,7 @@ class AcsyllaDriver(AbstractDriver):
 
     async def _get_existing_columns_async(self, table: str, keyspace: str) -> set[str]:
         """Introspect the existing column names via system_schema."""
-        stmt = (
-            "SELECT column_name FROM system_schema.columns "
-            "WHERE keyspace_name = ? AND table_name = ?"
-        )
+        stmt = "SELECT column_name FROM system_schema.columns WHERE keyspace_name = ? AND table_name = ?"
         rows = await self.execute_async(stmt, [keyspace, table])
         return {row["column_name"] for row in rows}
 
@@ -144,18 +138,14 @@ class AcsyllaDriver(AbstractDriver):
     ) -> None:
         from coodie.cql_builder import build_create_table, build_create_index
 
-        create_cql = build_create_table(
-            table, keyspace, cols, table_options=table_options
-        )
+        create_cql = build_create_table(table, keyspace, cols, table_options=table_options)
         await self._session.execute(self._cql_to_statement(create_cql))
 
         # Introspect existing columns and add missing ones
         existing = await self._get_existing_columns_async(table, keyspace)
         for col in cols:
             if col.name not in existing:
-                alter = (
-                    f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
-                )
+                alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
                 await self._session.execute(self._cql_to_statement(alter))
 
         # Secondary indexes
@@ -201,9 +191,7 @@ class AcsyllaDriver(AbstractDriver):
         cols: list[Any],
         table_options: dict[str, Any] | None = None,
     ) -> None:
-        self._loop.run_until_complete(
-            self.sync_table_async(table, keyspace, cols, table_options=table_options)
-        )
+        self._loop.run_until_complete(self.sync_table_async(table, keyspace, cols, table_options=table_options))
 
     def close(self) -> None:
         self._loop.run_until_complete(self.close_async())

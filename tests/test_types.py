@@ -78,12 +78,8 @@ def test_extended_type_marker(annotated_type, expected_cql):
 @pytest.mark.parametrize(
     "annotated_type, expected_cql",
     [
-        pytest.param(
-            Annotated[list[str], Frozen()], "frozen<list<text>>", id="frozen-list"
-        ),
-        pytest.param(
-            Annotated[set[int], Frozen()], "frozen<set<int>>", id="frozen-set"
-        ),
+        pytest.param(Annotated[list[str], Frozen()], "frozen<list<text>>", id="frozen-list"),
+        pytest.param(Annotated[set[int], Frozen()], "frozen<set<int>>", id="frozen-set"),
         pytest.param(
             Annotated[dict[str, int], Frozen()],
             "frozen<map<text, int>>",
@@ -113,17 +109,12 @@ def test_no_cqlengine_import():
 
 def test_marker_with_primary_key():
     """Marker should work alongside other annotations like PrimaryKey."""
-    assert (
-        python_type_to_cql_type_str(Annotated[int, PrimaryKey(), BigInt()]) == "bigint"
-    )
+    assert python_type_to_cql_type_str(Annotated[int, PrimaryKey(), BigInt()]) == "bigint"
 
 
 def test_frozen_with_marker():
     """Frozen combined with a type marker should wrap the marker's CQL type."""
-    assert (
-        python_type_to_cql_type_str(Annotated[UUID, Frozen(), TimeUUID()])
-        == "frozen<timeuuid>"
-    )
+    assert python_type_to_cql_type_str(Annotated[UUID, Frozen(), TimeUUID()]) == "frozen<timeuuid>"
 
 
 # ---- coerce_row_none_collections tests ----

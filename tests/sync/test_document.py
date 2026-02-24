@@ -393,9 +393,7 @@ def test_delete_with_consistency(registered_mock_driver):
 def test_execute_raw(registered_mock_driver):
     from coodie.sync import execute_raw
 
-    registered_mock_driver.set_return_rows(
-        [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
-    )
+    registered_mock_driver.set_return_rows([{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
     rows = execute_raw("SELECT * FROM test_ks.users")
     assert len(rows) == 2
     assert rows[0]["name"] == "Alice"
@@ -637,9 +635,7 @@ def test_materialized_view_find(registered_mock_driver):
 def test_materialized_view_find_one(registered_mock_driver):
     """12.3 – find_one() works on materialized views."""
     pid = uuid4()
-    registered_mock_driver.set_return_rows(
-        [{"brand": "Acme", "id": pid, "name": "Widget", "price": 9.99}]
-    )
+    registered_mock_driver.set_return_rows([{"brand": "Acme", "id": pid, "name": "Widget", "price": 9.99}])
     doc = ProductsByBrand.find_one(brand="Acme")
     assert isinstance(doc, ProductsByBrand)
     assert doc.brand == "Acme"
@@ -671,9 +667,7 @@ def test_materialized_view_custom_where_clause(registered_mock_driver):
             name = "custom_where_view"
             keyspace = "test_ks"
             __base_table__ = "products"
-            __where_clause__ = (
-                '"brand" IS NOT NULL AND "id" IS NOT NULL AND "brand" = \'Acme\''
-            )
+            __where_clause__ = '"brand" IS NOT NULL AND "id" IS NOT NULL AND "brand" = \'Acme\''
 
     CustomWhereView.sync_view()
     stmt, _ = registered_mock_driver.executed[0]

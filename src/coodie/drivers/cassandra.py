@@ -37,9 +37,7 @@ class CassandraDriver(AbstractDriver):
             if hasattr(row, "_asdict"):
                 rows.append(dict(row._asdict()))
             elif hasattr(row, "__dict__"):
-                rows.append(
-                    {k: v for k, v in row.__dict__.items() if not k.startswith("_")}
-                )
+                rows.append({k: v for k, v in row.__dict__.items() if not k.startswith("_")})
             else:
                 rows.append(dict(row))
         return rows
@@ -85,9 +83,7 @@ class CassandraDriver(AbstractDriver):
     ) -> None:
         from coodie.cql_builder import build_create_table, build_create_index
 
-        create_cql = build_create_table(
-            table, keyspace, cols, table_options=table_options
-        )
+        create_cql = build_create_table(table, keyspace, cols, table_options=table_options)
         self._session.execute(create_cql)
 
         # Introspect existing columns
@@ -95,9 +91,7 @@ class CassandraDriver(AbstractDriver):
 
         for col in cols:
             if col.name not in existing:
-                alter = (
-                    f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
-                )
+                alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
                 self._session.execute(alter)
 
         # Create secondary indexes
@@ -108,8 +102,7 @@ class CassandraDriver(AbstractDriver):
 
     def _get_existing_columns(self, table: str, keyspace: str) -> set[str]:
         rows = self._session.execute(
-            "SELECT column_name FROM system_schema.columns "
-            "WHERE keyspace_name = %s AND table_name = %s",
+            "SELECT column_name FROM system_schema.columns WHERE keyspace_name = %s AND table_name = %s",
             (keyspace, table),
         )
         return {r["column_name"] for r in self._rows_to_dicts(rows)}
@@ -181,9 +174,7 @@ class CassandraDriver(AbstractDriver):
         table_options: dict[str, Any] | None = None,
     ) -> None:
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None, self.sync_table, table, keyspace, cols, table_options
-        )
+        await loop.run_in_executor(None, self.sync_table, table, keyspace, cols, table_options)
 
     async def close_async(self) -> None:
         self.close()

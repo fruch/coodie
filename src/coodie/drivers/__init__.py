@@ -23,9 +23,7 @@ def register_driver(
 def get_driver(name: str | None = None) -> AbstractDriver:
     target = name or _default_driver_name
     if target is None or target not in _registry:
-        raise ConfigurationError(
-            "No coodie driver registered. Call init_coodie() first."
-        )
+        raise ConfigurationError("No coodie driver registered. Call init_coodie() first.")
     return _registry[target]
 
 
@@ -45,9 +43,7 @@ def init_coodie(
                 "AcsyllaDriver requires a pre-created acsylla session. "
                 "Pass session= or use init_coodie_async() with hosts."
             )
-        driver: AbstractDriver = AcsyllaDriver(
-            session=session, default_keyspace=keyspace
-        )
+        driver: AbstractDriver = AcsyllaDriver(session=session, default_keyspace=keyspace)
     elif driver_type in ("scylla", "cassandra"):
         from coodie.drivers.cassandra import CassandraDriver
 
@@ -64,10 +60,7 @@ def init_coodie(
 
         driver = CassandraDriver(session=session, default_keyspace=keyspace)
     else:
-        raise ConfigurationError(
-            f"Unknown driver_type={driver_type!r}. "
-            "Supported: 'scylla', 'cassandra', 'acsylla'."
-        )
+        raise ConfigurationError(f"Unknown driver_type={driver_type!r}. Supported: 'scylla', 'cassandra', 'acsylla'.")
 
     register_driver(name, driver, default=True)
     return driver
@@ -85,10 +78,7 @@ async def init_coodie_async(
         try:
             import acsylla  # type: ignore[import-untyped]
         except ImportError as exc:
-            raise ImportError(
-                "acsylla is required for AcsyllaDriver. "
-                "Install it with: pip install acsylla"
-            ) from exc
+            raise ImportError("acsylla is required for AcsyllaDriver. Install it with: pip install acsylla") from exc
         cluster = acsylla.create_cluster(hosts, **kwargs)
         session = await cluster.create_session(keyspace=keyspace)
 
@@ -103,9 +93,7 @@ async def init_coodie_async(
                 "Pass session= or use init_coodie_async() with hosts."
             )
         loop = asyncio.get_running_loop()
-        driver: AbstractDriver = AcsyllaDriver(
-            session=session, default_keyspace=keyspace, loop=loop
-        )
+        driver: AbstractDriver = AcsyllaDriver(session=session, default_keyspace=keyspace, loop=loop)
         register_driver(name, driver, default=True)
         return driver
 

@@ -21,9 +21,7 @@ def test_cqlengine_batch_insert_10(benchmark, bench_env):
     def _batch():
         with CqlBatch() as batch:
             for _ in range(10):
-                CqlEvent.batch(batch).create(
-                    id=uuid4(), event_type="click", payload="data"
-                )
+                CqlEvent.batch(batch).create(id=uuid4(), event_type="click", payload="data")
 
     benchmark(_batch)
 
@@ -37,9 +35,7 @@ def test_coodie_batch_insert_10(benchmark, bench_env):
     def _batch():
         with BatchQuery() as batch:
             for _ in range(10):
-                CoodieEvent(id=uuid4(), event_type="click", payload="data").save(
-                    batch=batch
-                )
+                CoodieEvent(id=uuid4(), event_type="click", payload="data").save(batch=batch)
 
     benchmark(_batch)
 
@@ -58,9 +54,7 @@ def test_cqlengine_batch_insert_100(benchmark, bench_env):
     def _batch():
         with CqlBatch() as batch:
             for _ in range(100):
-                CqlEvent.batch(batch).create(
-                    id=uuid4(), event_type="click", payload="data"
-                )
+                CqlEvent.batch(batch).create(id=uuid4(), event_type="click", payload="data")
 
     benchmark(_batch)
 
@@ -74,8 +68,6 @@ def test_coodie_batch_insert_100(benchmark, bench_env):
     def _batch():
         with BatchQuery() as batch:
             for _ in range(100):
-                CoodieEvent(id=uuid4(), event_type="click", payload="data").save(
-                    batch=batch
-                )
+                CoodieEvent(id=uuid4(), event_type="click", payload="data").save(batch=batch)
 
     benchmark(_batch)

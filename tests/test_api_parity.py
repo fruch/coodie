@@ -7,11 +7,7 @@ import coodie.sync.document as sync_doc
 
 
 def public_methods(cls: type) -> set[str]:
-    return {
-        name
-        for name, _ in inspect.getmembers(cls, predicate=inspect.isfunction)
-        if not name.startswith("_")
-    }
+    return {name for name, _ in inspect.getmembers(cls, predicate=inspect.isfunction) if not name.startswith("_")}
 
 
 def test_document_public_method_parity():
@@ -21,9 +17,7 @@ def test_document_public_method_parity():
 
     # These should be identical — if not, there's API drift
     assert sync_methods == async_methods, (
-        f"API drift detected!\n"
-        f"sync-only: {sync_methods - async_methods}\n"
-        f"async-only: {async_methods - sync_methods}"
+        f"API drift detected!\nsync-only: {sync_methods - async_methods}\nasync-only: {async_methods - sync_methods}"
     )
 
 

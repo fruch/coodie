@@ -67,6 +67,9 @@ dev = [
     "scylla-driver>=3.25.4",
 ]
 
+[tool.ruff]
+line-length = 120
+
 [tool.semantic_release]
 branch = "main"
 build_command = "uv build"

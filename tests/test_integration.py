@@ -69,9 +69,7 @@ def scylla_container():
 
     with (
         DockerContainer("scylladb/scylla:latest")
-        .with_command(
-            "--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0"
-        )
+        .with_command("--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0")
         .with_exposed_ports(9042) as container
     ):
         wait_for_logs(container, "Starting listening for CQL clients", timeout=120)
@@ -178,17 +176,13 @@ async def coodie_driver(
         # Reconnect with the keyspace set
         acsylla_session = await cluster.create_session(keyspace="test_ks")
         loop = asyncio.get_running_loop()
-        acsylla_driver = AcsyllaDriver(
-            session=acsylla_session, default_keyspace="test_ks", loop=loop
-        )
+        acsylla_driver = AcsyllaDriver(session=acsylla_session, default_keyspace="test_ks", loop=loop)
         from coodie.drivers import register_driver
 
         register_driver("default", acsylla_driver, default=True)
         driver = acsylla_driver
     else:
-        driver = init_coodie(
-            session=scylla_session, keyspace="test_ks", driver_type=driver_type
-        )
+        driver = init_coodie(session=scylla_session, keyspace="test_ks", driver_type=driver_type)
     yield driver
     _registry.clear()
     await driver.close_async()
@@ -487,9 +481,7 @@ class TestSyncIntegration:
         results = SyncReview.find(product_id=pid).all()
         assert len(results) == 2
         # DESC order: newest (t2) first
-        assert results[0].created_at.replace(tzinfo=timezone.utc) >= results[
-            1
-        ].created_at.replace(tzinfo=timezone.utc)
+        assert results[0].created_at.replace(tzinfo=timezone.utc) >= results[1].created_at.replace(tzinfo=timezone.utc)
 
         SyncReview.find(product_id=pid).delete()
 
@@ -527,9 +519,7 @@ class TestSyncIntegration:
 
     # --- Phase 10: Pagination & Token Queries ---
 
-    def test_paged_all_pagination(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    def test_paged_all_pagination(self, coodie_driver: object, driver_type: str) -> None:
         """paged_all() with fetch_size returns PagedResult and paginates."""
         from coodie.results import PagedResult
 
@@ -539,9 +529,7 @@ class TestSyncIntegration:
             SyncProduct(id=pid, name="PageTest", brand=brand).save()
 
         # fetch 2 at a time
-        result = (
-            SyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
-        )
+        result = SyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
         assert isinstance(result, PagedResult)
         assert len(result.data) > 0
         for doc in result.data:
@@ -550,13 +538,7 @@ class TestSyncIntegration:
         # collect all pages
         all_docs = list(result.data)
         while result.paging_state is not None:
-            result = (
-                SyncProduct.find(brand=brand)
-                .fetch_size(2)
-                .page(result.paging_state)
-                .allow_filtering()
-                .paged_all()
-            )
+            result = SyncProduct.find(brand=brand).fetch_size(2).page(result.paging_state).allow_filtering().paged_all()
             assert isinstance(result, PagedResult)
             all_docs.extend(result.data)
 
@@ -568,9 +550,7 @@ class TestSyncIntegration:
         for pid in ids:
             SyncProduct(id=pid, name="").delete()
 
-    def test_fetch_size_limits_page(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    def test_fetch_size_limits_page(self, coodie_driver: object, driver_type: str) -> None:
         """fetch_size(n) limits the number of rows returned per page."""
         from coodie.results import PagedResult
 
@@ -579,9 +559,7 @@ class TestSyncIntegration:
         for pid in ids:
             SyncProduct(id=pid, name="FetchSizeTest", brand=brand).save()
 
-        result = (
-            SyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
-        )
+        result = SyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
         assert isinstance(result, PagedResult)
         assert len(result.data) <= 2
 
@@ -595,9 +573,7 @@ class TestSyncIntegration:
             SyncProduct(id=pid, name="TokenTest").save()
 
         # Token queries with allow_filtering
-        results = (
-            SyncProduct.find(id__token__gt=MIN_MURMUR3_TOKEN).allow_filtering().all()
-        )
+        results = SyncProduct.find(id__token__gt=MIN_MURMUR3_TOKEN).allow_filtering().all()
         assert isinstance(results, list)
         # All inserted items should be found (token > min_token)
         found_ids = {r.id for r in results}
@@ -667,18 +643,11 @@ class TestAsyncIntegration:
 
     async def test_queryset_filtering(self, coodie_driver: object) -> None:
         pid = uuid4()
-        await AsyncProduct(
-            id=pid, name="AsyncIndexTest", brand="AsyncAcmeFiltered"
-        ).save()
+        await AsyncProduct(id=pid, name="AsyncIndexTest", brand="AsyncAcmeFiltered").save()
 
         from coodie.aio.query import QuerySet
 
-        results = (
-            await QuerySet(AsyncProduct)
-            .filter(brand="AsyncAcmeFiltered")
-            .allow_filtering()
-            .all()
-        )
+        results = await QuerySet(AsyncProduct).filter(brand="AsyncAcmeFiltered").allow_filtering().all()
         assert any(r.id == pid for r in results)
 
         await AsyncProduct(id=pid, name="").delete()
@@ -686,26 +655,14 @@ class TestAsyncIntegration:
     async def test_queryset_all_first_count(self, coodie_driver: object) -> None:
         ids = [uuid4() for _ in range(3)]
         for pid in ids:
-            await AsyncProduct(
-                id=pid, name="AsyncCountTest", brand="AsyncCountBrand"
-            ).save()
+            await AsyncProduct(id=pid, name="AsyncCountTest", brand="AsyncCountBrand").save()
 
         from coodie.aio.query import QuerySet
 
-        count = (
-            await QuerySet(AsyncProduct)
-            .filter(brand="AsyncCountBrand")
-            .allow_filtering()
-            .count()
-        )
+        count = await QuerySet(AsyncProduct).filter(brand="AsyncCountBrand").allow_filtering().count()
         assert count >= 3
 
-        first = (
-            await QuerySet(AsyncProduct)
-            .filter(brand="AsyncCountBrand")
-            .allow_filtering()
-            .first()
-        )
+        first = await QuerySet(AsyncProduct).filter(brand="AsyncCountBrand").allow_filtering().first()
         assert first is not None
 
         for pid in ids:
@@ -729,12 +686,7 @@ class TestAsyncIntegration:
 
         from coodie.aio.query import QuerySet
 
-        collected = [
-            item
-            async for item in QuerySet(AsyncProduct)
-            .filter(brand=brand)
-            .allow_filtering()
-        ]
+        collected = [item async for item in QuerySet(AsyncProduct).filter(brand=brand).allow_filtering()]
         assert len(collected) >= 2
 
         for pid in ids:
@@ -776,16 +728,12 @@ class TestAsyncIntegration:
         t1 = datetime(2024, 3, 1, 10, 0, 0, tzinfo=timezone.utc)
         t2 = datetime(2024, 3, 2, 10, 0, 0, tzinfo=timezone.utc)
 
-        await AsyncReview(
-            product_id=pid, created_at=t1, author="Alice", rating=3
-        ).save()
+        await AsyncReview(product_id=pid, created_at=t1, author="Alice", rating=3).save()
         await AsyncReview(product_id=pid, created_at=t2, author="Bob", rating=5).save()
 
         results = await AsyncReview.find(product_id=pid).all()
         assert len(results) == 2
-        assert results[0].created_at.replace(tzinfo=timezone.utc) >= results[
-            1
-        ].created_at.replace(tzinfo=timezone.utc)
+        assert results[0].created_at.replace(tzinfo=timezone.utc) >= results[1].created_at.replace(tzinfo=timezone.utc)
 
         from coodie.aio.query import QuerySet
 
@@ -819,9 +767,7 @@ class TestAsyncIntegration:
 
     # --- Phase 10: Pagination & Token Queries ---
 
-    async def test_paged_all_pagination(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_paged_all_pagination(self, coodie_driver: object, driver_type: str) -> None:
         """paged_all() with fetch_size returns PagedResult and paginates."""
         from coodie.results import PagedResult
 
@@ -831,9 +777,7 @@ class TestAsyncIntegration:
             await AsyncProduct(id=pid, name="AsyncPageTest", brand=brand).save()
 
         # fetch 2 at a time
-        result = await (
-            AsyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
-        )
+        result = await AsyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
         assert isinstance(result, PagedResult)
         assert len(result.data) > 0
         for doc in result.data:
@@ -843,11 +787,7 @@ class TestAsyncIntegration:
         all_docs = list(result.data)
         while result.paging_state is not None:
             result = await (
-                AsyncProduct.find(brand=brand)
-                .fetch_size(2)
-                .page(result.paging_state)
-                .allow_filtering()
-                .paged_all()
+                AsyncProduct.find(brand=brand).fetch_size(2).page(result.paging_state).allow_filtering().paged_all()
             )
             assert isinstance(result, PagedResult)
             all_docs.extend(result.data)
@@ -860,9 +800,7 @@ class TestAsyncIntegration:
         for pid in ids:
             await AsyncProduct(id=pid, name="").delete()
 
-    async def test_fetch_size_limits_page(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_fetch_size_limits_page(self, coodie_driver: object, driver_type: str) -> None:
         """fetch_size(n) limits the number of rows returned per page."""
         from coodie.results import PagedResult
 
@@ -871,27 +809,21 @@ class TestAsyncIntegration:
         for pid in ids:
             await AsyncProduct(id=pid, name="AsyncFetchSizeTest", brand=brand).save()
 
-        result = await (
-            AsyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
-        )
+        result = await AsyncProduct.find(brand=brand).fetch_size(2).allow_filtering().paged_all()
         assert isinstance(result, PagedResult)
         assert len(result.data) <= 2
 
         for pid in ids:
             await AsyncProduct(id=pid, name="").delete()
 
-    async def test_token_range_query(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_token_range_query(self, coodie_driver: object, driver_type: str) -> None:
         """Token-range filter queries execute without error."""
         ids = [uuid4() for _ in range(3)]
         for pid in ids:
             await AsyncProduct(id=pid, name="AsyncTokenTest").save()
 
         # Token queries with allow_filtering
-        results = await (
-            AsyncProduct.find(id__token__gt=MIN_MURMUR3_TOKEN).allow_filtering().all()
-        )
+        results = await AsyncProduct.find(id__token__gt=MIN_MURMUR3_TOKEN).allow_filtering().all()
         assert isinstance(results, list)
         # All inserted items should be found (token > min_token)
         found_ids = {r.id for r in results}
@@ -919,9 +851,7 @@ class TestSyncRawCQL:
         pid = uuid4()
         SyncProduct(id=pid, name="RawSync", brand="Test", price=1.0).save()
 
-        rows = execute_raw(
-            "SELECT name, brand FROM test_ks.it_sync_products WHERE id = ?", [pid]
-        )
+        rows = execute_raw("SELECT name, brand FROM test_ks.it_sync_products WHERE id = ?", [pid])
         assert len(rows) == 1
         assert rows[0]["name"] == "RawSync"
         assert rows[0]["brand"] == "Test"
@@ -935,14 +865,11 @@ class TestSyncRawCQL:
         SyncProduct.sync_table()
         pid = uuid4()
         execute_raw(
-            "INSERT INTO test_ks.it_sync_products (id, name, brand, category, price) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO test_ks.it_sync_products (id, name, brand, category, price) VALUES (?, ?, ?, ?, ?)",
             [pid, "RawInserted", "RawBrand", "general", 2.5],
         )
 
-        rows = execute_raw(
-            "SELECT name FROM test_ks.it_sync_products WHERE id = ?", [pid]
-        )
+        rows = execute_raw("SELECT name FROM test_ks.it_sync_products WHERE id = ?", [pid])
         assert len(rows) == 1
         assert rows[0]["name"] == "RawInserted"
 
@@ -953,9 +880,7 @@ class TestSyncRawCQL:
         from coodie.sync import execute_raw
 
         SyncProduct.sync_table()
-        rows = execute_raw(
-            "SELECT * FROM test_ks.it_sync_products WHERE id = ?", [uuid4()]
-        )
+        rows = execute_raw("SELECT * FROM test_ks.it_sync_products WHERE id = ?", [uuid4()])
         assert rows == []
 
 
@@ -972,9 +897,7 @@ class TestAsyncRawCQL:
         pid = uuid4()
         await AsyncProduct(id=pid, name="RawAsync", brand="Test", price=1.0).save()
 
-        rows = await execute_raw(
-            "SELECT name, brand FROM test_ks.it_async_products WHERE id = ?", [pid]
-        )
+        rows = await execute_raw("SELECT name, brand FROM test_ks.it_async_products WHERE id = ?", [pid])
         assert len(rows) == 1
         assert rows[0]["name"] == "RawAsync"
         assert rows[0]["brand"] == "Test"
@@ -988,14 +911,11 @@ class TestAsyncRawCQL:
         await AsyncProduct.sync_table()
         pid = uuid4()
         await execute_raw(
-            "INSERT INTO test_ks.it_async_products (id, name, brand, category, price) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO test_ks.it_async_products (id, name, brand, category, price) VALUES (?, ?, ?, ?, ?)",
             [pid, "RawInserted", "RawBrand", "general", 2.5],
         )
 
-        rows = await execute_raw(
-            "SELECT name FROM test_ks.it_async_products WHERE id = ?", [pid]
-        )
+        rows = await execute_raw("SELECT name FROM test_ks.it_async_products WHERE id = ?", [pid])
         assert len(rows) == 1
         assert rows[0]["name"] == "RawInserted"
 
@@ -1006,9 +926,7 @@ class TestAsyncRawCQL:
         from coodie.aio import execute_raw
 
         await AsyncProduct.sync_table()
-        rows = await execute_raw(
-            "SELECT * FROM test_ks.it_async_products WHERE id = ?", [uuid4()]
-        )
+        rows = await execute_raw("SELECT * FROM test_ks.it_async_products WHERE id = ?", [uuid4()])
         assert rows == []
 
 
@@ -1564,9 +1482,7 @@ class TestSyncExtended:
     # Schema migration — ALTER TABLE ADD column
     # ------------------------------------------------------------------
 
-    def test_schema_migration_add_column(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    def test_schema_migration_add_column(self, coodie_driver: object, driver_type: str) -> None:
         """sync_table adds a new column to an existing table without data loss."""
         from coodie.drivers import get_driver
         from coodie.schema import ColumnDefinition
@@ -1594,9 +1510,7 @@ class TestSyncExtended:
         drv.sync_table(tbl, ks, extended_cols)
 
         # The existing row is still there; the new column is NULL
-        rows = drv.execute(
-            f'SELECT "id", "label" FROM {ks}.{tbl} WHERE "id" = ?', [rid]
-        )
+        rows = drv.execute(f'SELECT "id", "label" FROM {ks}.{tbl} WHERE "id" = ?', [rid])
         assert rows
         # str() comparison works for both drivers (acsylla returns str, others uuid.UUID)
         assert str(rows[0]["id"]) == str(rid)
@@ -1716,9 +1630,7 @@ class TestSyncExtended:
         assert fetched.time_val.second == 30
         SyncExtendedTypes(id=rid).delete()
 
-    def test_frozen_list_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    def test_frozen_list_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """frozen<list<text>> column survives a save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -1730,9 +1642,7 @@ class TestSyncExtended:
         assert fetched.frozen_list == ["a", "b", "c"]
         SyncExtendedTypes(id=rid).delete()
 
-    def test_frozen_set_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    def test_frozen_set_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """frozen<set<int>> column survives a save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -1744,9 +1654,7 @@ class TestSyncExtended:
         assert fetched.frozen_set == {10, 20, 30}
         SyncExtendedTypes(id=rid).delete()
 
-    def test_frozen_map_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    def test_frozen_map_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """frozen<map<text, int>> column survives a save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -1758,9 +1666,7 @@ class TestSyncExtended:
         assert fetched.frozen_map == {"x": 1, "y": 2}
         SyncExtendedTypes(id=rid).delete()
 
-    def test_extended_types_all_fields_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    def test_extended_types_all_fields_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """All extended type fields set together survive a save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -1865,12 +1771,7 @@ class TestSyncExtended:
 
         from coodie.sync.query import QuerySet
 
-        results = (
-            QuerySet(SyncEvent)
-            .filter(partition_a=pa, partition_b=pb)
-            .per_partition_limit(2)
-            .all()
-        )
+        results = QuerySet(SyncEvent).filter(partition_a=pa, partition_b=pb).per_partition_limit(2).all()
         assert len(results) <= 2
 
         QuerySet(SyncEvent).filter(partition_a=pa, partition_b=pb).delete()
@@ -1958,9 +1859,7 @@ class TestAsyncExtended:
         await AsyncEvent.sync_table()
         pa, pb = "async_alpha", f"async_beta_{uuid4().hex[:6]}"
         for seq in range(3):
-            await AsyncEvent(
-                partition_a=pa, partition_b=pb, seq=seq, payload=f"p{seq}"
-            ).save()
+            await AsyncEvent(partition_a=pa, partition_b=pb, seq=seq, payload=f"p{seq}").save()
 
         results = await AsyncEvent.find(partition_a=pa, partition_b=pb).all()
         assert len(results) == 3
@@ -2012,9 +1911,7 @@ class TestAsyncExtended:
         """sync_table for extended types should succeed."""
         await AsyncExtendedTypes.sync_table()
 
-    async def test_bigint_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_bigint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """BigInt (bigint) column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2026,9 +1923,7 @@ class TestAsyncExtended:
         assert fetched.big_val == 2**40
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_smallint_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_smallint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """SmallInt (smallint) column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2040,9 +1935,7 @@ class TestAsyncExtended:
         assert fetched.small_val == 32000
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_tinyint_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_tinyint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """TinyInt (tinyint) column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2054,9 +1947,7 @@ class TestAsyncExtended:
         assert fetched.tiny_val == 127
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_varint_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_varint_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """VarInt (varint) column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2068,9 +1959,7 @@ class TestAsyncExtended:
         assert fetched.var_val == 10**30
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_double_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_double_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """Double (double) column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2082,9 +1971,7 @@ class TestAsyncExtended:
         assert abs(fetched.dbl_val - 3.141592653589793) < 1e-12
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_ascii_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_ascii_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """Ascii (ascii) column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2096,9 +1983,7 @@ class TestAsyncExtended:
         assert fetched.ascii_val == "hello"
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_timeuuid_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_timeuuid_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """TimeUUID (timeuuid) column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2113,9 +1998,7 @@ class TestAsyncExtended:
         assert fetched.timeuuid_val == tuuid
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_time_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_time_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """CQL time column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2131,9 +2014,7 @@ class TestAsyncExtended:
         assert fetched.time_val.second == 30
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_frozen_list_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_frozen_list_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """frozen<list<text>> column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2145,9 +2026,7 @@ class TestAsyncExtended:
         assert fetched.frozen_list == ["a", "b", "c"]
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_frozen_set_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_frozen_set_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """frozen<set<int>> column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2159,9 +2038,7 @@ class TestAsyncExtended:
         assert fetched.frozen_set == {10, 20, 30}
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_frozen_map_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_frozen_map_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """frozen<map<text, int>> column survives an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2173,9 +2050,7 @@ class TestAsyncExtended:
         assert fetched.frozen_map == {"x": 1, "y": 2}
         await AsyncExtendedTypes(id=rid).delete()
 
-    async def test_extended_types_all_fields_roundtrip(
-        self, coodie_driver: object, driver_type: str
-    ) -> None:
+    async def test_extended_types_all_fields_roundtrip(self, coodie_driver: object, driver_type: str) -> None:
         """All extended type fields set together survive an async save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
@@ -2260,9 +2135,7 @@ class TestAsyncExtended:
 
         from coodie.aio.query import QuerySet
 
-        results = (
-            await QuerySet(AsyncProduct).filter(id=pid).values_list("id", "name").all()
-        )
+        results = await QuerySet(AsyncProduct).filter(id=pid).values_list("id", "name").all()
         assert len(results) >= 1
         assert isinstance(results[0], tuple)
         # Use str() for comparison: acsylla returns UUIDs as strings
@@ -2278,18 +2151,11 @@ class TestAsyncExtended:
         pa = f"ppl_async_{uuid4().hex[:6]}"
         pb = "ppl_b"
         for seq in range(5):
-            await AsyncEvent(
-                partition_a=pa, partition_b=pb, seq=seq, payload=f"p{seq}"
-            ).save()
+            await AsyncEvent(partition_a=pa, partition_b=pb, seq=seq, payload=f"p{seq}").save()
 
         from coodie.aio.query import QuerySet
 
-        results = (
-            await QuerySet(AsyncEvent)
-            .filter(partition_a=pa, partition_b=pb)
-            .per_partition_limit(2)
-            .all()
-        )
+        results = await QuerySet(AsyncEvent).filter(partition_a=pa, partition_b=pb).per_partition_limit(2).all()
         assert len(results) <= 2
 
         await QuerySet(AsyncEvent).filter(partition_a=pa, partition_b=pb).delete()
@@ -2375,9 +2241,7 @@ class TestAsyncMaterializedView:
         await AsyncProduct.sync_table()
         await AsyncProductsByBrand.sync_view()
 
-    async def test_insert_base_row_queryable_via_view(
-        self, coodie_driver: object
-    ) -> None:
+    async def test_insert_base_row_queryable_via_view(self, coodie_driver: object) -> None:
         """Insert into the base table; query via the MV."""
         await AsyncProduct.sync_table()
         await AsyncProductsByBrand.sync_view()
@@ -2387,9 +2251,7 @@ class TestAsyncMaterializedView:
         await AsyncProduct(id=pid, name="AsyncMVWidget", brand=brand, price=42.0).save()
 
         # Materialized views are eventually consistent — retry until populated
-        results = await _retry_async(
-            lambda: AsyncProductsByBrand.find(brand=brand).all()
-        )
+        results = await _retry_async(lambda: AsyncProductsByBrand.find(brand=brand).all())
         assert len(results) >= 1
         match = [r for r in results if r.id == pid]
         assert len(match) == 1

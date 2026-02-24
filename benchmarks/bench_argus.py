@@ -411,9 +411,7 @@ def test_cqlengine_multi_model_lookup(benchmark, bench_env):
     from benchmarks.models_argus_cqlengine import CqlArgusEvent, CqlArgusUser
 
     uid = _make_uuid()
-    CqlArgusUser.create(
-        id=uid, username="lookup-test", email="lookup@test.com", roles=["ROLE_USER"]
-    )
+    CqlArgusUser.create(id=uid, username="lookup-test", email="lookup@test.com", roles=["ROLE_USER"])
     eid = _make_uuid()
     CqlArgusEvent.create(
         id=eid,
@@ -435,9 +433,7 @@ def test_coodie_multi_model_lookup(benchmark, bench_env):
     from benchmarks.models_argus_coodie import CoodieArgusEvent, CoodieArgusUser
 
     uid = _make_uuid()
-    user = CoodieArgusUser(
-        id=uid, username="lookup-test", email="lookup@test.com", roles=["ROLE_USER"]
-    )
+    user = CoodieArgusUser(id=uid, username="lookup-test", email="lookup@test.com", roles=["ROLE_USER"])
     user.save()
     eid = _make_uuid()
     evt = CoodieArgusEvent(

@@ -126,12 +126,7 @@ async def list_reviews(
     product_id: UUID,
     limit: int = Query(default=20, ge=1, le=100),
 ) -> list[Review]:
-    return (
-        await Review.find(product_id=product_id)
-        .order_by("-created_at")
-        .limit(limit)
-        .all()
-    )
+    return await Review.find(product_id=product_id).order_by("-created_at").limit(limit).all()
 
 
 @app.post("/products/{product_id}/reviews", response_model=Review, status_code=201)
@@ -173,9 +168,7 @@ async def ui_list_products(
     if category or brand:
         qs = qs.allow_filtering()
     products = await qs.all()
-    return templates.TemplateResponse(
-        "partials/product_list.html", {"request": request, "products": products}
-    )
+    return templates.TemplateResponse("partials/product_list.html", {"request": request, "products": products})
 
 
 @app.post("/ui/products", response_class=HTMLResponse)
@@ -199,9 +192,7 @@ async def ui_create_product(
     )
     await product.save()
     products = await Product.find().all()
-    return templates.TemplateResponse(
-        "partials/product_list.html", {"request": request, "products": products}
-    )
+    return templates.TemplateResponse("partials/product_list.html", {"request": request, "products": products})
 
 
 @app.delete("/ui/products/{product_id}", response_class=HTMLResponse)
@@ -210,9 +201,7 @@ async def ui_delete_product(request: Request, product_id: UUID) -> HTMLResponse:
     if product:
         await product.delete()
     products = await Product.find().all()
-    return templates.TemplateResponse(
-        "partials/product_list.html", {"request": request, "products": products}
-    )
+    return templates.TemplateResponse("partials/product_list.html", {"request": request, "products": products})
 
 
 @app.get("/ui/products/{product_id}", response_class=HTMLResponse)
@@ -220,19 +209,13 @@ async def ui_product_detail(request: Request, product_id: UUID) -> HTMLResponse:
     product = await Product.find_one(id=product_id)
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    return templates.TemplateResponse(
-        "partials/product_detail.html", {"request": request, "product": product}
-    )
+    return templates.TemplateResponse("partials/product_detail.html", {"request": request, "product": product})
 
 
 @app.get("/ui/products/{product_id}/reviews", response_class=HTMLResponse)
 async def ui_list_reviews(request: Request, product_id: UUID) -> HTMLResponse:
-    reviews = (
-        await Review.find(product_id=product_id).order_by("-created_at").limit(50).all()
-    )
-    return templates.TemplateResponse(
-        "partials/review_list.html", {"request": request, "reviews": reviews}
-    )
+    reviews = await Review.find(product_id=product_id).order_by("-created_at").limit(50).all()
+    return templates.TemplateResponse("partials/review_list.html", {"request": request, "reviews": reviews})
 
 
 @app.post("/ui/products/{product_id}/reviews", response_class=HTMLResponse)
@@ -250,24 +233,14 @@ async def ui_create_review(
         content=content or None,
     )
     await review.save()
-    reviews = (
-        await Review.find(product_id=product_id).order_by("-created_at").limit(50).all()
-    )
-    return templates.TemplateResponse(
-        "partials/review_list.html", {"request": request, "reviews": reviews}
-    )
+    reviews = await Review.find(product_id=product_id).order_by("-created_at").limit(50).all()
+    return templates.TemplateResponse("partials/review_list.html", {"request": request, "reviews": reviews})
 
 
 @app.delete("/ui/products/{product_id}/reviews/{ts}", response_class=HTMLResponse)
-async def ui_delete_review(
-    request: Request, product_id: UUID, ts: datetime
-) -> HTMLResponse:
+async def ui_delete_review(request: Request, product_id: UUID, ts: datetime) -> HTMLResponse:
     review = await Review.find_one(product_id=product_id, created_at=ts)
     if review:
         await review.delete()
-    reviews = (
-        await Review.find(product_id=product_id).order_by("-created_at").limit(50).all()
-    )
-    return templates.TemplateResponse(
-        "partials/review_list.html", {"request": request, "reviews": reviews}
-    )
+    reviews = await Review.find(product_id=product_id).order_by("-created_at").limit(50).all()
+    return templates.TemplateResponse("partials/review_list.html", {"request": request, "reviews": reviews})

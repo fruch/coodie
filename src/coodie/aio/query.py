@@ -220,10 +220,7 @@ class QuerySet:
                 filtered = {k: v for k, v in coerced.items() if k in known}
                 result.append(target_cls(**filtered))
             return result
-        return [
-            self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
-            for row in rows
-        ]
+        return [self._doc_cls(**coerce_row_none_collections(self._doc_cls, row)) for row in rows]
 
     async def paged_all(self) -> PagedResult:
         """Execute query returning a :class:`PagedResult` with documents and paging state."""

@@ -38,9 +38,7 @@ def test_create_keyspace_default():
 
 
 def test_create_keyspace_custom():
-    cql = build_create_keyspace(
-        "ks", replication_factor=3, strategy="NetworkTopologyStrategy"
-    )
+    cql = build_create_keyspace("ks", replication_factor=3, strategy="NetworkTopologyStrategy")
     assert "NetworkTopologyStrategy" in cql
     assert "'replication_factor': '3'" in cql
 
@@ -59,12 +57,8 @@ def test_create_table_simple():
 
 def test_create_table_composite_pk():
     cols = [
-        make_col(
-            name="product_id", cql_type="uuid", primary_key=True, partition_key_index=0
-        ),
-        make_col(
-            name="category", cql_type="text", primary_key=True, partition_key_index=1
-        ),
+        make_col(name="product_id", cql_type="uuid", primary_key=True, partition_key_index=0),
+        make_col(name="category", cql_type="text", primary_key=True, partition_key_index=1),
     ]
     cql = build_create_table("products", "ks", cols)
     assert 'PRIMARY KEY (("product_id", "category"))' in cql
@@ -359,18 +353,14 @@ def test_parse_update_kwargs_regular():
 
 
 def test_parse_update_kwargs_collection_ops():
-    set_data, ops = parse_update_kwargs(
-        {"tags__add": {"new"}, "items__remove": ["old"], "name": "X"}
-    )
+    set_data, ops = parse_update_kwargs({"tags__add": {"new"}, "items__remove": ["old"], "name": "X"})
     assert set_data == {"name": "X"}
     assert ("tags", "add", {"new"}) in ops
     assert ("items", "remove", ["old"]) in ops
 
 
 def test_parse_update_kwargs_append_prepend():
-    set_data, ops = parse_update_kwargs(
-        {"items__append": ["z"], "items__prepend": ["a"]}
-    )
+    set_data, ops = parse_update_kwargs({"items__append": ["z"], "items__prepend": ["a"]})
     assert set_data == {}
     assert ("items", "append", ["z"]) in ops
     assert ("items", "prepend", ["a"]) in ops
@@ -425,9 +415,7 @@ def test_build_update_with_if_conditions():
         ),
     ],
 )
-def test_build_update_collection_op(
-    op_key, op_name, value, expected_fragment, expected_params
-):
+def test_build_update_collection_op(op_key, op_name, value, expected_fragment, expected_params):
     cql, params = build_update(
         "products",
         "ks",
@@ -462,9 +450,7 @@ def test_create_table_with_default_ttl():
         make_col(name="id", cql_type="uuid", primary_key=True),
         make_col(name="name", cql_type="text"),
     ]
-    cql = build_create_table(
-        "products", "ks", cols, table_options={"default_time_to_live": 86400}
-    )
+    cql = build_create_table("products", "ks", cols, table_options={"default_time_to_live": 86400})
     assert "WITH default_time_to_live = 86400" in cql
 
 
@@ -487,9 +473,7 @@ def test_create_table_with_string_option():
     cols = [
         make_col(name="id", cql_type="uuid", primary_key=True),
     ]
-    cql = build_create_table(
-        "products", "ks", cols, table_options={"comment": "my table"}
-    )
+    cql = build_create_table("products", "ks", cols, table_options={"comment": "my table"})
     assert "comment = 'my table'" in cql
 
 
@@ -503,9 +487,7 @@ def test_create_table_with_clustering_and_options():
             clustering_order="DESC",
         ),
     ]
-    cql = build_create_table(
-        "reviews", "ks", cols, table_options={"default_time_to_live": 3600}
-    )
+    cql = build_create_table("reviews", "ks", cols, table_options={"default_time_to_live": 3600})
     assert "WITH CLUSTERING ORDER BY" in cql
     assert "default_time_to_live = 3600" in cql
     assert " AND " in cql
@@ -552,9 +534,7 @@ def test_build_where_clause_token():
 
 
 def test_build_where_clause_token_range():
-    clause, params = build_where_clause(
-        [("id", "TOKEN >", 100), ("id", "TOKEN <=", 200)]
-    )
+    clause, params = build_where_clause([("id", "TOKEN >", 100), ("id", "TOKEN <=", 200)])
     assert 'TOKEN("id") > ?' in clause
     assert 'TOKEN("id") <= ?' in clause
     assert params == [100, 200]
@@ -677,9 +657,7 @@ def test_build_create_keyspace_network_topology_single_dc():
 
 
 def test_build_create_keyspace_network_topology_overrides_strategy():
-    cql = build_create_keyspace(
-        "ks", strategy="SimpleStrategy", dc_replication_map={"dc1": 3}
-    )
+    cql = build_create_keyspace("ks", strategy="SimpleStrategy", dc_replication_map={"dc1": 3})
     assert "NetworkTopologyStrategy" in cql
     assert "SimpleStrategy" not in cql
 

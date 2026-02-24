@@ -641,7 +641,130 @@ self._doc_cls.model_validate(coerce_row_none_collections(self._doc_cls, row))
 
 ---
 
-## 10. Notes
+## 10. Phase 1 Results
+
+> **Post-optimization run**: [#22371151749](https://github.com/fruch/coodie/actions/runs/22371151749) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22371151749/job/64752712030?pr=46#step:5:124))
+> **PR**: [#46](https://github.com/fruch/coodie/pull/46) — `perf: implement Phase 1 performance improvements`
+
+### 10.1 Phase 1 Changes Implemented
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.1 | `_rows_to_dicts()` — type-check first row once, fast-path all rows (CassandraDriver) | ✅ Done |
+| 3.2 | `@lru_cache` on `_find_discriminator_column()` / `_get_discriminator_value()` | ✅ Done |
+| 3.3 | Module-level `get_driver` import in both query.py files | ✅ Done |
+| 7.1 | `__slots__` on QuerySet (sync + async), CassandraDriver, AcsyllaDriver, ColumnDefinition | ✅ Done |
+| 7.3 | Pydantic `model_config` tuning (`revalidate_instances`, `use_enum_values`, `populate_by_name`) | ✅ Done |
+| 7.5 | `_cached_type_hints(cls)` — `@lru_cache` wrapper around `get_type_hints()` | ✅ Done |
+| 7.7 | `_collection_fields(cls)` — pre-compute collection coercion map per class | ✅ Done |
+| 7.8 | `model_validate()` instead of `Model(**dict)` in `_rows_to_docs()` | ✅ Done |
+
+**Note**: `extra="forbid"` (§7.3) was intentionally omitted — materialized views and partial
+models read DB rows containing columns not defined in the model, which Pydantic would reject.
+
+### 10.2 Core Operations — Before vs After
+
+| Operation | Before (coodie) | After (coodie) | coodie Speedup | Before ratio | After ratio | Δ |
+|-----------|----------------|----------------|----------------|--------------|-------------|---|
+| **Reads** | | | | | | |
+| GET by PK | 1,382 µs | 486 µs | **−65%** | 2.12× slower | 0.75× (1.3× faster) | 🆕 now beats cqlengine |
+| Filter + LIMIT | 3,060 µs | 604 µs | **−80%** | 2.73× slower | 0.52× (1.9× faster) | 🆕 now beats cqlengine |
+| Filter (secondary index) | 18,120 µs | 1,555 µs | **−91%** | 4.03× slower | 0.33× (3.0× faster) | 🆕 now beats cqlengine |
+| COUNT | 1,492 µs | 896 µs | **−40%** | 1.46× slower | 0.89× (1.1× faster) | 🆕 now beats cqlengine |
+| Collection read | 1,405 µs | 495 µs | **−65%** | 2.15× slower | 0.74× (1.4× faster) | 🆕 now beats cqlengine |
+| Collection roundtrip | 2,460 µs | 970 µs | **−61%** | 1.89× slower | 0.70× (1.4× faster) | 🆕 now beats cqlengine |
+| **Writes** | | | | | | |
+| Single INSERT | 1,025 µs | 451 µs | **−56%** | 1.74× slower | 0.76× (1.3× faster) | 🆕 now beats cqlengine |
+| INSERT with TTL | 1,016 µs | 461 µs | **−55%** | 1.64× slower | 0.76× (1.3× faster) | 🆕 now beats cqlengine |
+| INSERT IF NOT EXISTS | 2,200 µs | 1,469 µs | **−33%** | 1.30× slower | 0.95× (1.1× faster) | 🆕 now beats cqlengine |
+| Collection write | 1,015 µs | 460 µs | **−55%** | 1.62× slower | 0.72× (1.4× faster) | 🆕 now beats cqlengine |
+| **Updates** | | | | | | |
+| Partial UPDATE | 2,203 µs | 923 µs | **−58%** | 4.34× slower | 1.72× slower | improved but still slower |
+| UPDATE IF condition (LWT) | 3,340 µs | 1,823 µs | **−45%** | 2.04× slower | 1.18× slower | improved |
+| **Deletes** | | | | | | |
+| Single DELETE | 1,970 µs | 939 µs | **−52%** | 1.89× slower | 0.87× (1.1× faster) | 🆕 now beats cqlengine |
+| Bulk DELETE | 2,010 µs | 900 µs | **−55%** | 1.72× slower | 0.79× (1.3× faster) | 🆕 now beats cqlengine |
+| **Batch** | | | | | | |
+| Batch INSERT 10 | 3,380 µs | 631 µs | **−81%** | 2.02× slower | 0.36× (2.8× faster) | 🆕 now beats cqlengine |
+| Batch INSERT 100 | 28,612 µs | 2,276 µs | **−92%** | 0.54× faster | 0.04× (23.8× faster) | was faster, now dominant |
+| **Schema** | | | | | | |
+| sync_table create | 2,646 µs | 2,508 µs | −5% | 15.3× slower | 14.3× slower | Phase 2 target |
+| sync_table no-op | 3,827 µs | 3,410 µs | −11% | 17.1× slower | 16.2× slower | Phase 2 target |
+| **Serialization (no DB)** | | | | | | |
+| Model instantiation | 2.00 µs | 2.05 µs | ≈0% | 0.17× (5.8× faster) | 0.17× (5.9× faster) | maintained |
+| Model serialization | 2.01 µs | 1.94 µs | +4% | 0.44× (2.3× faster) | 0.42× (2.4× faster) | maintained |
+
+### 10.3 Argus Real-World Patterns — Before vs After
+
+| Pattern | Before (coodie) | After (coodie) | coodie Speedup | Before ratio | After ratio | Δ |
+|---------|----------------|----------------|----------------|--------------|-------------|---|
+| Batch events (10) | 3,560 µs | 1,219 µs | **−66%** | 1.17× slower | 0.40× (2.5× faster) | 🆕 now beats cqlengine |
+| Comment with collections | 779 µs | 531 µs | **−32%** | 1.04× slower | 0.69× (1.4× faster) | 🆕 now beats cqlengine |
+| Filter by partition key | 1,430 µs | 604 µs | **−58%** | 1.34× slower | 0.59× (1.7× faster) | 🆕 now beats cqlengine |
+| Get-or-create user | 902 µs | 497 µs | **−45%** | 1.21× slower | 0.68× (1.5× faster) | 🆕 now beats cqlengine |
+| Latest N runs (clustering) | 1,188 µs | 499 µs | **−58%** | 1.28× slower | 0.52× (1.9× faster) | 🆕 now beats cqlengine |
+| Multi-model lookup | 1,813 µs | 959 µs | **−47%** | 1.37× slower | 0.71× (1.4× faster) | 🆕 now beats cqlengine |
+| Notification feed | 1,433 µs | 600 µs | **−58%** | 1.06× slower | 0.45× (2.2× faster) | 🆕 now beats cqlengine |
+| List mutation + save | 1,647 µs | 997 µs | **−39%** | 2.17× slower | 1.35× slower | improved but still slower |
+| Status update | 1,752 µs | 956 µs | **−45%** | 2.10× slower | 1.11× slower | improved |
+| Argus model instantiation | 18.2 µs | 18.1 µs | ≈0% | 0.55× faster | 0.54× faster | maintained |
+
+### 10.4 Success Criteria — Phase 1 Scorecard
+
+| Metric | Target | Before | After | Status |
+|--------|--------|--------|-------|--------|
+| Single INSERT latency | ≤ 1.3× cqlengine | 1.74× | **0.76×** | ✅ **Exceeded** — now 1.3× faster |
+| GET by PK latency | ≤ 1.5× cqlengine | 2.12× | **0.75×** | ✅ **Exceeded** — now 1.3× faster |
+| Filter + LIMIT latency | ≤ 1.8× cqlengine | 2.73× | **0.52×** | ✅ **Exceeded** — now 1.9× faster |
+| `sync_table` no-op | ≤ 1.5× cqlengine | 17.1× | **16.2×** | ❌ Not met — Phase 2 (table cache) needed |
+| Partial UPDATE | ≤ 2× cqlengine | 4.34× | **1.72×** | ✅ **Met** |
+| Model instantiation | ≤ 0.2× (maintain advantage) | 0.17× | **0.17×** | ✅ **Maintained** |
+| Model serialization | ≤ 0.5× (maintain advantage) | 0.44× | **0.42×** | ✅ **Maintained** |
+
+**6 out of 7 success criteria met or exceeded.** The only unmet target (`sync_table` no-op) requires
+Phase 2's table metadata cache, which is a separate feature (not a code optimization).
+
+### 10.5 Key Findings
+
+1. **coodie now beats cqlengine on 24 out of 30 benchmarks.** Before Phase 1, coodie was
+   slower than cqlengine on 16 out of 18 DB operations. After Phase 1, coodie is faster on
+   all reads, all writes (except partial UPDATE and LWT), all deletes, and all batch operations.
+
+2. **Read operations saw the biggest improvement (40–91% faster).** The combination of
+   `_cached_type_hints()`, `_rows_to_dicts()` namedtuple fast-path, `_collection_fields()`
+   cache, and `model_validate()` eliminated the per-row overhead that dominated read paths.
+
+3. **Batch INSERT 100 improved by 92%** (28.6 ms → 2.3 ms), making coodie **23.8× faster**
+   than cqlengine. The `@lru_cache` on discriminator functions eliminated 100× `get_type_hints()`
+   calls per batch.
+
+4. **Filter (secondary index) improved by 91%** (18.1 ms → 1.6 ms), going from 4× slower
+   to 3× faster than cqlengine. This was the highest-severity bottleneck (🔴 Critical in §1.2).
+
+5. **Argus real-world patterns flipped:** 7 out of 9 DB-backed patterns now beat cqlengine
+   (was: 0 out of 9). Only list-mutation and status-update remain slower, both involving
+   read-modify-write cycles where the write path still has overhead.
+
+6. **`sync_table` remains the main gap.** Phase 2's table metadata cache (task 3.4) is needed
+   to close the 16× overhead on `sync_table` no-op.
+
+7. **Pydantic advantage maintained.** Model instantiation (5.9× faster) and serialization
+   (2.4× faster) are unchanged — the Phase 1 changes only optimized the ORM ↔ driver interface.
+
+### 10.6 Remaining Priorities After Phase 1
+
+| Priority | Task | Expected Impact |
+|----------|------|-----------------|
+| **P0** | 3.4 Table metadata cache | Close 16× `sync_table` gap → ≤ 1.5× |
+| P1 | 3.5 Skip column introspection on create | Faster first-run `sync_table` |
+| P1 | 3.7 Skip intermediate dict on reads | Further read improvement (already partially done via `model_validate`) |
+| P2 | 3.8 CQL query string cache | Eliminate CQL construction overhead |
+| P2 | 3.10 Reduce `_clone()` overhead | Faster query chain construction |
+| P2 | 7.4 Lazy parsing (LazyDocument) | Near-zero cost for PK-only reads |
+
+---
+
+## 11. Notes
 
 - coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for
   pure Python model construction. The overhead is in the ORM ↔ driver interface.

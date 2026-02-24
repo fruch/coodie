@@ -20,6 +20,15 @@ jobs:
       github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'benchmark')
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        driver:
+          - name: scylla
+            extra: scylla
+          - name: acsylla
+            extra: acsylla
+    name: benchmark (${{ matrix.driver.name }})
     permissions:
       contents: read
     steps:
@@ -33,19 +42,20 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --all-groups
-          uv pip install -e ".[scylla]"
+          uv pip install -e ".[${{ matrix.driver.extra }}]"
 
       - name: Run benchmarks
         run: |
           uv run pytest benchmarks/ \
             -v \
+            --driver-type=${{ matrix.driver.name }} \
             --benchmark-enable \
             --benchmark-sort=mean \
-            --benchmark-json=benchmark-results.json
+            --benchmark-json=benchmark-results-${{ matrix.driver.name }}.json
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results
-          path: benchmark-results.json
+          name: benchmark-results-${{ matrix.driver.name }}
+          path: benchmark-results-${{ matrix.driver.name }}.json
           retention-days: 90

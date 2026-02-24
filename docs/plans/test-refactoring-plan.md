@@ -258,9 +258,12 @@ def _make_product(base_cls):
 ```
 
 **⚠️ PEP 563 caveat:** Do NOT use `from __future__ import annotations` in files
-that define Document subclasses inside functions. `get_type_hints()` cannot
-resolve string annotations for classes in local scope, causing `build_schema()`
-to return empty columns. This may be resolved by PEP 649 in Python 3.14+.
+that define Document subclasses inside functions. PEP 563 stores annotations as
+strings, and `get_type_hints()` cannot resolve them for classes in local scope,
+causing `build_schema()` to return empty columns. **Workaround:** define model
+factories at module level without the `__future__` import. See
+`benchmarks/bench_schema.py` for a verified example. This may be resolved by
+PEP 649 (deferred evaluation) in Python 3.14+.
 
 ### 4.2 Add `_maybe_await` helper to `tests/conftest.py`
 

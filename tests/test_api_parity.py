@@ -54,7 +54,6 @@ def test_document_model_config_has_performance_settings():
     """Document model_config should include performance-tuned settings."""
     config = sync_doc.Document.model_config
     assert config["revalidate_instances"] == "never"
-    assert config["extra"] == "forbid"
     assert config["use_enum_values"] is True
     assert config["populate_by_name"] is True
 

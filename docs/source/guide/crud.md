@@ -257,6 +257,8 @@ Only `increment()` and `decrement()` modify counter values.
 
 ## What's Next?
 
-- {doc}`defining-documents` — Document classes and field definitions
-- {doc}`field-types` — all type annotations and CQL mappings
-- {doc}`keys-and-indexes` — primary keys, clustering keys, and indexes
+- {doc}`querying` — QuerySet chaining and terminal methods
+- {doc}`filtering` — Django-style lookup operators for WHERE clauses
+- {doc}`collections` — set, list, and map operations
+- {doc}`counters` — counter tables and increment/decrement
+- {doc}`ttl` — time-to-live support

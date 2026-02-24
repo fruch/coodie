@@ -1158,11 +1158,11 @@ make clean html    # Clean build — like clearing your browser cache but useful
 - [x] CRUD operations guide
 
 ### Phase 2: Querying & Data (Intermediate Docs)
-- [ ] QuerySet & chaining guide
-- [ ] Filtering (Django-style lookups) guide
-- [ ] Collection operations guide
-- [ ] Counter tables guide
-- [ ] TTL support guide
+- [x] QuerySet & chaining guide
+- [x] Filtering (Django-style lookups) guide
+- [x] Collection operations guide
+- [x] Counter tables guide
+- [x] TTL support guide
 
 ### Phase 3: Advanced Features
 - [ ] Lightweight Transactions (LWT) guide

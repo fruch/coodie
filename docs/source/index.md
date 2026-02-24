@@ -26,6 +26,7 @@ guide/batch-operations
 guide/sync-vs-async
 guide/drivers
 guide/exceptions
+guide/benchmarks
 ```
 
 ```{toctree}

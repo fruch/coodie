@@ -30,7 +30,8 @@ jobs:
             extra: acsylla
     name: benchmark (${{ matrix.driver.name }})
     permissions:
-      contents: read
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
 
@@ -59,3 +60,18 @@ jobs:
           name: benchmark-results-${{ matrix.driver.name }}
           path: benchmark-results-${{ matrix.driver.name }}.json
           retention-days: 90
+
+      - name: Store and compare benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: "coodie benchmarks (${{ matrix.driver.name }})"
+          tool: pytest
+          output-file-path: benchmark-results-${{ matrix.driver.name }}.json
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: benchmarks/${{ matrix.driver.name }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.event_name != 'pull_request' }}
+          comment-on-alert: true
+          alert-threshold: "150%"
+          fail-on-alert: false
+          summary-always: true

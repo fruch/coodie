@@ -274,6 +274,25 @@ class NerdStats(Document):
     frozen_skills: Annotated[list[str], Frozen()]     # frozen<list<text>>
 ```
 
+Also cover `Static()` column marker for columns shared across a partition:
+
+```python
+from coodie.fields import PrimaryKey, ClusteringKey, Static
+
+class SensorReading(Document):
+    sensor_id: Annotated[str, PrimaryKey()]
+    reading_time: Annotated[str, ClusteringKey()]
+    sensor_name: Annotated[str, Static()]    # shared across partition
+    value: float
+
+# CQL equivalent:
+# CREATE TABLE sensor_reading (
+#     ...
+#     "sensor_name" text STATIC,
+#     ...
+# );
+```
+
 ---
 
 ### 4.5 Primary Keys & Clustering Keys

@@ -40,34 +40,25 @@ Legend:
 | cqlengine Column | CQL Type | Python Type (coodie) | Status |
 |---|---|---|---|
 | `columns.Text()` | `text` | `str` | ✅ |
-| `columns.Ascii()` | `ascii` | — | ❌ |
+| `columns.Ascii()` | `ascii` | `Annotated[str, Ascii()]` | ✅ |
 | `columns.Integer()` | `int` | `int` | ✅ |
-| `columns.BigInt()` | `bigint` | — | ❌ |
-| `columns.SmallInt()` | `smallint` | — | ❌ |
-| `columns.TinyInt()` | `tinyint` | — | ❌ |
-| `columns.VarInt()` | `varint` | — | ❌ |
+| `columns.BigInt()` | `bigint` | `Annotated[int, BigInt()]` | ✅ |
+| `columns.SmallInt()` | `smallint` | `Annotated[int, SmallInt()]` | ✅ |
+| `columns.TinyInt()` | `tinyint` | `Annotated[int, TinyInt()]` | ✅ |
+| `columns.VarInt()` | `varint` | `Annotated[int, VarInt()]` | ✅ |
 | `columns.Float()` | `float` | `float` | ✅ |
-| `columns.Double()` | `double` | — | ❌ |
+| `columns.Double()` | `double` | `Annotated[float, Double()]` | ✅ |
 | `columns.Decimal()` | `decimal` | `Decimal` | ✅ |
 | `columns.Boolean()` | `boolean` | `bool` | ✅ |
 | `columns.UUID()` | `uuid` | `UUID` | ✅ |
-| `columns.TimeUUID()` | `timeuuid` | — | ❌ |
+| `columns.TimeUUID()` | `timeuuid` | `Annotated[UUID, TimeUUID()]` | ✅ |
 | `columns.DateTime()` | `timestamp` | `datetime` | ✅ |
 | `columns.Date()` | `date` | `date` | ✅ |
-| `columns.Time()` | `time` | — | ❌ |
+| `columns.Time()` | `time` | `datetime.time` | ✅ |
 | `columns.Blob()` | `blob` | `bytes` | ✅ |
 | `columns.Inet()` | `inet` | `IPv4Address` / `IPv6Address` | ✅ |
-| `columns.Counter()` | `counter` | `Annotated[int, Counter()]` | 🔧 schema emits type, no increment/decrement API |
-
-**Gap summary — scalar types to add:**
-- `bigint` → map to a new type annotation or `Annotated[int, BigInt()]`
-- `smallint` → `Annotated[int, SmallInt()]`
-- `tinyint` → `Annotated[int, TinyInt()]`
-- `varint` → `Annotated[int, VarInt()]`
-- `double` → `Annotated[float, Double()]` or a `Double` sentinel
-- `ascii` → `Annotated[str, Ascii()]`
-- `timeuuid` → new type or `Annotated[UUID, TimeUUID()]`
-- `time` → `datetime.time` → `time`
+| `columns.Counter()` | `counter` | `Annotated[int, Counter()]` | ✅ `CounterDocument` with `increment()`/`decrement()` |
+| `columns.Static()` | N/A (modifier) | `Annotated[T, Static()]` | ✅ emits `STATIC` in DDL |
 
 #### Collection Types
 
@@ -77,11 +68,7 @@ Legend:
 | `columns.Set(value_type)` | `set<T>` | `set[T]` | ✅ |
 | `columns.Map(key_type, value_type)` | `map<K,V>` | `dict[K,V]` | ✅ |
 | `columns.Tuple(type1, type2, …)` | `tuple<…>` | `tuple[T1, T2, …]` | ✅ |
-| `frozen<T>` (any collection) | `frozen<T>` | — | ❌ |
-
-**Gap summary — collections:**
-- `frozen<>` wrapper: needed for nested collections and UDT columns used as PK/clustering key components.
-  Add a `Frozen` annotation marker in `fields.py`.
+| `frozen<T>` (any collection) | `frozen<T>` | `Annotated[T, Frozen()]` | ✅ |
 
 #### User-Defined Types
 
@@ -101,25 +88,25 @@ Legend:
 | `class MyModel(Model)` | `class MyModel(Document)` | ✅ |
 | `__table_name__` | `Settings.name` | ✅ |
 | `__keyspace__` | `Settings.keyspace` | ✅ |
-| `__connection__` | `Settings.connection` / `_get_driver()` | 🔧 driver registry exists, no per-model connection |
-| `__default_ttl__` | — | ❌ |
-| `__abstract__ = True` | — | ❌ |
-| `__discriminator_value__` (polymorphism) | — | ❌ |
-| `__options__` (table options: compaction, etc.) | — | ❌ |
-| `Model.create(**kwargs)` | — (use `MyModel(**kwargs).save()`) | ❌ convenience classmethod missing |
+| `__connection__` | `Settings.connection` / `_get_driver()` | ✅ routes to named driver |
+| `__default_ttl__` | `Settings.__default_ttl__` | ✅ |
+| `__abstract__ = True` | `Settings.__abstract__` | ✅ |
+| `__discriminator_value__` (polymorphism) | `Settings.__discriminator_value__` + `Discriminator` marker | ✅ |
+| `__options__` (table options: compaction, etc.) | `Settings.__options__` | ✅ |
+| `Model.create(**kwargs)` | `Document.create(**kwargs)` | ✅ |
 | `Model.save()` | `Document.save()` | ✅ |
-| `Model.update(**kwargs)` | — | ❌ no partial update on instance |
+| `Model.update(**kwargs)` | `Document.update(**kwargs)` | ✅ |
 | `Model.delete()` | `Document.delete()` | ✅ |
 | `Model.insert()` (IF NOT EXISTS) | `Document.insert()` | ✅ |
 | `Model.validate()` | Pydantic `model_validate()` | ✅ (via Pydantic) |
-| `Model.column_family_name()` | `Document._get_table()` | 🔧 private method, not public |
+| `Model.column_family_name()` | `Document.table_name()` / `_get_table()` | ✅ |
 | `Model.objects` (returns QuerySet) | `Document.find()` | ✅ different API surface |
-| `Model.timeout(seconds)` on instance operations | — | ❌ |
-| `Model.consistency(level)` on instance operations | — | ❌ |
+| `Model.timeout(seconds)` on instance operations | `Document.save(timeout=...)` etc. | ✅ |
+| `Model.consistency(level)` on instance operations | `Document.save(consistency=...)` etc. | ✅ |
 | `Model.if_not_exists()` on save | `Document.insert()` | ✅ |
-| `Model.if_exists()` on update/delete | — | ❌ |
+| `Model.if_exists()` on update/delete | `Document.delete(if_exists=True)` / `update(if_exists=True)` | ✅ |
 | `Model.batch(batch_query)` | `doc.save(batch=batch)` / `doc.delete(batch=batch)` | ✅ |
-| `Model.timestamp(ts)` on write ops | — | ❌ |
+| `Model.timestamp(ts)` on write ops | `Document.save(timestamp=...)` etc. | ✅ |
 
 ### 1.3 QuerySet / Query API
 
@@ -137,19 +124,19 @@ Legend:
 | `__iter__` (sync) | `QuerySet.__iter__` | ✅ |
 | `__len__` (sync) | `QuerySet.__len__` | ✅ |
 | `__aiter__` (async) | `AsyncQuerySet.__aiter__` | ✅ |
-| `.update(**kwargs)` (bulk UPDATE) | — | ❌ |
-| `.if_not_exists()` on QuerySet | — | ❌ |
-| `.if_exists()` on QuerySet | — | ❌ |
-| `.ttl(seconds)` on QuerySet | — | ❌ |
-| `.timestamp(ts)` on QuerySet | — | ❌ |
-| `.consistency(level)` on QuerySet | — | ❌ |
-| `.using(ttl=, timestamp=)` | — | ❌ |
-| `.values_list()` (column projection) | — | ❌ |
-| `.only(*columns)` (column projection) | — | ❌ |
-| `.defer(*columns)` (exclude columns) | — | ❌ |
-| `.per_partition_limit(n)` | 🔧 `build_select` supports it; QuerySet does not expose | 🔧 |
-| Token-range queries / paging | — | ❌ |
-| Named queries / raw CQL execution | — | ❌ |
+| `.update(**kwargs)` (bulk UPDATE) | `QuerySet.update(**kwargs)` | ✅ |
+| `.if_not_exists()` on QuerySet | `QuerySet.if_not_exists()` | ✅ |
+| `.if_exists()` on QuerySet | `QuerySet.if_exists()` | ✅ |
+| `.ttl(seconds)` on QuerySet | `QuerySet.ttl(seconds)` | ✅ |
+| `.timestamp(ts)` on QuerySet | `QuerySet.timestamp(ts)` | ✅ |
+| `.consistency(level)` on QuerySet | `QuerySet.consistency(level)` | ✅ |
+| `.using(ttl=, timestamp=)` | `QuerySet.using(ttl=, timestamp=, consistency=, timeout=)` | ✅ |
+| `.values_list()` (column projection) | `QuerySet.values_list(*columns)` | ✅ |
+| `.only(*columns)` (column projection) | `QuerySet.only(*columns)` | ✅ |
+| `.defer(*columns)` (exclude columns) | `QuerySet.defer(*columns)` | ✅ |
+| `.per_partition_limit(n)` | `QuerySet.per_partition_limit(n)` | ✅ |
+| Token-range queries / paging | `QuerySet.fetch_size(n)` / `.page(state)` / `.paged_all()` | ✅ |
+| Named queries / raw CQL execution | `execute_raw(stmt, params)` | ✅ |
 
 #### Filter Operators
 
@@ -162,24 +149,24 @@ Legend:
 | `__in` | `__in` | ✅ |
 | `__contains` | `__contains` | ✅ |
 | `__contains_key` (map) | `__contains_key` | ✅ |
-| `__like` (SASI index) | — | ❌ |
-| `__token` (token range) | — | ❌ |
+| `__like` (SASI index) | `__like` | ✅ |
+| `__token` (token range) | `__token__gt`, `__token__gte`, `__token__lt`, `__token__lte` | ✅ |
 
 ### 1.4 Schema / DDL Management
 
 | cqlengine Feature | coodie Equivalent | Status |
 |---|---|---|
 | `management.sync_table(Model)` | `Document.sync_table()` | ✅ |
-| `management.drop_table(Model)` | `build_drop_table()` in `cql_builder` | 🔧 no public API on Document |
+| `management.drop_table(Model)` | `Document.drop_table()` | ✅ |
 | `management.sync_type(UserType)` | — | ❌ |
-| `management.create_keyspace_simple()` | `build_create_keyspace()` in `cql_builder` | 🔧 no public API |
-| `management.create_keyspace_network_topology()` | — | ❌ |
-| `management.drop_keyspace()` | — | ❌ |
+| `management.create_keyspace_simple()` | `create_keyspace(ks, replication_factor=N)` | ✅ |
+| `management.create_keyspace_network_topology()` | `create_keyspace(ks, dc_replication_map={...})` | ✅ |
+| `management.drop_keyspace()` | `drop_keyspace(ks)` | ✅ |
 | `ALTER TABLE ADD column` (schema migration) | Handled inside `sync_table` via driver | ✅ |
 | `CREATE INDEX IF NOT EXISTS` | Handled inside `sync_table` for `Indexed` fields | ✅ |
-| `CREATE MATERIALIZED VIEW` | — | ❌ |
-| `DROP MATERIALIZED VIEW` | — | ❌ |
-| Table options (`WITH compaction = …`) | — | ❌ |
+| `CREATE MATERIALIZED VIEW` | `MaterializedView.sync_view()` | ✅ |
+| `DROP MATERIALIZED VIEW` | `MaterializedView.drop_view()` | ✅ |
+| Table options (`WITH compaction = …`) | `Settings.__options__` | ✅ |
 
 ### 1.5 User-Defined Types (UDT)
 
@@ -191,8 +178,23 @@ cqlengine provides a `UserType` base class in `cassandra.cqlengine.usertype` wit
 - Nested UDTs
 - UDTs inside collections
 
-**coodie status: Entirely missing.** This is a significant gap for applications
-that use custom types.
+**coodie status: Entirely missing.** This is the only significant remaining gap.
+Use `frozen<>` collections or separate tables as a workaround.
+
+#### UDT Implementation Tasks
+
+| Task | Description |
+|---|---|
+| A.1 | Create `coodie.usertype` module with `UserType(BaseModel)` base class |
+| A.2 | Add `__type_name__` override (default: snake_case of class name) |
+| A.3 | Add `build_create_type()` / `build_drop_type()` to `cql_builder.py` |
+| A.4 | Add `sync_type()` classmethod to `UserType` |
+| A.5 | Register UDT types in `python_type_to_cql_type_str()` → emit `frozen<type_name>` |
+| A.6 | Support UDTs inside collections (`list[MyUDT]` → `list<frozen<my_udt>>`) |
+| A.7 | Support nested UDTs |
+| A.8 | Serialization/deserialization of UDT values to/from dicts |
+| A.9 | Register UDT with driver (e.g. `cluster.register_user_type()`) |
+| A.10 | Unit + integration tests |
 
 ### 1.6 Batch Operations
 
@@ -213,8 +215,8 @@ that use custom types.
 | `connection.setup(hosts, keyspace)` | `init_coodie(hosts, keyspace)` | ✅ |
 | `connection.register_connection(name, ...)` | `register_driver(name, driver)` | ✅ |
 | `connection.set_default_connection(name)` | default driver in registry | ✅ |
-| Per-model `__connection__` | — | ❌ |
-| Multiple named connections in same app | 🔧 registry supports named drivers | 🔧 |
+| Per-model `__connection__` | `Settings.connection` routes to named driver | ✅ |
+| Multiple named connections in same app | Driver registry supports named drivers | ✅ |
 | Lazy connection (connect on first use) | — | ❌ |
 | Connection pooling options | Delegated to underlying driver | ✅ (passthrough) |
 
@@ -222,19 +224,20 @@ that use custom types.
 
 | cqlengine Feature | coodie Status | Notes |
 |---|---|---|
-| Polymorphic models (`__discriminator_value__`) | ❌ | Single-table inheritance |
-| Abstract models (`__abstract__`) | ❌ | Base class not mapped to table |
-| Default TTL (`__default_ttl__`) | ❌ | Table-level default TTL |
-| Table options (`__options__`) | ❌ | Compaction, caching, compression, etc. |
-| Lightweight transactions (IF EXISTS / IF conditions) | 🔧 `build_update` supports `if_conditions`; not exposed via API | — |
-| USING TIMESTAMP | ❌ | Write timestamp for conflict resolution |
-| Consistency level per operation | ❌ | Per-query consistency |
-| Timeout per operation | ❌ | Per-query timeout |
-| Pagination (`paging_state`, `fetch_size`) | ❌ | Cursor-based page iteration |
-| Token-range queries | ❌ | Full-table scans |
-| Materialized views | ❌ | — |
-| SASI / SAI index support | ❌ | `__like` operator |
-| Counter increment/decrement API | ❌ | `UPDATE … SET col = col + ?` |
+| Polymorphic models (`__discriminator_value__`) | ✅ | `Discriminator` marker + `Settings.__discriminator_value__` |
+| Abstract models (`__abstract__`) | ✅ | `Settings.__abstract__ = True` |
+| Default TTL (`__default_ttl__`) | ✅ | `Settings.__default_ttl__` → `WITH default_time_to_live` |
+| Table options (`__options__`) | ✅ | `Settings.__options__` dict |
+| Lightweight transactions (IF EXISTS / IF conditions) | ✅ | `Document.update(if_exists=True)`, `delete(if_exists=True)`, `update(if_conditions={...})` |
+| USING TIMESTAMP | ✅ | `save(timestamp=...)`, `delete(timestamp=...)` etc. |
+| Consistency level per operation | ✅ | `save(consistency=...)`, `QuerySet.consistency(level)` |
+| Timeout per operation | ✅ | `save(timeout=...)`, `QuerySet.timeout(seconds)` |
+| Pagination (`paging_state`, `fetch_size`) | ✅ | `QuerySet.fetch_size(n)` / `.page(state)` / `.paged_all()` |
+| Token-range queries | ✅ | `__token__gt`, `__token__gte`, `__token__lt`, `__token__lte` |
+| Materialized views | ✅ | `MaterializedView` base class with `sync_view()` / `drop_view()` |
+| SASI / SAI index support | ✅ | `__like` filter operator |
+| Counter increment/decrement API | ✅ | `CounterDocument.increment()` / `decrement()` |
+| Static columns | ✅ | `Annotated[T, Static()]` marker |
 | Column-level delete | 🔧 `build_delete(columns=[...])` exists | Not exposed on Document |
 
 ---

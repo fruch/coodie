@@ -52,6 +52,10 @@ are demonstrated.
 - **Sample data built in** — every demo includes a `seed.py` (or CLI command)
   that generates realistic sample data using Faker or hand-crafted generators;
   optionally accepts CSV/JSON feeds for real data
+- **Makefile-driven** — every demo includes a `Makefile` with standard targets
+  (`make db-up`, `make db-down`, `make seed`, `make run`, `make clean`) so a
+  single `make run` spins the database up, creates the keyspace, syncs tables,
+  seeds data, and starts the app
 - **Copy-paste runnable** — each README has a numbered quick-start (start
   ScyllaDB → install → seed → run) that works in under 2 minutes
 - **Showcases coodie, not the framework** — framework boilerplate is minimal;
@@ -156,8 +160,10 @@ Legend:
 ```
 demos/
 ├── README.md                          # Index: list of all demos with descriptions
+├── docker-compose.yml                 # Shared ScyllaDB container
 ├── fastapi-catalog/                   # Existing demo (moved from demo/)
 │   ├── README.md
+│   ├── Makefile                       # db-up, db-down, seed, run, clean
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
@@ -168,6 +174,7 @@ demos/
 │       └── partials/
 ├── flask-blog/                        # NEW: Flask integration
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── app.py
 │   ├── models.py
@@ -175,6 +182,7 @@ demos/
 │   └── templates/
 ├── django-taskboard/                  # NEW: Django integration
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── manage.py
 │   ├── taskboard/
@@ -191,66 +199,77 @@ demos/
 │   └── seed.py
 ├── ttl-sessions/                      # NEW: TTL & ephemeral data
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── realtime-counters/                 # NEW: Counter columns
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── lwt-user-registry/                 # NEW: Lightweight transactions
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── batch-importer/                    # NEW: Batch operations
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── collections-tags/                  # NEW: Collections & nested types
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── materialized-views/                # NEW: Materialized views
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── timeseries-iot/                    # NEW: Time-series patterns
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── polymorphic-cms/                   # NEW: Single-table inheritance
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── vector-search/                     # NEW: Vector similarity search
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 ├── argus-tracker/                     # NEW: Argus-inspired complex models
 │   ├── README.md
+│   ├── Makefile
 │   ├── pyproject.toml
 │   ├── main.py
 │   ├── models.py
 │   └── seed.py
 └── migration-guide/                   # NEW: cqlengine → coodie migration
     ├── README.md
+    ├── Makefile
     ├── cqlengine_models.py
     ├── coodie_models.py
     ├── migrate.py
@@ -269,9 +288,10 @@ demos/
 |---|---|
 | 1.1 | Create `demos/` top-level directory with `README.md` index |
 | 1.2 | Move existing `demo/` to `demos/fastapi-catalog/`, update paths and README |
-| 1.3 | Add `seed.py` to `demos/fastapi-catalog/` with Faker-based product/review generation and `rich` progress output |
-| 1.4 | Ensure `--count N` and `--feed products.csv` flags work |
-| 1.5 | Verify the moved demo still runs end-to-end |
+| 1.3 | Add `Makefile` with `db-up`, `db-down`, `seed`, `run`, `clean` targets to `demos/fastapi-catalog/` |
+| 1.4 | Add `seed.py` to `demos/fastapi-catalog/` with Faker-based product/review generation and `rich` progress output |
+| 1.5 | Ensure `--count N` and `--feed products.csv` flags work |
+| 1.6 | Verify the moved demo still runs end-to-end via `make run` |
 
 ### Phase 2: Flask Blog Demo (Priority: High)
 
@@ -388,7 +408,7 @@ demos/
 |---|---|
 | 9.1 | Write `demos/README.md` with a table listing all demos, their focus area, and quick-start links |
 | 9.2 | Add a `docker-compose.yml` at `demos/` level for shared ScyllaDB instance |
-| 9.3 | Ensure every demo has consistent color theming, README structure, and seed.py interface |
+| 9.3 | Ensure every demo has consistent Makefile targets, color theming, README structure, and seed.py interface |
 | 9.4 | Update the top-level `README.md` to link to the new `demos/` directory |
 | 9.5 | Final review of all demos for consistency and correctness |
 
@@ -445,7 +465,47 @@ services:
     command: --smp 1 --memory 512M --developer-mode 1
 ```
 
-### 8.2 Seed Script Convention
+### 8.2 Makefile Convention
+
+Every demo includes a `Makefile` with standard targets so that `make run` is the
+only command a user needs to try the demo end-to-end:
+
+```makefile
+COMPOSE  := docker compose -f ../docker-compose.yml
+KEYSPACE := <demo_keyspace>
+
+.PHONY: db-up db-down seed run clean
+
+db-up:                          ## Start ScyllaDB and create keyspace
+	$(COMPOSE) up -d
+	@echo "Waiting for ScyllaDB to be ready..."
+	@until $(COMPOSE) exec scylladb nodetool status 2>/dev/null | grep -q "^UN"; do sleep 2; done
+	$(COMPOSE) exec scylladb cqlsh -e \
+	  "CREATE KEYSPACE IF NOT EXISTS $(KEYSPACE) \
+	   WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};"
+
+db-down:                        ## Stop ScyllaDB
+	$(COMPOSE) down
+
+seed: db-up                     ## Seed sample data (depends on db-up)
+	uv run python seed.py --count 50
+
+run: seed                       ## Install deps, seed, and start the app
+	uv run uvicorn main:app --reload
+
+clean: db-down                  ## Stop DB and remove data volumes
+	$(COMPOSE) down -v
+```
+
+**Rules:**
+- Targets reference the shared `demos/docker-compose.yml` via `../docker-compose.yml`
+- `db-up` waits for ScyllaDB to report `UN` (Up/Normal) before creating the keyspace
+- `seed` depends on `db-up` so it works standalone
+- `run` depends on `seed` so a single `make run` does everything
+- Demo-specific targets (e.g., `migrate`, `sync-tables`) may be added as needed
+- Django demos use `manage.py` commands in place of `uvicorn`
+
+### 8.3 Seed Script Convention
 
 Every `seed.py` follows a common pattern:
 
@@ -464,7 +524,7 @@ if __name__ == "__main__":
     seed()
 ```
 
-### 8.3 Color Theme Convention
+### 8.4 Color Theme Convention
 
 All demos with a web UI use a dark-theme palette consistent with the existing
 FastAPI demo:

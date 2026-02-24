@@ -9,7 +9,7 @@ from uuid import UUID, uuid1, uuid4
 
 from pydantic import Field, field_validator
 
-from coodie.fields import ClusteringKey, Indexed, PrimaryKey, SmallInt, TimeUUID
+from coodie.fields import BigInt, ClusteringKey, Indexed, PrimaryKey, TimeUUID
 from coodie.sync.document import Document
 
 
@@ -87,7 +87,7 @@ class CoodieArgusNotification(Document):
         default_factory=uuid1
     )
     type: str = ""
-    state: Annotated[int, SmallInt()] = 0
+    state: int = 0
     sender: Optional[UUID] = None
     source_type: str = ""
     source_id: Optional[UUID] = None
@@ -106,7 +106,7 @@ class CoodieArgusComment(Document):
     test_run_id: Annotated[Optional[UUID], Indexed()] = None
     user_id: Annotated[Optional[UUID], Indexed()] = None
     release_id: Annotated[Optional[UUID], Indexed()] = None
-    posted_at: Annotated[int, ClusteringKey(order="DESC")] = 0
+    posted_at: Annotated[int, BigInt(), ClusteringKey(order="DESC")] = 0
     message: str = ""
     mentions: List[UUID] = Field(default_factory=list)
     reactions: Dict[str, int] = Field(default_factory=dict)

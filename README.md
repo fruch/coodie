@@ -7,8 +7,8 @@
     <a href="https://github.com/fruch/coodie/actions/workflows/ci.yml">
       <img src="https://img.shields.io/github/actions/workflow/status/fruch/coodie/ci.yml?branch=main&label=CI&logo=github&style=flat-square" alt="CI Status">
     </a>
-    <a href="https://coodie.readthedocs.io">
-      <img src="https://img.shields.io/readthedocs/coodie.svg?logo=read-the-docs&logoColor=fff&style=flat-square" alt="Documentation Status">
+    <a href="https://fruch.github.io/coodie/">
+      <img src="https://img.shields.io/github/actions/workflow/status/fruch/coodie/docs.yml?branch=main&label=Docs&logo=github&style=flat-square" alt="Documentation Status">
     </a>
     <a href="https://codecov.io/gh/fruch/coodie">
       <img src="https://img.shields.io/codecov/c/github/fruch/coodie.svg?logo=codecov&logoColor=fff&style=flat-square" alt="Test coverage percentage">

@@ -16,6 +16,11 @@ guide/defining-documents
 guide/field-types
 guide/keys-and-indexes
 guide/crud
+guide/querying
+guide/filtering
+guide/collections
+guide/counters
+guide/ttl
 ```
 
 ```{toctree}

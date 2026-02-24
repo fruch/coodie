@@ -84,12 +84,7 @@ class AcsyllaDriver(AbstractDriver):
 
     @staticmethod
     def _rows_to_dicts(result: Any) -> list[dict[str, Any]]:
-        rows = list(result)
-        if not rows:
-            return []
-        if isinstance(rows[0], dict):
-            return rows
-        return [dict(r) for r in rows]
+        return [dict(row) for row in result]
 
     def _cql_to_statement(self, cql: str) -> Any:
         """Wrap a raw CQL string in an acsylla Statement for session.execute()."""

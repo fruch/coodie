@@ -440,17 +440,6 @@ def test_acsylla_driver_rows_to_dicts():
         assert result == [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
 
 
-def test_acsylla_driver_rows_to_dicts_zero_copy():
-    """When rows are already dicts, _rows_to_dicts skips per-row conversion."""
-    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
-        from coodie.drivers.acsylla import AcsyllaDriver
-
-        original = {"id": "1"}
-        rows = [original, {"id": "2"}]
-        result = AcsyllaDriver._rows_to_dicts(rows)
-        assert result[0] is original
-
-
 def test_acsylla_driver_rows_to_dicts_empty():
     with patch.dict("sys.modules", {"acsylla": MagicMock()}):
         from coodie.drivers.acsylla import AcsyllaDriver

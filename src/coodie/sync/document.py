@@ -307,7 +307,6 @@ class Document(BaseModel):
     model_config = {
         "arbitrary_types_allowed": True,
         "revalidate_instances": "never",
-        "extra": "forbid",
         "use_enum_values": True,
         "populate_by_name": True,
     }

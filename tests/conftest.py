@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import pytest
+
+
+async def _maybe_await(fn, *args, **kwargs):
+    """Call *fn* and ``await`` the result only when it is awaitable.
+
+    This allows the same test body to drive both sync and async variants.
+    """
+    result = fn(*args, **kwargs)
+    if inspect.isawaitable(result):
+        return await result
+    return result
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

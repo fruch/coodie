@@ -58,7 +58,7 @@ This provides:
 
 * **Historical trend charts** — viewable on the repository's GitHub Pages site
   under the `/benchmarks/scylla/` and `/benchmarks/acsylla/` paths.
-* **Regression alerts** — when a benchmark regresses beyond 150 % of its
+* **Regression alerts** — when a benchmark regresses beyond 150% of its
   previous value, an alert comment is posted on the commit or pull request.
 * **Workflow summary** — every CI run includes a benchmark summary in the
   GitHub Actions job summary.

@@ -193,8 +193,13 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
         networks = container_info.attrs["NetworkSettings"]["Networks"]
         container_ip = next(iter(networks.values()))["IPAddress"]
 
-        cluster = acsylla.create_cluster([container_ip], port=9042)
-        session = loop.run_until_complete(cluster.create_session(keyspace="bench_ks"))
+        # acsylla.create_cluster() requires a running event loop, so wrap
+        # all acsylla setup in a coroutine and execute it on our loop.
+        async def _setup_acsylla():
+            cluster = acsylla.create_cluster([container_ip], port=9042)
+            return await cluster.create_session(keyspace="bench_ks")
+
+        session = loop.run_until_complete(_setup_acsylla())
         driver = AcsyllaDriver(session=session, default_keyspace="bench_ks", loop=loop)
         register_driver("default", driver, default=True)
     else:

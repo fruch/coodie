@@ -40,6 +40,35 @@ pytest benchmarks/ --benchmark-enable --benchmark-compare=0001_baseline
 pytest benchmarks/ --benchmark-enable --benchmark-histogram=bench_results
 ```
 
+## Running with Different Drivers
+
+Use `--driver-type` to choose which driver coodie uses.  The **cqlengine** side
+always uses cassandra-driver / scylla-driver (it has no alternative backend).
+
+```bash
+# Default — coodie uses CassandraDriver backed by scylla-driver
+pytest benchmarks/ -v --benchmark-enable --driver-type=scylla
+
+# coodie uses CassandraDriver backed by cassandra-driver
+pytest benchmarks/ -v --benchmark-enable --driver-type=cassandra
+
+# coodie uses AcsyllaDriver (async-native, pip install acsylla)
+pytest benchmarks/ -v --benchmark-enable --driver-type=acsylla
+```
+
+To compare drivers, save a baseline from each and compare:
+
+```bash
+# Save scylla baseline
+pytest benchmarks/ --benchmark-enable --driver-type=scylla --benchmark-save=scylla
+
+# Save acsylla baseline
+pytest benchmarks/ --benchmark-enable --driver-type=acsylla --benchmark-save=acsylla
+
+# Compare
+pytest-benchmark compare 0001_scylla 0002_acsylla --group-by=group
+```
+
 ## Benchmark Files
 
 | File | What It Benchmarks |

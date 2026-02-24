@@ -52,6 +52,20 @@ uv run pytest benchmarks/ -v --benchmark-enable --benchmark-group-by=group
 uv run pytest benchmarks/bench_serialization.py -v --benchmark-enable
 ```
 
+### Running with Different Drivers
+
+Use `--driver-type` to choose which driver coodie uses for benchmarks.
+The **cqlengine** side always uses cassandra-driver / scylla-driver.
+
+```bash
+# Default — coodie uses CassandraDriver backed by scylla-driver
+uv run pytest benchmarks/ -v --benchmark-enable --driver-type=scylla
+
+# coodie uses AcsyllaDriver (async-native)
+uv pip install -e ".[acsylla]"
+uv run pytest benchmarks/ -v --benchmark-enable --driver-type=acsylla
+```
+
 ### Saving and Comparing Results
 
 ```bash

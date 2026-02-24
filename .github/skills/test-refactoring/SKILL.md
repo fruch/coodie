@@ -96,7 +96,7 @@ Look at the test file you want to refactor:
 | Roundtrip tests | Save value → read back → assert for N types | `@pytest.mark.parametrize("field,write_val,check", [...])` |
 | Error cases | Same function, different bad inputs, same exception | `@pytest.mark.parametrize("bad_input", [...])` |
 
-## Quick Reference: File Size Targets
+## Quick Reference: File Size Targets (coodie project)
 
 | File | Current | Target | Action |
 |------|---------|--------|--------|

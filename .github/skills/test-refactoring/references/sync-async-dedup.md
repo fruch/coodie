@@ -123,9 +123,9 @@ AsyncProduct = _make_product(AsyncDocument)
 
 ### Important: PEP 563 Caveat
 
-Do **not** use `from __future__ import annotations` in files that define Document subclasses inside functions. PEP 563 stores annotations as strings, and `get_type_hints()` cannot resolve them for classes defined in local scope, causing `build_schema()` to return empty columns.
+Do **not** use `from __future__ import annotations` in files that define Document subclasses inside functions. PEP 563 (active when `from __future__ import annotations` is used, default in Python < 3.14) stores annotations as strings, and `get_type_hints()` cannot resolve them for classes defined in local scope, causing coodie's `build_schema()` to return empty columns.
 
-Define model factories at module level, or ensure the file does not import `annotations` from `__future__`.
+Define model factories at module level, or ensure the file does not import `annotations` from `__future__`. This caveat may be resolved by PEP 649 (deferred evaluation, accepted for Python 3.14+).
 
 ---
 

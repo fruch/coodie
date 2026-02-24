@@ -198,9 +198,7 @@ class QuerySet:
             allow_filtering=self._allow_filtering_val,
             per_partition_limit=self._per_partition_limit_val,
         )
-        rows = self._get_driver().execute(
-            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
-        )
+        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
         if self._values_list_val is not None:
             vl_cols = self._values_list_val
             return [tuple(row.get(c) for c in vl_cols) for row in rows]
@@ -220,10 +218,7 @@ class QuerySet:
                 filtered = {k: v for k, v in coerced.items() if k in known}
                 result.append(target_cls(**filtered))
             return result
-        return [
-            self._doc_cls(**coerce_row_none_collections(self._doc_cls, row))
-            for row in rows
-        ]
+        return [self._doc_cls(**coerce_row_none_collections(self._doc_cls, row)) for row in rows]
 
     def paged_all(self) -> PagedResult:
         """Execute query returning a :class:`PagedResult` with documents and paging state."""
@@ -258,9 +253,7 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        rows = self._get_driver().execute(
-            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
-        )
+        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
         if rows:
             row = rows[0]
             return int(next(iter(row.values())))
@@ -274,9 +267,7 @@ class QuerySet:
             timestamp=self._timestamp_val,
             if_exists=self._if_exists_val,
         )
-        rows = self._get_driver().execute(
-            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
-        )
+        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
         if self._if_exists_val:
             return _parse_lwt_result(rows)
         return None

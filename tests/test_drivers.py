@@ -73,9 +73,7 @@ def test_mock_driver_execute_with_timeout(mock_driver):
 
 async def test_mock_driver_execute_async_with_consistency(mock_driver):
     mock_driver.set_return_rows([{"id": "1"}])
-    await mock_driver.execute_async(
-        "SELECT * FROM ks.t", [], consistency="LOCAL_QUORUM"
-    )
+    await mock_driver.execute_async("SELECT * FROM ks.t", [], consistency="LOCAL_QUORUM")
     assert mock_driver.last_consistency == "LOCAL_QUORUM"
 
 
@@ -203,24 +201,18 @@ def test_cassandra_driver_prepared_cache(cassandra_driver, mock_cassandra_sessio
     mock_cassandra_session.prepare.assert_called_once_with("SELECT * FROM test_ks.t")
 
 
-def test_cassandra_driver_execute_with_consistency(
-    cassandra_driver, mock_cassandra_session
-):
+def test_cassandra_driver_execute_with_consistency(cassandra_driver, mock_cassandra_session):
     from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
 
     mock_cassandra_session.execute.return_value = []
-    cassandra_driver.execute(
-        "SELECT * FROM test_ks.t", ["p1"], consistency="LOCAL_QUORUM"
-    )
+    cassandra_driver.execute("SELECT * FROM test_ks.t", ["p1"], consistency="LOCAL_QUORUM")
     prepared = mock_cassandra_session.prepare.return_value
     prepared.bind.assert_called_once_with(["p1"])
     bound = prepared.bind.return_value
     assert bound.consistency_level == ConsistencyLevel.LOCAL_QUORUM
 
 
-def test_cassandra_driver_execute_with_timeout(
-    cassandra_driver, mock_cassandra_session
-):
+def test_cassandra_driver_execute_with_timeout(cassandra_driver, mock_cassandra_session):
     mock_cassandra_session.execute.return_value = []
     cassandra_driver.execute("SELECT * FROM test_ks.t", [], timeout=5.0)
     # CassandraDriver always binds params first, then passes bound statement
@@ -275,9 +267,7 @@ def test_cassandra_driver_sync_table(cassandra_driver, mock_cassandra_session):
     assert '"name"' in str(calls[2])
 
 
-def test_cassandra_driver_sync_table_with_index(
-    cassandra_driver, mock_cassandra_session
-):
+def test_cassandra_driver_sync_table_with_index(cassandra_driver, mock_cassandra_session):
     from coodie.schema import ColumnDefinition
 
     cols = [
@@ -321,9 +311,7 @@ async def test_cassandra_driver_execute_async(cassandra_driver, mock_cassandra_s
     assert rows == [{"id": "1", "name": "Alice"}]
 
 
-async def test_cassandra_driver_sync_table_async(
-    cassandra_driver, mock_cassandra_session
-):
+async def test_cassandra_driver_sync_table_async(cassandra_driver, mock_cassandra_session):
     """sync_table_async delegates to sync_table via run_in_executor."""
     from coodie.schema import ColumnDefinition
 
@@ -378,9 +366,7 @@ def acsylla_driver(mock_acsylla_session):
 async def test_acsylla_driver_execute_async(acsylla_driver, mock_acsylla_session):
     rows = await acsylla_driver.execute_async("SELECT * FROM test_ks.t", ["p1"])
     assert rows == [{"id": "1", "name": "Alice"}]
-    mock_acsylla_session.create_prepared.assert_awaited_once_with(
-        "SELECT * FROM test_ks.t"
-    )
+    mock_acsylla_session.create_prepared.assert_awaited_once_with("SELECT * FROM test_ks.t")
 
 
 async def test_acsylla_driver_prepared_cache(acsylla_driver, mock_acsylla_session):
@@ -390,12 +376,8 @@ async def test_acsylla_driver_prepared_cache(acsylla_driver, mock_acsylla_sessio
     mock_acsylla_session.create_prepared.assert_awaited_once()
 
 
-async def test_acsylla_driver_execute_async_with_consistency(
-    acsylla_driver, mock_acsylla_session
-):
-    await acsylla_driver.execute_async(
-        "SELECT * FROM test_ks.t", [], consistency="LOCAL_QUORUM"
-    )
+async def test_acsylla_driver_execute_async_with_consistency(acsylla_driver, mock_acsylla_session):
+    await acsylla_driver.execute_async("SELECT * FROM test_ks.t", [], consistency="LOCAL_QUORUM")
     prepared = await mock_acsylla_session.create_prepared("SELECT * FROM test_ks.t")
     prepared.bind.assert_called_with([], consistency="LOCAL_QUORUM")
 
@@ -411,14 +393,10 @@ async def test_acsylla_driver_sync_table_async(acsylla_driver, mock_acsylla_sess
     # session.execute must return an iterable result for both DDL (no rows)
     # and the system_schema SELECT (column_name rows).
     introspection_result = MagicMock()
-    introspection_result.__iter__ = MagicMock(
-        return_value=iter([{"column_name": "id"}, {"column_name": "email"}])
-    )
+    introspection_result.__iter__ = MagicMock(return_value=iter([{"column_name": "id"}, {"column_name": "email"}]))
     ddl_result = MagicMock()
     ddl_result.__iter__ = MagicMock(return_value=iter([]))
-    mock_acsylla_session.execute = AsyncMock(
-        side_effect=[ddl_result, introspection_result, ddl_result]
-    )
+    mock_acsylla_session.execute = AsyncMock(side_effect=[ddl_result, introspection_result, ddl_result])
     await acsylla_driver.sync_table_async("users", "test_ks", cols)
     calls = mock_acsylla_session.execute.await_args_list
     # CREATE TABLE + introspection query + CREATE INDEX
@@ -439,9 +417,7 @@ def test_acsylla_driver_rows_to_dicts():
         assert result == [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
 
 
-async def test_acsylla_driver_execute_async_with_paging(
-    acsylla_driver, mock_acsylla_session
-):
+async def test_acsylla_driver_execute_async_with_paging(acsylla_driver, mock_acsylla_session):
     """AcsyllaDriver passes page_size to bind() and reads paging state from result."""
     mock_result = MagicMock()
     mock_result.__iter__ = MagicMock(return_value=iter([{"id": "1"}, {"id": "2"}]))
@@ -449,9 +425,7 @@ async def test_acsylla_driver_execute_async_with_paging(
     mock_result.page_state.return_value = b"next-page-token"
     mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
 
-    rows = await acsylla_driver.execute_async(
-        "SELECT * FROM test_ks.t", [], fetch_size=2
-    )
+    rows = await acsylla_driver.execute_async("SELECT * FROM test_ks.t", [], fetch_size=2)
     assert rows == [{"id": "1"}, {"id": "2"}]
     assert acsylla_driver._last_paging_state == b"next-page-token"
 
@@ -460,18 +434,14 @@ async def test_acsylla_driver_execute_async_with_paging(
     prepared.bind.assert_called_with([], page_size=2)
 
 
-async def test_acsylla_driver_execute_async_with_paging_state(
-    acsylla_driver, mock_acsylla_session
-):
+async def test_acsylla_driver_execute_async_with_paging_state(acsylla_driver, mock_acsylla_session):
     """AcsyllaDriver sets page_state on statement when paging_state is provided."""
     mock_result = MagicMock()
     mock_result.__iter__ = MagicMock(return_value=iter([{"id": "3"}]))
     mock_result.has_more_pages.return_value = False
     mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
 
-    rows = await acsylla_driver.execute_async(
-        "SELECT * FROM test_ks.t", [], fetch_size=2, paging_state=b"page-token"
-    )
+    rows = await acsylla_driver.execute_async("SELECT * FROM test_ks.t", [], fetch_size=2, paging_state=b"page-token")
     assert rows == [{"id": "3"}]
     assert acsylla_driver._last_paging_state is None
 

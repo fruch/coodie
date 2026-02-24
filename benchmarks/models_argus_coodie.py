@@ -20,9 +20,7 @@ class CoodieArgusUser(Document):
     username: Annotated[str, Indexed()] = ""
     full_name: str = ""
     email: Annotated[str, Indexed()] = ""
-    registration_date: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    registration_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     roles: List[str] = Field(default_factory=list)
     picture_id: Optional[UUID] = None
     api_token: Annotated[Optional[str], Indexed()] = None
@@ -83,9 +81,7 @@ class CoodieArgusNotification(Document):
     """Notification model — partition by receiver, TimeUUID clustering DESC."""
 
     receiver: Annotated[UUID, PrimaryKey()]
-    id: Annotated[UUID, TimeUUID(), ClusteringKey(order="DESC")] = Field(
-        default_factory=uuid1
-    )
+    id: Annotated[UUID, TimeUUID(), ClusteringKey(order="DESC")] = Field(default_factory=uuid1)
     type: str = ""
     state: int = 0
     sender: Optional[UUID] = None

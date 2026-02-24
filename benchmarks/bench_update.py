@@ -23,9 +23,7 @@ def _ensure_row(bench_env):
     from benchmarks.models_coodie import CoodieProduct
 
     _UPDATE_ID = uuid4()
-    CoodieProduct(
-        id=_UPDATE_ID, name="UpdateTarget", brand="UpdateBrand", price=1.0
-    ).save()
+    CoodieProduct(id=_UPDATE_ID, name="UpdateTarget", brand="UpdateBrand", price=1.0).save()
     _SETUP_DONE = True
 
 

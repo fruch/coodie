@@ -27,9 +27,7 @@ def test_coodie_single_insert(benchmark, bench_env):
     from benchmarks.models_coodie import CoodieProduct
 
     def _insert():
-        CoodieProduct(
-            id=uuid4(), name="BenchItem", brand="BenchBrand", price=9.99
-        ).save()
+        CoodieProduct(id=uuid4(), name="BenchItem", brand="BenchBrand", price=9.99).save()
 
     benchmark(_insert)
 
@@ -44,9 +42,7 @@ def test_cqlengine_insert_if_not_exists(benchmark, bench_env):
     from benchmarks.models_cqlengine import CqlProduct
 
     def _insert():
-        CqlProduct.if_not_exists().create(
-            id=uuid4(), name="BenchINE", brand="BenchBrand", price=1.0
-        )
+        CqlProduct.if_not_exists().create(id=uuid4(), name="BenchINE", brand="BenchBrand", price=1.0)
 
     benchmark(_insert)
 
@@ -56,9 +52,7 @@ def test_coodie_insert_if_not_exists(benchmark, bench_env):
     from benchmarks.models_coodie import CoodieProduct
 
     def _insert():
-        CoodieProduct(
-            id=uuid4(), name="BenchINE", brand="BenchBrand", price=1.0
-        ).insert()
+        CoodieProduct(id=uuid4(), name="BenchINE", brand="BenchBrand", price=1.0).insert()
 
     benchmark(_insert)
 
@@ -73,9 +67,7 @@ def test_cqlengine_insert_with_ttl(benchmark, bench_env):
     from benchmarks.models_cqlengine import CqlProduct
 
     def _insert():
-        CqlProduct.ttl(60).create(
-            id=uuid4(), name="BenchTTL", brand="BenchBrand", price=2.0
-        )
+        CqlProduct.ttl(60).create(id=uuid4(), name="BenchTTL", brand="BenchBrand", price=2.0)
 
     benchmark(_insert)
 
@@ -85,8 +77,6 @@ def test_coodie_insert_with_ttl(benchmark, bench_env):
     from benchmarks.models_coodie import CoodieProduct
 
     def _insert():
-        CoodieProduct(id=uuid4(), name="BenchTTL", brand="BenchBrand", price=2.0).save(
-            ttl=60
-        )
+        CoodieProduct(id=uuid4(), name="BenchTTL", brand="BenchBrand", price=2.0).save(ttl=60)
 
     benchmark(_insert)

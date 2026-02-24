@@ -14,10 +14,7 @@ def build_create_keyspace(
     if dc_replication_map is not None:
         strategy = "NetworkTopologyStrategy"
         dc_parts = ", ".join(f"'{dc}': '{rf}'" for dc, rf in dc_replication_map.items())
-        return (
-            f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
-            f"WITH replication = {{'class': '{strategy}', {dc_parts}}}"
-        )
+        return f"CREATE KEYSPACE IF NOT EXISTS {keyspace} WITH replication = {{'class': '{strategy}', {dc_parts}}}"
     return (
         f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
         f"WITH replication = {{'class': '{strategy}', "
@@ -56,9 +53,7 @@ def build_create_table(
         pk_str = "(" + ", ".join(f'"{c.name}"' for c in pk_cols) + ")"
 
     if ck_cols:
-        primary_key = (
-            f"PRIMARY KEY ({pk_str}, " + ", ".join(f'"{c.name}"' for c in ck_cols) + ")"
-        )
+        primary_key = f"PRIMARY KEY ({pk_str}, " + ", ".join(f'"{c.name}"' for c in ck_cols) + ")"
     else:
         primary_key = f"PRIMARY KEY ({pk_str})"
 
@@ -72,9 +67,7 @@ def build_create_table(
 
     with_parts: list[str] = []
     if clustering_order_parts:
-        with_parts.append(
-            "CLUSTERING ORDER BY (" + ", ".join(clustering_order_parts) + ")"
-        )
+        with_parts.append("CLUSTERING ORDER BY (" + ", ".join(clustering_order_parts) + ")")
     if table_options:
         for k, v in table_options.items():
             if isinstance(v, str):
@@ -95,9 +88,7 @@ def build_create_index(
     col: ColumnDefinition,
 ) -> str:
     index_name = col.index_name or f"{table}_{col.name}_idx"
-    return (
-        f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
-    )
+    return f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
 
 
 def build_drop_table(table: str, keyspace: str) -> str:
@@ -135,11 +126,7 @@ def build_create_materialized_view(
         pk_str = "(" + ", ".join(f'"{c}"' for c in primary_key_columns) + ")"
 
     if clustering_columns:
-        key_str = (
-            f"PRIMARY KEY ({pk_str}, "
-            + ", ".join(f'"{c}"' for c in clustering_columns)
-            + ")"
-        )
+        key_str = f"PRIMARY KEY ({pk_str}, " + ", ".join(f'"{c}"' for c in clustering_columns) + ")"
     else:
         key_str = f"PRIMARY KEY ({pk_str})"
 
@@ -401,9 +388,7 @@ def build_delete(
     timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else ""
-    cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace(
-        "DELETE  FROM", "DELETE FROM"
-    )
+    cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace("DELETE  FROM", "DELETE FROM")
     cql += _build_using_clause(timestamp=timestamp)
 
     clause, params = build_where_clause(where)

@@ -100,13 +100,7 @@ def test_len(registered_mock_driver):
 
 def test_chaining(registered_mock_driver):
     registered_mock_driver.set_return_rows([])
-    qs = (
-        QuerySet(Item)
-        .filter(rating__gte=3)
-        .limit(10)
-        .order_by("-rating")
-        .allow_filtering()
-    )
+    qs = QuerySet(Item).filter(rating__gte=3).limit(10).order_by("-rating").allow_filtering()
     qs.all()
     stmt, params = registered_mock_driver.executed[0]
     assert "LIMIT 10" in stmt
@@ -184,9 +178,7 @@ def test_if_not_exists_create(registered_mock_driver):
 
 
 def test_if_not_exists_create_not_applied(registered_mock_driver):
-    registered_mock_driver.set_return_rows(
-        [{"[applied]": False, "id": "existing-id", "name": "Old", "rating": 3}]
-    )
+    registered_mock_driver.set_return_rows([{"[applied]": False, "id": "existing-id", "name": "Old", "rating": 3}])
     result = QuerySet(Item).if_not_exists().create(id=uuid4(), name="Widget", rating=5)
     assert result is not None
     assert result.applied is False
@@ -239,9 +231,7 @@ def test_timeout_chain(registered_mock_driver):
 
 
 def test_using_chain(registered_mock_driver):
-    qs = QuerySet(Item).using(
-        ttl=60, timestamp=1234567890, consistency="ONE", timeout=10.0
-    )
+    qs = QuerySet(Item).using(ttl=60, timestamp=1234567890, consistency="ONE", timeout=10.0)
     assert qs._ttl_val == 60
     assert qs._timestamp_val == 1234567890
     assert qs._consistency_val == "ONE"
@@ -268,14 +258,7 @@ def test_timestamp_in_delete_cql(registered_mock_driver):
 
 def test_chaining_preserves_execution_options(registered_mock_driver):
     registered_mock_driver.set_return_rows([])
-    qs = (
-        QuerySet(Item)
-        .filter(rating__gte=3)
-        .consistency("LOCAL_QUORUM")
-        .timeout(5.0)
-        .timestamp(1234567890)
-        .limit(10)
-    )
+    qs = QuerySet(Item).filter(rating__gte=3).consistency("LOCAL_QUORUM").timeout(5.0).timestamp(1234567890).limit(10)
     qs.all()
     assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
     assert registered_mock_driver.last_timeout == 5.0

@@ -97,11 +97,7 @@ async def test_update_with_ttl(registered_mock_driver):
 
 
 async def test_update_with_if_conditions(registered_mock_driver):
-    await (
-        QuerySet(AsyncItem)
-        .filter(name="old")
-        .update(if_conditions={"rating": 5}, name="new")
-    )
+    await QuerySet(AsyncItem).filter(name="old").update(if_conditions={"rating": 5}, name="new")
     stmt, params = registered_mock_driver.executed[0]
     assert 'IF "rating" = ?' in stmt
     assert 5 in params
@@ -144,11 +140,7 @@ async def test_if_exists_returns_new_queryset(registered_mock_driver):
 
 async def test_if_not_exists_create(registered_mock_driver):
     registered_mock_driver.set_return_rows([{"[applied]": True}])
-    result = (
-        await QuerySet(AsyncItem)
-        .if_not_exists()
-        .create(id=uuid4(), name="Widget", rating=5)
-    )
+    result = await QuerySet(AsyncItem).if_not_exists().create(id=uuid4(), name="Widget", rating=5)
     stmt, _ = registered_mock_driver.executed[0]
     assert "INSERT INTO" in stmt
     assert "IF NOT EXISTS" in stmt
@@ -157,14 +149,8 @@ async def test_if_not_exists_create(registered_mock_driver):
 
 
 async def test_if_not_exists_create_not_applied(registered_mock_driver):
-    registered_mock_driver.set_return_rows(
-        [{"[applied]": False, "id": "existing-id", "name": "Old", "rating": 3}]
-    )
-    result = (
-        await QuerySet(AsyncItem)
-        .if_not_exists()
-        .create(id=uuid4(), name="Widget", rating=5)
-    )
+    registered_mock_driver.set_return_rows([{"[applied]": False, "id": "existing-id", "name": "Old", "rating": 3}])
+    result = await QuerySet(AsyncItem).if_not_exists().create(id=uuid4(), name="Widget", rating=5)
     assert result is not None
     assert result.applied is False
     assert result.existing is not None
@@ -216,9 +202,7 @@ def test_timeout_chain(registered_mock_driver):
 
 
 def test_using_chain(registered_mock_driver):
-    qs = QuerySet(AsyncItem).using(
-        ttl=60, timestamp=1234567890, consistency="ONE", timeout=10.0
-    )
+    qs = QuerySet(AsyncItem).using(ttl=60, timestamp=1234567890, consistency="ONE", timeout=10.0)
     assert qs._ttl_val == 60
     assert qs._timestamp_val == 1234567890
     assert qs._consistency_val == "ONE"

@@ -163,9 +163,7 @@ class Document(BaseModel):
         if batch is not None:
             batch.add(cql, params)
         else:
-            await self.__class__._get_driver().execute_async(
-                cql, params, consistency=consistency, timeout=timeout
-            )
+            await self.__class__._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
 
     async def insert(
         self,
@@ -192,9 +190,7 @@ class Document(BaseModel):
         if batch is not None:
             batch.add(cql, params)
         else:
-            await self.__class__._get_driver().execute_async(
-                cql, params, consistency=consistency, timeout=timeout
-            )
+            await self.__class__._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
 
     async def delete(
         self,
@@ -224,9 +220,7 @@ class Document(BaseModel):
             batch.add(cql, params)
             return None
 
-        rows = await self.__class__._get_driver().execute_async(
-            cql, params, consistency=consistency, timeout=timeout
-        )
+        rows = await self.__class__._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
         if if_exists:
             return _parse_lwt_result(rows)
         return None
@@ -299,9 +293,7 @@ class Document(BaseModel):
         """Return a single document or None."""
         results = await cls.find(**kwargs).limit(2).all()
         if len(results) > 1:
-            raise MultipleDocumentsFound(
-                f"Expected one {cls.__name__} but found multiple matching {kwargs}"
-            )
+            raise MultipleDocumentsFound(f"Expected one {cls.__name__} but found multiple matching {kwargs}")
         return results[0] if results else None
 
     @classmethod
@@ -329,10 +321,7 @@ class CounterDocument(Document):
         consistency: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        raise InvalidQueryError(
-            "Counter tables do not support save(). "
-            "Use increment() or decrement() instead."
-        )
+        raise InvalidQueryError("Counter tables do not support save(). Use increment() or decrement() instead.")
 
     async def insert(  # noqa: ARG002
         self,
@@ -341,10 +330,7 @@ class CounterDocument(Document):
         consistency: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        raise InvalidQueryError(
-            "Counter tables do not support insert(). "
-            "Use increment() or decrement() instead."
-        )
+        raise InvalidQueryError("Counter tables do not support insert(). Use increment() or decrement() instead.")
 
     async def _counter_update(self, deltas: dict[str, int]) -> None:
         """Execute a counter UPDATE with the given deltas."""
@@ -408,9 +394,7 @@ class MaterializedView(Document):
         settings = getattr(cls, "Settings", None)
         base = getattr(settings, "__base_table__", None) if settings else None
         if not base:
-            raise InvalidQueryError(
-                f"{cls.__name__}.Settings must define __base_table__"
-            )
+            raise InvalidQueryError(f"{cls.__name__}.Settings must define __base_table__")
         return base
 
     @classmethod
@@ -465,21 +449,13 @@ class MaterializedView(Document):
         await cls._get_driver().execute_async(cql, [])
 
     async def save(self, **kwargs: Any) -> None:  # type: ignore[override]
-        raise InvalidQueryError(
-            "Materialized views are read-only. Use the base table to write data."
-        )
+        raise InvalidQueryError("Materialized views are read-only. Use the base table to write data.")
 
     async def insert(self, **kwargs: Any) -> None:  # type: ignore[override]
-        raise InvalidQueryError(
-            "Materialized views are read-only. Use the base table to write data."
-        )
+        raise InvalidQueryError("Materialized views are read-only. Use the base table to write data.")
 
     async def delete(self, **kwargs: Any) -> LWTResult | None:  # type: ignore[override]
-        raise InvalidQueryError(
-            "Materialized views are read-only. Use the base table to write data."
-        )
+        raise InvalidQueryError("Materialized views are read-only. Use the base table to write data.")
 
     async def update(self, **kwargs: Any) -> LWTResult | None:  # type: ignore[override]
-        raise InvalidQueryError(
-            "Materialized views are read-only. Use the base table to write data."
-        )
+        raise InvalidQueryError("Materialized views are read-only. Use the base table to write data.")

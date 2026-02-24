@@ -77,10 +77,7 @@ def test_cqlengine_model_serialization(benchmark):
 
     def _serialize():
         # cqlengine serialisation path used during save
-        {
-            col.db_field_name: col.to_database(getattr(obj, col.column_name))
-            for col in obj._columns.values()
-        }
+        {col.db_field_name: col.to_database(getattr(obj, col.column_name)) for col in obj._columns.values()}
 
     benchmark(_serialize)
 

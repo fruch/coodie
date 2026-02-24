@@ -60,9 +60,7 @@ def test_base_find_no_discriminator_filter(registered_mock_driver):
 @pytest.mark.asyncio
 async def test_subclass_find_one_filters(registered_mock_driver):
     pid = uuid4()
-    registered_mock_driver.set_return_rows(
-        [{"id": pid, "name": "Whiskers", "pet_type": "cat", "cuteness": 9.5}]
-    )
+    registered_mock_driver.set_return_rows([{"id": pid, "name": "Whiskers", "pet_type": "cat", "cuteness": 9.5}])
     doc = await Cat.find_one(name="Whiskers")
     assert doc is not None
     assert isinstance(doc, Cat)
@@ -74,9 +72,7 @@ async def test_subclass_find_one_filters(registered_mock_driver):
 @pytest.mark.asyncio
 async def test_subclass_get_filters(registered_mock_driver):
     pid = uuid4()
-    registered_mock_driver.set_return_rows(
-        [{"id": pid, "name": "Buddy", "pet_type": "dog", "loudness": 8}]
-    )
+    registered_mock_driver.set_return_rows([{"id": pid, "name": "Buddy", "pet_type": "dog", "loudness": 8}])
     doc = await Dog.get(name="Buddy")
     assert isinstance(doc, Dog)
     stmt, params = registered_mock_driver.executed[0]
@@ -147,9 +143,7 @@ async def test_base_query_returns_correct_subclasses(registered_mock_driver):
 async def test_unknown_discriminator_falls_back_to_queried_class(
     registered_mock_driver,
 ):
-    registered_mock_driver.set_return_rows(
-        [{"id": uuid4(), "name": "Parrot", "pet_type": "bird"}]
-    )
+    registered_mock_driver.set_return_rows([{"id": uuid4(), "name": "Parrot", "pet_type": "bird"}])
     results = await Pet.find().all()
     assert len(results) == 1
     assert isinstance(results[0], Pet)
@@ -159,9 +153,7 @@ async def test_unknown_discriminator_falls_back_to_queried_class(
 @pytest.mark.asyncio
 async def test_subclass_query_returns_only_subclass(registered_mock_driver):
     pid = uuid4()
-    registered_mock_driver.set_return_rows(
-        [{"id": pid, "name": "Whiskers", "pet_type": "cat", "cuteness": 9.5}]
-    )
+    registered_mock_driver.set_return_rows([{"id": pid, "name": "Whiskers", "pet_type": "cat", "cuteness": 9.5}])
     results = await Cat.find().all()
     assert len(results) == 1
     assert isinstance(results[0], Cat)

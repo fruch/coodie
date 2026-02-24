@@ -59,10 +59,7 @@ def scylla_container():
 
     with (
         DockerContainer("scylladb/scylla:latest")
-        .with_command(
-            "--smp 1 --memory 512M --developer-mode 1 "
-            "--skip-wait-for-gossip-to-settle=0"
-        )
+        .with_command("--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0")
         .with_exposed_ports(9042) as container
     ):
         wait_for_logs(container, "Starting listening for CQL clients", timeout=120)
@@ -132,9 +129,7 @@ def cqlengine_connection(cql_session: Any):
         from cassandra.cqlengine import connection as cql_conn
         from cassandra.cqlengine.management import sync_table
     except ImportError:
-        pytest.skip(
-            "cqlengine not available (install cassandra-driver or scylla-driver)"
-        )
+        pytest.skip("cqlengine not available (install cassandra-driver or scylla-driver)")
 
     cql_conn.register_connection("bench", session=cql_session)
     cql_conn.set_default_connection("bench")
@@ -203,9 +198,7 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
         driver = AcsyllaDriver(session=session, default_keyspace="bench_ks", loop=loop)
         register_driver("default", driver, default=True)
     else:
-        driver = init_coodie(
-            session=cql_session, keyspace="bench_ks", driver_type=driver_type
-        )
+        driver = init_coodie(session=cql_session, keyspace="bench_ks", driver_type=driver_type)
 
     from benchmarks.models_coodie import CoodieProduct, CoodieReview, CoodieEvent
     from benchmarks.models_argus_coodie import (

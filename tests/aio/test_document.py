@@ -340,9 +340,7 @@ async def test_delete_with_consistency(registered_mock_driver):
 async def test_execute_raw(registered_mock_driver):
     from coodie.aio import execute_raw
 
-    registered_mock_driver.set_return_rows(
-        [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
-    )
+    registered_mock_driver.set_return_rows([{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}])
     rows = await execute_raw("SELECT * FROM test_ks.users")
     assert len(rows) == 2
     assert rows[0]["name"] == "Alice"
@@ -372,9 +370,7 @@ async def test_execute_raw_empty_result(registered_mock_driver):
 async def test_execute_raw_insert(registered_mock_driver):
     from coodie.aio import execute_raw
 
-    await execute_raw(
-        "INSERT INTO test_ks.users (id, name) VALUES (?, ?)", [1, "Alice"]
-    )
+    await execute_raw("INSERT INTO test_ks.users (id, name) VALUES (?, ?)", [1, "Alice"])
     stmt, params = registered_mock_driver.executed[0]
     assert "INSERT INTO" in stmt
     assert params == [1, "Alice"]
@@ -530,9 +526,7 @@ async def test_materialized_view_sync_view(registered_mock_driver):
     await AsyncProductsByBrand.sync_view()
     assert len(registered_mock_driver.executed) == 1
     stmt, params = registered_mock_driver.executed[0]
-    assert (
-        "CREATE MATERIALIZED VIEW IF NOT EXISTS test_ks.async_products_by_brand" in stmt
-    )
+    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS test_ks.async_products_by_brand" in stmt
     assert "AS SELECT * FROM test_ks.async_products" in stmt
     assert '"brand" IS NOT NULL' in stmt
     assert '"id" IS NOT NULL' in stmt
@@ -587,9 +581,7 @@ async def test_materialized_view_find(registered_mock_driver):
 async def test_materialized_view_find_one(registered_mock_driver):
     """12.3 – find_one() works on materialized views."""
     pid = uuid4()
-    registered_mock_driver.set_return_rows(
-        [{"brand": "Acme", "id": pid, "name": "Widget", "price": 9.99}]
-    )
+    registered_mock_driver.set_return_rows([{"brand": "Acme", "id": pid, "name": "Widget", "price": 9.99}])
     doc = await AsyncProductsByBrand.find_one(brand="Acme")
     assert isinstance(doc, AsyncProductsByBrand)
     assert doc.brand == "Acme"

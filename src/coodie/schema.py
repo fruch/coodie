@@ -51,10 +51,7 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         args = typing.get_args(annotation)
 
         # Check if it's ClassVar
-        if origin is typing.ClassVar or (
-            hasattr(typing, "ClassVar")
-            and str(annotation).startswith("typing.ClassVar")
-        ):
+        if origin is typing.ClassVar or (hasattr(typing, "ClassVar") and str(annotation).startswith("typing.ClassVar")):
             continue
 
         # Extract Annotated metadata
@@ -121,8 +118,7 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         if non_counter:
             names = ", ".join(c.name for c in non_counter)
             raise InvalidQueryError(
-                f"Counter tables can only have counter and primary key columns. "
-                f"Non-counter data columns found: {names}"
+                f"Counter tables can only have counter and primary key columns. Non-counter data columns found: {names}"
             )
 
     doc_cls.__schema__ = cols

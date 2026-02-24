@@ -38,61 +38,85 @@ The best way to send feedback [our issue page][gh-issues] on GitHub. If you are 
 
 Ready to contribute? Here's how to set yourself up for local development.
 
-1. Fork the repo on GitHub.
+### Prerequisites
 
-2. Clone your fork locally:
+- **Python 3.10+**
+- **[uv](https://github.com/astral-sh/uv)** (recommended) or pip
+- **Docker** (for integration tests)
 
-   ```shell
-   $ git clone git@github.com:your_name_here/coodie.git
-   ```
+### Quick Setup
 
-3. Install the project dependencies with [Poetry](https://python-poetry.org):
+```bash
+# Fork & clone
+git clone git@github.com:your_name_here/coodie.git
+cd coodie
 
-   ```shell
-   $ poetry install
-   ```
+# Install dependencies with uv (recommended)
+uv sync --all-extras
 
-4. Create a branch for local development:
+# Or with pip
+pip install -e ".[scylla]"
+pip install pytest pytest-cov pytest-asyncio pre-commit
 
-   ```shell
-   $ git checkout -b name-of-your-bugfix-or-feature
-   ```
+# Install pre-commit hooks
+uv run pre-commit install
 
-   Now you can make your changes locally.
+# Run unit tests (no database needed)
+uv run pytest tests/ -v
 
-5. When you're done making changes, check that your changes pass our tests:
+# Run linters
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
 
-   ```shell
-   $ poetry run pytest
-   ```
+# Or run all pre-commit hooks at once
+uv run pre-commit run --all-files
+```
 
-6. Linting is done through [pre-commit](https://pre-commit.com). Provided you have the tool installed globally, you can run them all as one-off:
+### Running Integration Tests
 
-   ```shell
-   $ pre-commit run -a
-   ```
+Integration tests need a running ScyllaDB instance. The test suite uses
+[testcontainers](https://github.com/testcontainers/testcontainers-python)
+to start one automatically:
 
-   Or better, install the hooks once and have them run automatically each time you commit:
+```bash
+# Run integration tests (starts ScyllaDB via Docker)
+uv run pytest tests/ -v -m integration
+```
 
-   ```shell
-   $ pre-commit install
-   ```
+### Creating a Branch
 
-7. Commit your changes and push your branch to GitHub:
+```bash
+git checkout -b name-of-your-bugfix-or-feature
+```
 
-   ```shell
-   $ git add .
-   $ git commit -m "feat(something): your detailed description of your changes"
-   $ git push origin name-of-your-bugfix-or-feature
-   ```
+Now you can make your changes locally.
 
-   Note: the commit message should follow [the conventional commits](https://www.conventionalcommits.org). We run [`commitlint` on CI](https://github.com/marketplace/actions/commit-linter) to validate it, and if you've installed pre-commit hooks at the previous step, the message will be checked at commit time.
+### Committing
 
-8. Submit a pull request through the GitHub website or using the GitHub CLI (if you have it installed):
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org):
 
-   ```shell
-   $ gh pr create --fill
-   ```
+```bash
+git add .
+git commit -m "feat(something): your detailed description of your changes"
+git push origin name-of-your-bugfix-or-feature
+```
+
+Examples:
+
+- `feat(aio): add TTL support to Document.save()`
+- `fix(cql_builder): escape column names with reserved words`
+- `docs: update quickstart guide`
+- `test(sync): add QuerySet chaining coverage`
+
+We run [`commitlint` on CI](https://github.com/marketplace/actions/commit-linter) to validate commit messages. If you've installed pre-commit hooks, the message will be checked at commit time.
+
+### Submitting a Pull Request
+
+Submit a pull request through the GitHub website or using the GitHub CLI:
+
+```bash
+gh pr create --fill
+```
 
 ## Pull Request Guidelines
 
@@ -106,8 +130,8 @@ We like to have the pull request open as soon as possible, that's a great place 
 
 To run a subset of tests:
 
-```shell
-$ pytest tests
+```bash
+uv run pytest tests/ -k "test_something" -v
 ```
 
 ## Making a new release

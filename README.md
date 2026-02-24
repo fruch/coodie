@@ -166,6 +166,7 @@ class Product(Document):
 ```python
 import asyncio
 from coodie import init_coodie
+# Product defined above — same field definitions, using coodie.aio.Document
 
 async def main():
     await init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")

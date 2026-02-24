@@ -1,39 +1,57 @@
 # Performance Improvement Plan for coodie
 
-> **Based on**: Benchmark CI run [#64603357715](https://github.com/fruch/coodie/actions/runs/22325833587/job/64603357715?pr=31#step:5:305)
-> **Date**: 2026-02-23
-> **Status**: Draft — priorities based on initial benchmark data
+> **Based on**: Benchmark CI run [#22353872673](https://github.com/fruch/coodie/actions/runs/22353872673) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22353872673/job/64694559794?pr=31#step:5:122)) and acsylla driver ([job](https://github.com/fruch/coodie/actions/runs/22353872673/job/64694559911?pr=31#step:5:122))
+> **Date**: 2026-02-24
+> **Status**: Updated with latest benchmark results and cross-driver comparison
 
 ---
 
-## 1. Benchmark Summary
+## 1. Benchmark Summary (scylla driver)
 
 ### 1.1 Where coodie is faster (Pydantic advantage)
 
 | Operation | coodie | cqlengine | Ratio | Notes |
 |-----------|--------|-----------|-------|-------|
-| Model instantiation | 1.94 µs | 11.6 µs | **0.17× (6× faster)** | Pydantic compiled validators |
-| Model serialization | 2.01 µs | 4.62 µs | **0.43× (2.3× faster)** | `model_dump()` vs cqlengine internals |
+| Model instantiation | 2.00 µs | 11.58 µs | **0.17× (5.8× faster)** | Pydantic compiled validators |
+| Model serialization | 2.01 µs | 4.60 µs | **0.44× (2.3× faster)** | `model_dump()` vs cqlengine internals |
+| Argus model instantiation (11 fields) | 18.2 µs | 33.4 µs | **0.55× (1.8× faster)** | Pydantic scales better with field count |
+| Batch INSERT 100 rows | 28.6 ms | 53.2 ms | **0.54× (1.9× faster)** | coodie batch CQL builder is more efficient |
 
 ### 1.2 Where coodie is slower (ORM overhead)
 
 | Operation | coodie | cqlengine | Ratio | Severity |
 |-----------|--------|-----------|-------|----------|
-| `sync_table` no-op | 4,199 µs | 233 µs | **18× slower** | 🔴 Critical |
-| Filter (secondary index) | 19.3 ms | 4.6 ms | **4.2× slower** | 🔴 Critical |
-| Partial UPDATE | 2,359 µs | 559 µs | **4.2× slower** | 🔴 Critical |
-| Filter + LIMIT | 3.23 ms | 1.22 ms | **2.7× slower** | 🟠 High |
-| GET by PK | 1,441 µs | 675 µs | **2.1× slower** | 🟠 High |
-| UPDATE IF condition (LWT) | 3.09 ms | 1.34 ms | **2.3× slower** | 🟠 High |
-| Collection read | 1,565 µs | 701 µs | **2.2× slower** | 🟠 High |
-| Collection roundtrip | 2.63 ms | 1.42 ms | **1.85× slower** | 🟡 Medium |
-| Bulk DELETE | 2.10 ms | 1.19 ms | **1.76× slower** | 🟡 Medium |
-| Single INSERT | 1,055 µs | 612 µs | **1.72× slower** | 🟡 Medium |
-| Single DELETE | 1.96 ms | 1.13 ms | **1.73× slower** | 🟡 Medium |
-| Collection write | 1,086 µs | 677 µs | **1.60× slower** | 🟡 Medium |
-| INSERT with TTL | 1,068 µs | 616 µs | **1.73× slower** | 🟡 Medium |
-| COUNT | 1.54 ms | 1.05 ms | **1.46× slower** | 🟢 Acceptable |
-| INSERT IF NOT EXISTS | 1.81 ms | 1.39 ms | **1.30× slower** | 🟢 Acceptable |
+| `sync_table` no-op | 3,827 µs | 224 µs | **17.1× slower** | 🔴 Critical |
+| `sync_table` create | 2,646 µs | 173 µs | **15.3× slower** | 🔴 Critical |
+| Filter (secondary index) | 18.1 ms | 4.5 ms | **4.0× slower** | 🔴 Critical |
+| Partial UPDATE | 2,203 µs | 508 µs | **4.3× slower** | 🔴 Critical |
+| Filter + LIMIT | 3.06 ms | 1.12 ms | **2.7× slower** | 🟠 High |
+| GET by PK | 1,382 µs | 651 µs | **2.1× slower** | 🟠 High |
+| Collection read | 1,405 µs | 654 µs | **2.1× slower** | 🟠 High |
+| UPDATE IF condition (LWT) | 3.34 ms | 1.64 ms | **2.0× slower** | 🟠 High |
+| Batch INSERT 10 rows | 3.38 ms | 1.67 ms | **2.0× slower** | 🟠 High |
+| Collection roundtrip | 2.46 ms | 1.30 ms | **1.89× slower** | 🟡 Medium |
+| Single DELETE | 1.97 ms | 1.04 ms | **1.89× slower** | 🟡 Medium |
+| Single INSERT | 1,025 µs | 589 µs | **1.74× slower** | 🟡 Medium |
+| Bulk DELETE | 2.01 ms | 1.17 ms | **1.72× slower** | 🟡 Medium |
+| INSERT with TTL | 1,016 µs | 621 µs | **1.64× slower** | 🟡 Medium |
+| Collection write | 1,015 µs | 627 µs | **1.62× slower** | 🟡 Medium |
+| COUNT | 1.49 ms | 1.02 ms | **1.47× slower** | 🟢 Acceptable |
+| INSERT IF NOT EXISTS | 2.20 ms | 1.69 ms | **1.30× slower** | 🟢 Acceptable |
+
+### 1.3 Argus-inspired real-world patterns (scylla driver)
+
+| Pattern | coodie | cqlengine | Ratio | Notes |
+|---------|--------|-----------|-------|-------|
+| Notification feed | 1.43 ms | 1.35 ms | **1.06×** | 🟢 Near parity |
+| Comment with collections | 779 µs | 751 µs | **1.04×** | 🟢 Near parity |
+| Batch events (10) | 3.56 ms | 3.04 ms | **1.17×** | 🟢 Acceptable |
+| Get-or-create user | 902 µs | 747 µs | **1.21×** | 🟢 Acceptable |
+| Latest N runs (clustering) | 1,188 µs | 928 µs | **1.28×** | 🟢 Acceptable |
+| Filter by partition key | 1.43 ms | 1.07 ms | **1.34×** | 🟢 Acceptable |
+| Multi-model lookup | 1.81 ms | 1.32 ms | **1.37×** | 🟡 Medium |
+| Status update (read-modify-save) | 1,752 µs | 836 µs | **2.10×** | 🟠 High |
+| List mutation + save | 1,647 µs | 758 µs | **2.17×** | 🟠 High |
 
 ---
 
@@ -529,17 +547,118 @@ self._doc_cls.model_validate(coerce_row_none_collections(self._doc_cls, row))
 
 ---
 
-## 9. Notes
+## 9. Driver Comparison: scylla-driver vs acsylla
 
-- coodie's Pydantic-based model system is **already 6× faster** than cqlengine for
+> **Run**: [#22353872673](https://github.com/fruch/coodie/actions/runs/22353872673) — same ScyllaDB container, same benchmark code, different coodie driver.
+> cqlengine always uses scylla-driver regardless of the `--driver-type` option.
+
+### 9.1 coodie performance by driver (Mean times)
+
+| Operation | scylla-driver | acsylla | Δ | Winner |
+|-----------|--------------|---------|---|--------|
+| **DDL / Schema** | | | | |
+| `sync_table` create | 2,646 µs | 1,345 µs | **−49%** | 🏆 acsylla |
+| `sync_table` no-op | 3,827 µs | 2,624 µs | **−31%** | 🏆 acsylla |
+| **Writes** | | | | |
+| Single INSERT | 1,025 µs | 1,109 µs | +8% | scylla |
+| INSERT with TTL | 1,016 µs | 1,113 µs | +10% | scylla |
+| INSERT IF NOT EXISTS | 2,200 µs | 1,616 µs | **−27%** | 🏆 acsylla |
+| Collection write | 1,015 µs | 1,101 µs | +8% | scylla |
+| **Reads** | | | | |
+| GET by PK | 1,382 µs | 1,373 µs | ~0% | tie |
+| Filter + LIMIT | 3,058 µs | 2,916 µs | −5% | acsylla |
+| Filter (secondary index) | 18,120 µs | 18,843 µs | +4% | scylla |
+| COUNT | 1,492 µs | 1,487 µs | ~0% | tie |
+| Collection read | 1,405 µs | 1,402 µs | ~0% | tie |
+| Collection roundtrip | 2,459 µs | 2,433 µs | ~0% | tie |
+| **Updates** | | | | |
+| Partial UPDATE | 2,203 µs | 2,253 µs | +2% | tie |
+| UPDATE IF condition (LWT) | 3,342 µs | 2,931 µs | **−12%** | 🏆 acsylla |
+| **Deletes** | | | | |
+| Single DELETE | 1,967 µs | 2,007 µs | +2% | tie |
+| Bulk DELETE | 2,010 µs | 2,187 µs | +9% | scylla |
+| **Batch** | | | | |
+| Batch INSERT 10 | 3,379 µs | 3,374 µs | ~0% | tie |
+| Batch INSERT 100 | 28,612 µs | 28,992 µs | ~0% | tie |
+| **Serialization (no DB)** | | | | |
+| Model instantiation | 2.00 µs | 2.03 µs | ~0% | tie |
+| Model serialization | 2.01 µs | 1.94 µs | ~0% | tie |
+
+### 9.2 Argus patterns by driver
+
+| Pattern | scylla-driver | acsylla | Δ | Winner |
+|---------|--------------|---------|---|--------|
+| Get-or-create user | 902 µs | 905 µs | ~0% | tie |
+| Filter by partition key | 1,429 µs | 1,418 µs | ~0% | tie |
+| Latest N runs (clustering) | 1,188 µs | 1,245 µs | +5% | scylla |
+| List mutation + save | 1,647 µs | 1,595 µs | −3% | acsylla |
+| Batch events (10) | 3,557 µs | 3,534 µs | ~0% | tie |
+| Notification feed | 1,433 µs | 1,393 µs | −3% | acsylla |
+| Status update | 1,752 µs | 1,665 µs | −5% | acsylla |
+| Comment with collections | 779 µs | 757 µs | −3% | acsylla |
+| Multi-model lookup | 1,813 µs | 1,819 µs | ~0% | tie |
+| Argus model instantiation | 18.2 µs | 18.3 µs | ~0% | tie |
+
+### 9.3 Key Findings
+
+1. **acsylla dominates DDL operations**: `sync_table` is 31–49% faster with acsylla.
+   This is likely because acsylla's C++ core handles the CQL round-trips more
+   efficiently than scylla-driver's Python-level protocol handling.
+
+2. **acsylla wins on LWT/conditional writes**: INSERT IF NOT EXISTS is 27% faster,
+   UPDATE IF is 12% faster. LWT operations involve extra coordinator round-trips
+   where acsylla's native event loop outperforms scylla-driver's thread-pool model.
+
+3. **scylla-driver is slightly faster for simple writes**: Single INSERT and INSERT
+   with TTL are 8-10% faster with scylla-driver. The prepared-statement caching
+   in scylla-driver's Python layer may avoid the async bridge overhead that acsylla
+   pays when called from sync code.
+
+4. **Read performance is identical**: GET by PK, COUNT, collection reads, and most
+   Argus patterns are within ±3% — well within noise. The read path is dominated
+   by coodie's ORM overhead (`_rows_to_dicts()`, Pydantic construction), not driver
+   overhead.
+
+5. **Serialization is driver-independent**: Model instantiation and serialization
+   benchmarks don't touch the database, confirming they measure pure Pydantic
+   performance.
+
+6. **For Argus-style real-world patterns**: acsylla shows a slight but consistent
+   advantage in multi-step operations (status update −5%, list mutation −3%,
+   notification feed −3%), likely due to lower per-operation overhead accumulating
+   across multiple CQL calls.
+
+### 9.4 Recommendations
+
+- **Default driver**: Keep scylla-driver as default — it has the best overall
+  ecosystem support, documentation, and debuggability.
+- **acsylla for DDL-heavy workloads**: Applications that frequently call `sync_table`
+  (e.g., multi-tenant schemas, dynamic table creation) should consider acsylla.
+- **acsylla for LWT-heavy workloads**: Applications using many conditional writes
+  (IF NOT EXISTS, IF condition) will see measurable improvement with acsylla.
+- **Future**: Once coodie implements `sync_table` caching (Phase 2, task 3.4), the
+  DDL advantage of acsylla will be reduced since the cache eliminates repeat calls.
+
+---
+
+## 10. Notes
+
+- coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for
   pure Python model construction. The overhead is in the ORM ↔ driver interface.
+- **New finding**: coodie's batch INSERT for 100 rows is **1.9× faster** than cqlengine,
+  likely because `build_batch()` constructs CQL more efficiently than cqlengine's
+  per-statement batch approach.
 - The biggest single improvement is task 3.4 (table cache) — it eliminates the
-  **18× overhead** on `sync_table` with minimal code change.
+  **17× overhead** on `sync_table` with minimal code change.
 - Tasks 3.1 and 3.7 together can significantly reduce read latency by eliminating
   unnecessary dict conversions.
-- The filter-secondary-index benchmark (4.2× slower) likely includes Pydantic model
+- The filter-secondary-index benchmark (4.0× slower) likely includes Pydantic model
   construction overhead for multiple rows — task 3.7 directly addresses this.
 - Tasks 7.1 (`__slots__`) and 7.5 (type hints cache) are low-risk, high-reward
   changes that can be done first as they require no API changes.
 - Beanie's `lazy_parse` and `projection_model` patterns are powerful but require
   API additions — schedule for Phase 3 after core performance is optimized.
+- **Argus patterns show coodie is close to parity**: 6 out of 9 DB-backed Argus
+  benchmarks are within 1.4× of cqlengine. Only write-heavy patterns (list mutation,
+  status update) show significant overhead, confirming the write-path optimization
+  priorities in Phases 1 and 3.

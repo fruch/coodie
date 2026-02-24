@@ -400,9 +400,10 @@ carry over to the new package.
 
 ## 6. Task 5 — Parametrize extended-type roundtrips
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 **Effort:** Low (depends on Task 4 completing first)
 **Target:** Eliminate 8 near-identical roundtrip methods per sync/async class
+**Result:** 474 → 403 lines (−15%). 11 individual methods → 2 parametrized + 1 separate. Test count unchanged (54).
 
 ### 6.1 Current repetition
 

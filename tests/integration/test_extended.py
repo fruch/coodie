@@ -293,76 +293,33 @@ class TestExtended:
         """sync_table for extended types should succeed."""
         await _maybe_await(ExtendedTypes.sync_table)
 
-    async def test_bigint_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """BigInt (bigint) column survives a save/load round-trip."""
+    @pytest.mark.parametrize(
+        "field_name, write_value",
+        [
+            pytest.param("big_val", 2**40, id="bigint"),
+            pytest.param("small_val", 32_000, id="smallint"),
+            pytest.param("tiny_val", 127, id="tinyint"),
+            pytest.param("var_val", 10**30, id="varint"),
+            pytest.param("dbl_val", 3.141592653589793, id="double"),
+            pytest.param("ascii_val", "hello", id="ascii"),
+        ],
+    )
+    async def test_extended_type_roundtrip(
+        self, coodie_driver, ExtendedTypes, driver_type, field_name, write_value
+    ) -> None:
+        """Extended scalar type column survives a save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
         await _maybe_await(ExtendedTypes.sync_table)
         rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, big_val=2**40).save)
+        await _maybe_await(ExtendedTypes(id=rid, **{field_name: write_value}).save)
         fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
         assert fetched is not None
-        assert fetched.big_val == 2**40
-        await _maybe_await(ExtendedTypes(id=rid).delete)
-
-    async def test_smallint_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """SmallInt (smallint) column survives a save/load round-trip."""
-        if driver_type == "acsylla":
-            pytest.skip("acsylla prepared binding does not support extended CQL types")
-        await _maybe_await(ExtendedTypes.sync_table)
-        rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, small_val=32000).save)
-        fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
-        assert fetched is not None
-        assert fetched.small_val == 32000
-        await _maybe_await(ExtendedTypes(id=rid).delete)
-
-    async def test_tinyint_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """TinyInt (tinyint) column survives a save/load round-trip."""
-        if driver_type == "acsylla":
-            pytest.skip("acsylla prepared binding does not support extended CQL types")
-        await _maybe_await(ExtendedTypes.sync_table)
-        rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, tiny_val=127).save)
-        fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
-        assert fetched is not None
-        assert fetched.tiny_val == 127
-        await _maybe_await(ExtendedTypes(id=rid).delete)
-
-    async def test_varint_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """VarInt (varint) column survives a save/load round-trip."""
-        if driver_type == "acsylla":
-            pytest.skip("acsylla prepared binding does not support extended CQL types")
-        await _maybe_await(ExtendedTypes.sync_table)
-        rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, var_val=10**30).save)
-        fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
-        assert fetched is not None
-        assert fetched.var_val == 10**30
-        await _maybe_await(ExtendedTypes(id=rid).delete)
-
-    async def test_double_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """Double (double) column survives a save/load round-trip."""
-        if driver_type == "acsylla":
-            pytest.skip("acsylla prepared binding does not support extended CQL types")
-        await _maybe_await(ExtendedTypes.sync_table)
-        rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, dbl_val=3.141592653589793).save)
-        fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
-        assert fetched is not None
-        assert abs(fetched.dbl_val - 3.141592653589793) < 1e-12
-        await _maybe_await(ExtendedTypes(id=rid).delete)
-
-    async def test_ascii_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """Ascii (ascii) column survives a save/load round-trip."""
-        if driver_type == "acsylla":
-            pytest.skip("acsylla prepared binding does not support extended CQL types")
-        await _maybe_await(ExtendedTypes.sync_table)
-        rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, ascii_val="hello").save)
-        fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
-        assert fetched is not None
-        assert fetched.ascii_val == "hello"
+        actual = getattr(fetched, field_name)
+        if isinstance(write_value, float):
+            assert abs(actual - write_value) < 1e-12
+        else:
+            assert actual == write_value
         await _maybe_await(ExtendedTypes(id=rid).delete)
 
     async def test_timeuuid_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
@@ -394,40 +351,26 @@ class TestExtended:
         assert fetched.time_val.second == 30
         await _maybe_await(ExtendedTypes(id=rid).delete)
 
-    async def test_frozen_list_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """frozen<list<text>> column survives a save/load round-trip."""
+    @pytest.mark.parametrize(
+        "field_name, write_value",
+        [
+            pytest.param("frozen_list", ["a", "b", "c"], id="frozen-list"),
+            pytest.param("frozen_set", {10, 20, 30}, id="frozen-set"),
+            pytest.param("frozen_map", {"x": 1, "y": 2}, id="frozen-map"),
+        ],
+    )
+    async def test_frozen_collection_roundtrip(
+        self, coodie_driver, ExtendedTypes, driver_type, field_name, write_value
+    ) -> None:
+        """Frozen collection column survives a save/load round-trip."""
         if driver_type == "acsylla":
             pytest.skip("acsylla prepared binding does not support extended CQL types")
         await _maybe_await(ExtendedTypes.sync_table)
         rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, frozen_list=["a", "b", "c"]).save)
+        await _maybe_await(ExtendedTypes(id=rid, **{field_name: write_value}).save)
         fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
         assert fetched is not None
-        assert fetched.frozen_list == ["a", "b", "c"]
-        await _maybe_await(ExtendedTypes(id=rid).delete)
-
-    async def test_frozen_set_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """frozen<set<int>> column survives a save/load round-trip."""
-        if driver_type == "acsylla":
-            pytest.skip("acsylla prepared binding does not support extended CQL types")
-        await _maybe_await(ExtendedTypes.sync_table)
-        rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, frozen_set={10, 20, 30}).save)
-        fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
-        assert fetched is not None
-        assert fetched.frozen_set == {10, 20, 30}
-        await _maybe_await(ExtendedTypes(id=rid).delete)
-
-    async def test_frozen_map_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:
-        """frozen<map<text, int>> column survives a save/load round-trip."""
-        if driver_type == "acsylla":
-            pytest.skip("acsylla prepared binding does not support extended CQL types")
-        await _maybe_await(ExtendedTypes.sync_table)
-        rid = uuid4()
-        await _maybe_await(ExtendedTypes(id=rid, frozen_map={"x": 1, "y": 2}).save)
-        fetched = await _maybe_await(ExtendedTypes.find_one, id=rid)
-        assert fetched is not None
-        assert fetched.frozen_map == {"x": 1, "y": 2}
+        assert getattr(fetched, field_name) == write_value
         await _maybe_await(ExtendedTypes(id=rid).delete)
 
     async def test_extended_types_all_fields_roundtrip(self, coodie_driver, ExtendedTypes, driver_type) -> None:

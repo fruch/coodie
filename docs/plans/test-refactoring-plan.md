@@ -28,14 +28,14 @@
 |------|-------|---------|
 | `tests/test_types.py` | 242 | ~15 one-liner type-mapping functions + ~7 coercion functions with identical structure |
 | `tests/test_cql_builder.py` | 706 | Repetitive filter-operator, collection-op, and USING-clause tests |
-| `tests/sync/test_document.py` | 699 | Mirrors `aio/test_document.py` — same tests, just sync |
-| `tests/aio/test_document.py` | 609 | Mirrors `sync/test_document.py` — same tests, just async |
-| `tests/sync/test_query.py` | 432 | Mirrors `aio/test_query.py` |
-| `tests/aio/test_query.py` | 408 | Mirrors `sync/test_query.py` |
-| `tests/sync/test_polymorphic.py` | 320 | Partially mirrors `aio/test_polymorphic.py` |
-| `tests/aio/test_polymorphic.py` | 183 | Subset of sync polymorphic tests |
+| ~~`tests/sync/test_document.py`~~ | ~~699~~ | ✅ Merged into `tests/test_document.py` (725 lines) |
+| ~~`tests/aio/test_document.py`~~ | ~~609~~ | ✅ Merged into `tests/test_document.py` |
+| ~~`tests/sync/test_query.py`~~ | ~~432~~ | ✅ Merged into `tests/test_query.py` (475 lines) |
+| ~~`tests/aio/test_query.py`~~ | ~~408~~ | ✅ Merged into `tests/test_query.py` |
+| ~~`tests/sync/test_polymorphic.py`~~ | ~~320~~ | ✅ Merged into `tests/test_polymorphic.py` (319 lines) |
+| ~~`tests/aio/test_polymorphic.py`~~ | ~~183~~ | ✅ Merged into `tests/test_polymorphic.py` |
 | `tests/test_integration.py` | 2,435 | Monolithic; every sync class has an async twin |
-| **Total** | **7,249** | |
+| **Total** | **~5,547** | |
 
 ---
 
@@ -236,9 +236,10 @@ def test_using_clause(builder, extra_kwargs, expected_fragment):
 
 ## 4. Task 3 — Merge sync/async unit tests
 
-**Status:** ❌ Not started
+**Status:** ✅ Done
 **Effort:** Medium
 **Target:** Eliminate `tests/sync/` and `tests/aio/` directories; move to unified test files
+**Result:** 8 files (2656 lines) → 5 files (1720 lines, −35%). Test count increased from 463 → 489.
 
 ### 4.1 Extract shared model definitions
 

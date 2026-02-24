@@ -10,6 +10,11 @@ async def _maybe_await(fn, *args, **kwargs):
     """Call *fn* and ``await`` the result only when it is awaitable.
 
     This allows the same test body to drive both sync and async variants.
+    The calling test must itself be ``async def`` so that ``await`` is valid::
+
+        async def test_save(Product, registered_mock_driver):
+            p = Product(name="Widget")
+            await _maybe_await(p.save)
     """
     result = fn(*args, **kwargs)
     if inspect.isawaitable(result):

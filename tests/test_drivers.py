@@ -301,6 +301,95 @@ def test_cassandra_driver_sync_table_with_index(cassandra_driver, mock_cassandra
     assert "CREATE INDEX" in str(calls[2])
 
 
+def test_cassandra_driver_sync_table_cache_skips_second_call(cassandra_driver, mock_cassandra_session):
+    """Second sync_table call for the same table is a no-op (cache hit)."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id")],  # system_schema
+    ]
+    cassandra_driver.sync_table("cached_table", "test_ks", cols)
+    first_call_count = mock_cassandra_session.execute.call_count
+
+    # Second call — should be a no-op due to _known_tables cache
+    cassandra_driver.sync_table("cached_table", "test_ks", cols)
+    assert mock_cassandra_session.execute.call_count == first_call_count
+
+
+def test_cassandra_driver_sync_table_cache_different_tables(cassandra_driver, mock_cassandra_session):
+    """Different tables are cached independently."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE t1
+        [SysRow(column_name="id")],  # system_schema t1
+        None,  # CREATE TABLE t2
+        [SysRow(column_name="id")],  # system_schema t2
+    ]
+    cassandra_driver.sync_table("t1", "test_ks", cols)
+    cassandra_driver.sync_table("t2", "test_ks", cols)
+    # Both should have been synced (4 execute calls: 2 per table)
+    assert mock_cassandra_session.execute.call_count == 4
+
+
+def test_cassandra_driver_sync_table_skips_alter_on_new_table(cassandra_driver, mock_cassandra_session):
+    """When existing columns match model columns, ALTER TABLE is skipped."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id"), SysRow(column_name="name")],  # system_schema — all cols present
+    ]
+    cassandra_driver.sync_table("new_table", "test_ks", cols)
+    calls = mock_cassandra_session.execute.call_args_list
+    # Only 2 calls: CREATE TABLE + system_schema introspection — no ALTER TABLE
+    assert len(calls) == 2
+    assert "ALTER TABLE" not in str(calls)
+
+
+def test_cassandra_driver_sync_table_cache_invalidates_on_new_columns(cassandra_driver, mock_cassandra_session):
+    """sync_table re-runs when called with additional columns (schema migration)."""
+    from coodie.schema import ColumnDefinition
+
+    cols_v1 = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    cols_v2 = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="label", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE (v1)
+        [SysRow(column_name="id")],  # system_schema (v1)
+        None,  # CREATE TABLE (v2)
+        [SysRow(column_name="id")],  # system_schema (v2) — "label" missing
+        None,  # ALTER TABLE ADD "label"
+    ]
+    cassandra_driver.sync_table("migrating", "test_ks", cols_v1)
+    first_count = mock_cassandra_session.execute.call_count
+
+    # Second call with new column — cache miss, full sync runs
+    cassandra_driver.sync_table("migrating", "test_ks", cols_v2)
+    assert mock_cassandra_session.execute.call_count > first_count
+    calls = mock_cassandra_session.execute.call_args_list
+    assert "ALTER TABLE" in str(calls[-1])
+
+
 def test_cassandra_driver_close(cassandra_driver, mock_cassandra_session):
     cassandra_driver.close()
     mock_cassandra_session.cluster.shutdown.assert_called_once()
@@ -424,6 +513,46 @@ async def test_acsylla_driver_sync_table_async(acsylla_driver, mock_acsylla_sess
     calls = mock_acsylla_session.execute.await_args_list
     # CREATE TABLE + introspection query + CREATE INDEX
     assert len(calls) >= 3
+
+
+async def test_acsylla_driver_sync_table_cache_skips_second_call(acsylla_driver, mock_acsylla_session):
+    """Second sync_table_async call for the same table is a no-op (cache hit)."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    introspection_result = MagicMock()
+    introspection_result.__iter__ = MagicMock(return_value=iter([{"column_name": "id"}]))
+    ddl_result = MagicMock()
+    ddl_result.__iter__ = MagicMock(return_value=iter([]))
+    mock_acsylla_session.execute = AsyncMock(side_effect=[ddl_result, introspection_result])
+    await acsylla_driver.sync_table_async("cached_table", "test_ks", cols)
+    first_call_count = mock_acsylla_session.execute.await_count
+
+    # Second call — should be a no-op due to _known_tables cache
+    await acsylla_driver.sync_table_async("cached_table", "test_ks", cols)
+    assert mock_acsylla_session.execute.await_count == first_call_count
+
+
+async def test_acsylla_driver_sync_table_skips_alter_on_new_table(acsylla_driver, mock_acsylla_session):
+    """When existing columns match model columns, ALTER TABLE is skipped."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    introspection_result = MagicMock()
+    introspection_result.__iter__ = MagicMock(return_value=iter([{"column_name": "id"}, {"column_name": "name"}]))
+    ddl_result = MagicMock()
+    ddl_result.__iter__ = MagicMock(return_value=iter([]))
+    mock_acsylla_session.execute = AsyncMock(side_effect=[ddl_result, introspection_result])
+    await acsylla_driver.sync_table_async("new_table", "test_ks", cols)
+    # Only 2 calls: CREATE TABLE + introspection (via execute_async) — no ALTER TABLE
+    # Note: introspection goes through execute_async which uses create_prepared + session.execute
+    # but the DDL call goes through session.execute directly
+    assert mock_acsylla_session.execute.await_count == 2
 
 
 async def test_acsylla_driver_close_async(acsylla_driver, mock_acsylla_session):

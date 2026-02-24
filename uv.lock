@@ -228,7 +228,6 @@ wheels = [
 
 [[package]]
 name = "coodie"
-version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
@@ -271,7 +270,7 @@ requires-dist = [
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=5.0,<6" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=1.0,<2" },
 ]
-provides-extras = ["scylla", "cassandra", "acsylla", "docs"]
+provides-extras = ["acsylla", "cassandra", "docs", "scylla"]
 
 [package.metadata.requires-dev]
 dev = [

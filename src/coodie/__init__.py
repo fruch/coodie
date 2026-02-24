@@ -1,4 +1,15 @@
-__version__ = "0.0.1"
+try:
+    from importlib.metadata import version, PackageNotFoundError
+
+    try:
+        __version__ = version("coodie")
+    except PackageNotFoundError:
+        try:
+            from coodie._version import __version__  # type: ignore[no-redef]
+        except ImportError:
+            __version__ = "unknown"
+except ImportError:
+    __version__ = "unknown"
 
 from coodie.aio import (
     Document,

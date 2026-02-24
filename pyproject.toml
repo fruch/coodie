@@ -1,6 +1,6 @@
 [project]
 name = "coodie"
-version = "0.0.1"
+dynamic = ["version"]
 description = "coodie = cassandra+beanie(hoodie)"
 authors = [
     { name = "Israel Fruchter", email = "fruch@scylladb.com" }
@@ -42,9 +42,18 @@ Repository = "https://github.com/fruch/coodie"
 "Bug Tracker" = "https://github.com/fruch/coodie/issues"
 Changelog = "https://github.com/fruch/coodie/blob/main/CHANGELOG.md"
 
+# NOTE: We'd prefer to use uv_build here, but it doesn't yet support dynamic
+# versioning from VCS. Switch back once uv_build gains this support:
+# https://github.com/astral-sh/uv/issues/14037
 [build-system]
-requires = ["uv_build>=0.9,<1"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27", "hatch-vcs>=0.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/coodie/_version.py"
 
 [dependency-groups]
 dev = [
@@ -59,9 +68,8 @@ dev = [
 
 [tool.semantic_release]
 branch = "main"
-version_toml = "pyproject.toml:project.version"
-version_variable = "src/coodie/__init__.py:__version__"
 build_command = "uv build"
+tag_format = "v{version}"
 
 [tool.pytest.ini_options]
 addopts = "-v -Wdefault --cov=coodie --cov-report=term-missing:skip-covered -m 'not integration'"

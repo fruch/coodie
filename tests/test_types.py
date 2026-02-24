@@ -168,3 +168,36 @@ def test_coerce_optional_collection():
     row: dict = {"tags": None}
     result = coerce_row_none_collections(_OptionalListDoc, row)
     assert result["tags"] == []
+
+
+# ---- _collection_fields caching tests ----
+
+
+def test_collection_fields_cached():
+    """_collection_fields should return the same object on repeated calls."""
+    from coodie.types import _collection_fields
+
+    result1 = _collection_fields(_FakeDoc)
+    result2 = _collection_fields(_FakeDoc)
+    assert result1 is result2
+
+
+def test_collection_fields_detects_collections():
+    """_collection_fields should identify all collection-typed fields."""
+    from coodie.types import _collection_fields
+
+    fields = _collection_fields(_FakeDoc)
+    assert "tags" in fields
+    assert "labels" in fields
+    assert "meta" in fields
+    assert "name" not in fields
+    assert "description" not in fields
+
+
+def test_coerce_skips_absent_keys():
+    """coerce_row_none_collections should not add keys absent from the row."""
+    row: dict = {"name": "test", "tags": None}
+    result = coerce_row_none_collections(_FakeDoc, row)
+    assert "labels" not in result
+    assert "meta" not in result
+    assert result["tags"] == []  # present key with None is still coerced

@@ -1,3 +1,4 @@
+import functools
 import typing
 from datetime import date, datetime, time as dt_time
 from decimal import Decimal
@@ -17,6 +18,7 @@ from coodie.fields import (
     TinyInt,
     VarInt,
 )
+from coodie.schema import _cached_type_hints
 
 _SCALAR_CQL_TYPES: dict[type, str] = {
     str: "text",
@@ -129,6 +131,20 @@ def _unwrap_annotation(annotation: Any) -> Any:
     return annotation
 
 
+@functools.lru_cache(maxsize=128)
+def _collection_fields(cls: type) -> dict[str, type]:
+    """Return ``{field_name: factory}`` for fields with collection types."""
+    hints = _cached_type_hints(cls)
+    result: dict[str, type] = {}
+    for name, ann in hints.items():
+        base = _unwrap_annotation(ann)
+        origin = typing.get_origin(base) or base
+        factory = _COLLECTION_ORIGINS.get(origin)  # type: ignore[arg-type]
+        if factory is not None:
+            result[name] = factory
+    return result
+
+
 def coerce_row_none_collections(doc_cls: type, row: dict[str, Any]) -> dict[str, Any]:
     """Replace ``None`` values for collection-typed fields with empty collections.
 
@@ -136,21 +152,9 @@ def coerce_row_none_collections(doc_cls: type, row: dict[str, Any]) -> dict[str,
     Pydantic rejects ``None`` for non-optional collection fields, so we coerce
     them to the appropriate empty container *before* constructing the model.
     """
-    try:
-        hints = typing.get_type_hints(doc_cls, include_extras=True)
-    except Exception:
-        hints = getattr(doc_cls, "__annotations__", {})
-
-    for key, value in row.items():
-        if value is not None:
-            continue
-        annotation = hints.get(key)
-        if annotation is None:
-            continue
-        base = _unwrap_annotation(annotation)
-        origin = typing.get_origin(base) or base
-        factory = _COLLECTION_ORIGINS.get(origin)  # type: ignore[arg-type]
-        if factory is not None:
+    coll_fields = _collection_fields(doc_cls)
+    for key, factory in coll_fields.items():
+        if key in row and row[key] is None:
             row[key] = factory()
 
     return row

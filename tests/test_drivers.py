@@ -242,6 +242,22 @@ def test_cassandra_driver_rows_to_dicts_dict_fallback():
     assert result == [{"id": "3", "name": "Carol"}]
 
 
+def test_cassandra_driver_rows_to_dicts_dict_zero_copy():
+    """When rows are already dicts, _rows_to_dicts skips per-row conversion."""
+    from coodie.drivers.cassandra import CassandraDriver
+
+    original = {"id": "1", "name": "Alice"}
+    rows = [original, {"id": "2", "name": "Bob"}]
+    result = CassandraDriver._rows_to_dicts(rows)
+    assert result[0] is original  # same dict objects, no dict() wrapping
+
+
+def test_cassandra_driver_rows_to_dicts_empty_iterable():
+    from coodie.drivers.cassandra import CassandraDriver
+
+    assert CassandraDriver._rows_to_dicts([]) == []
+
+
 def test_cassandra_driver_sync_table(cassandra_driver, mock_cassandra_session):
     from coodie.schema import ColumnDefinition
 
@@ -288,6 +304,13 @@ def test_cassandra_driver_sync_table_with_index(cassandra_driver, mock_cassandra
 def test_cassandra_driver_close(cassandra_driver, mock_cassandra_session):
     cassandra_driver.close()
     mock_cassandra_session.cluster.shutdown.assert_called_once()
+
+
+def test_cassandra_driver_has_slots():
+    from coodie.drivers.cassandra import CassandraDriver
+
+    assert hasattr(CassandraDriver, "__slots__")
+    assert "_session" in CassandraDriver.__slots__
 
 
 async def test_cassandra_driver_execute_async(cassandra_driver, mock_cassandra_session):
@@ -415,6 +438,24 @@ def test_acsylla_driver_rows_to_dicts():
         rows = [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
         result = AcsyllaDriver._rows_to_dicts(rows)
         assert result == [{"id": "1", "name": "Alice"}, {"id": "2", "name": "Bob"}]
+
+
+def test_acsylla_driver_rows_to_dicts_zero_copy():
+    """When rows are already dicts, _rows_to_dicts skips per-row conversion."""
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        from coodie.drivers.acsylla import AcsyllaDriver
+
+        original = {"id": "1"}
+        rows = [original, {"id": "2"}]
+        result = AcsyllaDriver._rows_to_dicts(rows)
+        assert result[0] is original
+
+
+def test_acsylla_driver_rows_to_dicts_empty():
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        from coodie.drivers.acsylla import AcsyllaDriver
+
+        assert AcsyllaDriver._rows_to_dicts([]) == []
 
 
 async def test_acsylla_driver_execute_async_with_paging(acsylla_driver, mock_acsylla_session):

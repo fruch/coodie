@@ -171,3 +171,41 @@ def test_counter_table_valid_schema():
 def test_counter_table_mixed_columns_raises():
     with pytest.raises(InvalidQueryError, match="Non-counter data columns found"):
         build_schema(InvalidCounterDoc)
+
+
+# ---- Phase 1: Performance optimization tests ----
+
+
+def test_cached_type_hints_returns_same_object():
+    """_cached_type_hints should return the same object on repeated calls."""
+    from coodie.schema import _cached_type_hints
+
+    hints1 = _cached_type_hints(SimpleDoc)
+    hints2 = _cached_type_hints(SimpleDoc)
+    assert hints1 is hints2
+
+
+def test_find_discriminator_column_cached():
+    """_find_discriminator_column is cached via @lru_cache."""
+    from coodie.schema import _find_discriminator_column
+
+    result1 = _find_discriminator_column(SimpleDoc)
+    result2 = _find_discriminator_column(SimpleDoc)
+    assert result1 == result2
+    assert result1 is None
+
+
+def test_get_discriminator_value_cached():
+    """_get_discriminator_value is cached via @lru_cache."""
+    from coodie.schema import _get_discriminator_value
+
+    result1 = _get_discriminator_value(SimpleDoc)
+    result2 = _get_discriminator_value(SimpleDoc)
+    assert result1 == result2
+    assert result1 is None
+
+
+def test_column_definition_has_slots():
+    """ColumnDefinition should use __slots__ via @dataclass(slots=True)."""
+    col = ColumnDefinition(name="x", cql_type="text")
+    assert not hasattr(col, "__dict__")

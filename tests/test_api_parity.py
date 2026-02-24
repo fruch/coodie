@@ -43,3 +43,28 @@ def test_materialized_view_public_method_parity():
         f"sync-only: {sync_methods - async_methods}\n"
         f"async-only: {async_methods - sync_methods}"
     )
+
+
+def test_document_model_config_parity():
+    """Both sync and async Document must share the same model_config."""
+    assert sync_doc.Document.model_config == aio_doc.Document.model_config
+
+
+def test_document_model_config_has_performance_settings():
+    """Document model_config should include performance-tuned settings."""
+    config = sync_doc.Document.model_config
+    assert config["revalidate_instances"] == "never"
+    assert config["extra"] == "forbid"
+    assert config["use_enum_values"] is True
+    assert config["populate_by_name"] is True
+
+
+def test_queryset_has_slots():
+    """Both sync and async QuerySet should use __slots__."""
+    from coodie.sync.query import QuerySet as SyncQS
+    from coodie.aio.query import QuerySet as AsyncQS
+
+    assert hasattr(SyncQS, "__slots__")
+    assert hasattr(AsyncQS, "__slots__")
+    assert "_doc_cls" in SyncQS.__slots__
+    assert "_doc_cls" in AsyncQS.__slots__

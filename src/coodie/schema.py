@@ -1,11 +1,24 @@
 from __future__ import annotations
 
+import functools
 import typing
 from dataclasses import dataclass
 from typing import Any, get_type_hints
 
 
-@dataclass
+@functools.lru_cache(maxsize=128)
+def _cached_type_hints(cls: type) -> dict[str, Any]:
+    """Return ``get_type_hints(cls, include_extras=True)`` with caching.
+
+    Type hints never change at runtime, so the result can be cached per class.
+    """
+    try:
+        return get_type_hints(cls, include_extras=True)
+    except Exception:
+        return getattr(cls, "__annotations__", {})
+
+
+@dataclass(slots=True)
 class ColumnDefinition:
     name: str
     cql_type: str
@@ -33,10 +46,7 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
     from coodie.types import python_type_to_cql_type_str
     from coodie.exceptions import InvalidQueryError
 
-    try:
-        hints = get_type_hints(doc_cls, include_extras=True)
-    except Exception:
-        hints = doc_cls.__annotations__
+    hints = _cached_type_hints(doc_cls)
 
     cols: list[ColumnDefinition] = []
 
@@ -130,14 +140,12 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
 # ------------------------------------------------------------------
 
 
+@functools.lru_cache(maxsize=128)
 def _find_discriminator_column(doc_cls: type) -> str | None:
     """Return the name of the discriminator column, or ``None``."""
     from coodie.fields import Discriminator
 
-    try:
-        hints = get_type_hints(doc_cls, include_extras=True)
-    except Exception:
-        hints = getattr(doc_cls, "__annotations__", {})
+    hints = _cached_type_hints(doc_cls)
 
     for field_name, annotation in hints.items():
         if field_name.startswith("_") or field_name == "Settings":
@@ -151,6 +159,7 @@ def _find_discriminator_column(doc_cls: type) -> str | None:
     return None
 
 
+@functools.lru_cache(maxsize=128)
 def _get_discriminator_value(doc_cls: type) -> str | None:
     """Return ``__discriminator_value__`` from *Settings*, or ``None``."""
     settings = getattr(doc_cls, "Settings", None)

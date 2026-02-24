@@ -18,6 +18,7 @@ from coodie.schema import (
     _build_subclass_map,
 )
 from coodie.types import coerce_row_none_collections
+from coodie.drivers import get_driver as _get_driver_impl
 
 if TYPE_CHECKING:
     from coodie.sync.document import Document
@@ -25,6 +26,26 @@ if TYPE_CHECKING:
 
 class QuerySet:
     """Synchronous chainable query builder."""
+
+    __slots__ = (
+        "_doc_cls",
+        "_where",
+        "_limit_val",
+        "_order_by_val",
+        "_allow_filtering_val",
+        "_if_not_exists_val",
+        "_if_exists_val",
+        "_ttl_val",
+        "_timestamp_val",
+        "_consistency_val",
+        "_timeout_val",
+        "_only_val",
+        "_defer_val",
+        "_values_list_val",
+        "_per_partition_limit_val",
+        "_fetch_size_val",
+        "_paging_state_val",
+    )
 
     def __init__(
         self,
@@ -168,9 +189,7 @@ class QuerySet:
     # ------------------------------------------------------------------
 
     def _get_driver(self) -> Any:
-        from coodie.drivers import get_driver
-
-        return get_driver()
+        return _get_driver_impl()
 
     def _table(self) -> str:
         return self._doc_cls._get_table()
@@ -216,9 +235,9 @@ class QuerySet:
                 coerced = coerce_row_none_collections(target_cls, row)
                 known = target_cls.model_fields
                 filtered = {k: v for k, v in coerced.items() if k in known}
-                result.append(target_cls(**filtered))
+                result.append(target_cls.model_validate(filtered))
             return result
-        return [self._doc_cls(**coerce_row_none_collections(self._doc_cls, row)) for row in rows]
+        return [self._doc_cls.model_validate(coerce_row_none_collections(self._doc_cls, row)) for row in rows]
 
     def paged_all(self) -> PagedResult:
         """Execute query returning a :class:`PagedResult` with documents and paging state."""

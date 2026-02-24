@@ -54,6 +54,8 @@ class AcsyllaDriver(AbstractDriver):
     (scripts, CLI tools, Django/Flask views).
     """
 
+    __slots__ = ("_acsylla", "_session", "_default_keyspace", "_prepared", "_loop", "_last_paging_state")
+
     def __init__(
         self,
         session: Any,
@@ -82,10 +84,12 @@ class AcsyllaDriver(AbstractDriver):
 
     @staticmethod
     def _rows_to_dicts(result: Any) -> list[dict[str, Any]]:
-        rows = []
-        for row in result:
-            rows.append(dict(row))
-        return rows
+        rows = list(result)
+        if not rows:
+            return []
+        if isinstance(rows[0], dict):
+            return rows
+        return [dict(r) for r in rows]
 
     def _cql_to_statement(self, cql: str) -> Any:
         """Wrap a raw CQL string in an acsylla Statement for session.execute()."""

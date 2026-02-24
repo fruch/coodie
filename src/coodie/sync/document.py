@@ -304,7 +304,13 @@ class Document(BaseModel):
             raise DocumentNotFound(f"No {cls.__name__} found matching {kwargs}")
         return result
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "revalidate_instances": "never",
+        "extra": "forbid",
+        "use_enum_values": True,
+        "populate_by_name": True,
+    }
 
 
 class CounterDocument(Document):

@@ -470,5 +470,3 @@ class TestExtended:
         assert fetched.frozen_map == {"k": 99}
 
         await _maybe_await(ExtendedTypes(id=rid).delete)
-
-        await _maybe_await(ExtendedTypes(id=rid).delete)

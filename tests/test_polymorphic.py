@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import Field
 
-from coodie.fields import Discriminator, PrimaryKey
+from coodie.fields import PrimaryKey
 from tests.conftest import _maybe_await
 from tests.models import make_pet_hierarchy, make_vehicle_hierarchy
 

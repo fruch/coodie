@@ -312,7 +312,14 @@ async def test_timestamp_in_delete_cql(Item, queryset_cls, registered_mock_drive
 
 async def test_chaining_preserves_execution_options(Item, queryset_cls, registered_mock_driver):
     registered_mock_driver.set_return_rows([])
-    qs = queryset_cls(Item).filter(rating__gte=3).consistency("LOCAL_QUORUM").timeout(5.0).timestamp(1234567890).limit(10)
+    qs = (
+        queryset_cls(Item)
+        .filter(rating__gte=3)
+        .consistency("LOCAL_QUORUM")
+        .timeout(5.0)
+        .timestamp(1234567890)
+        .limit(10)
+    )
     await _maybe_await(qs.all)
     assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
     assert registered_mock_driver.last_timeout == 5.0

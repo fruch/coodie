@@ -17,11 +17,19 @@ of ``--driver-type`` (cqlengine has no acsylla backend).
 from __future__ import annotations
 
 import asyncio
-import time
+import sys
+import os
 from typing import Any
 from uuid import uuid4
 
 import pytest
+
+# Ensure the project root is on sys.path so ``tests.conftest_scylla`` is
+# importable even when benchmarks are collected standalone.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from tests.conftest_scylla import create_acsylla_session, create_cql_session  # noqa: E402, F401
+from tests.conftest_scylla import scylla_container  # noqa: E402, F401
 
 
 # ---------------------------------------------------------------------------
@@ -44,74 +52,14 @@ def driver_type(request: pytest.FixtureRequest) -> str:
 
 
 # ---------------------------------------------------------------------------
-# ScyllaDB container (session-scoped)
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def scylla_container():
-    """Start a ScyllaDB container once for the entire benchmark session."""
-    try:
-        from testcontainers.core.container import DockerContainer
-        from testcontainers.core.waiting_utils import wait_for_logs
-    except ImportError:
-        pytest.skip("testcontainers not installed")
-
-    with (
-        DockerContainer("scylladb/scylla:latest")
-        .with_command("--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0")
-        .with_exposed_ports(9042) as container
-    ):
-        wait_for_logs(container, "Starting listening for CQL clients", timeout=120)
-        yield container
-
-
-# ---------------------------------------------------------------------------
-# Address translator for Docker networking
-# ---------------------------------------------------------------------------
-
-
-class _LocalhostTranslator:
-    """Translate container-internal IPs back to 127.0.0.1."""
-
-    def translate(self, addr: str) -> str:
-        return "127.0.0.1"
-
-
-# ---------------------------------------------------------------------------
 # Raw cassandra-driver session (used by cqlengine and coodie when not acsylla)
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
-def cql_session(scylla_container: Any):
-    """Return a cassandra-driver ``Session`` connected to the test keyspace."""
-    try:
-        from cassandra.cluster import Cluster, NoHostAvailable
-    except ImportError:
-        pytest.skip("cassandra-driver / scylla-driver not installed")
-
-    port = int(scylla_container.get_exposed_port(9042))
-    cluster = Cluster(
-        ["127.0.0.1"],
-        port=port,
-        connect_timeout=10,
-        address_translator=_LocalhostTranslator(),
-    )
-
-    for attempt in range(10):
-        try:
-            session = cluster.connect()
-            break
-        except NoHostAvailable:
-            if attempt == 9:
-                raise
-            time.sleep(2)
-
-    session.execute(
-        "CREATE KEYSPACE IF NOT EXISTS bench_ks "
-        "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}"
-    )
+def cql_session(scylla_container: Any):  # noqa: F811
+    """Return a cassandra-driver ``Session`` connected to the bench keyspace."""
+    session, cluster = create_cql_session(scylla_container, "bench_ks")
     session.set_keyspace("bench_ks")
     yield session
     cluster.shutdown()
@@ -161,7 +109,7 @@ def cqlengine_connection(cql_session: Any):
 
 
 @pytest.fixture(scope="session")
-def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str):
+def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str):  # noqa: F811
     """Register a coodie driver — backend chosen by ``--driver-type``.
 
     * ``scylla`` / ``cassandra`` — CassandraDriver sharing the cql_session
@@ -173,28 +121,14 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
 
     if driver_type == "acsylla":
         try:
-            import acsylla
+            import acsylla  # type: ignore[import-untyped] # noqa: F401
         except ImportError:
             pytest.skip("acsylla is not installed")
 
         from coodie.drivers.acsylla import AcsyllaDriver
 
         loop = asyncio.new_event_loop()
-
-        # acsylla has no address translator — connect via the container's
-        # internal Docker IP on the native CQL port.
-        container_info = scylla_container.get_wrapped_container()
-        container_info.reload()
-        networks = container_info.attrs["NetworkSettings"]["Networks"]
-        container_ip = next(iter(networks.values()))["IPAddress"]
-
-        # acsylla.create_cluster() requires a running event loop, so wrap
-        # all acsylla setup in a coroutine and execute it on our loop.
-        async def _setup_acsylla():
-            cluster = acsylla.create_cluster([container_ip], port=9042)
-            return await cluster.create_session(keyspace="bench_ks")
-
-        session = loop.run_until_complete(_setup_acsylla())
+        session = loop.run_until_complete(create_acsylla_session(scylla_container, "bench_ks"))
         driver = AcsyllaDriver(session=session, default_keyspace="bench_ks", loop=loop)
         register_driver("default", driver, default=True)
     else:

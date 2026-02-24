@@ -29,6 +29,14 @@ guide/exceptions
 ```
 
 ```{toctree}
+:caption: Migration
+:maxdepth: 2
+
+migration/from-cqlengine
+migration/argus-example
+```
+
+```{toctree}
 :caption: Reference
 :maxdepth: 2
 

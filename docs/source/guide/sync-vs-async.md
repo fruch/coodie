@@ -137,7 +137,7 @@ Both APIs share these modules — no separate sync/async versions needed:
 
 | Module | Purpose |
 |--------|---------|
-| `coodie.fields` | `PrimaryKey`, `ClusteringKey`, `Counter`, `Frozen`, `SecondaryIndex` |
+| `coodie.fields` | `PrimaryKey`, `ClusteringKey`, `Counter`, `Frozen`, `Indexed` |
 | `coodie.types` | Custom CQL type mappings |
 | `coodie.schema` | Schema introspection (`build_schema`) |
 | `coodie.cql_builder` | CQL generation functions |

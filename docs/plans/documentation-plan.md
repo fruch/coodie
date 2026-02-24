@@ -1165,11 +1165,11 @@ make clean html    # Clean build — like clearing your browser cache but useful
 - [x] TTL support guide
 
 ### Phase 3: Advanced Features
-- [ ] Lightweight Transactions (LWT) guide
-- [ ] Batch operations guide
-- [ ] Sync vs Async API comparison guide
-- [ ] Drivers & initialization guide
-- [ ] Exceptions & error handling guide
+- [x] Lightweight Transactions (LWT) guide
+- [x] Batch operations guide
+- [x] Sync vs Async API comparison guide
+- [x] Drivers & initialization guide
+- [x] Exceptions & error handling guide
 
 ### Phase 4: Reference & Migration
 - [ ] Auto-generated API reference (sphinx-autodoc)

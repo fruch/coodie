@@ -1,0 +1,108 @@
+name: Self-Healing CI
+
+# NOTE: workflow_run triggers only fire for workflow files that exist on the
+# default branch. This workflow must be merged to main before it will react
+# to failures in other workflows.
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Unit Tests
+      - Integration Tests
+    types:
+      - completed
+
+jobs:
+  on-failure:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    permissions:
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Find associated pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          head_branch="${{ github.event.workflow_run.head_branch }}"
+
+          # Try to find an open PR for the branch that triggered the failed run
+          pr_number=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "${head_branch}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$pr_number" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "number=${pr_number}" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect failed job logs
+        if: steps.pr.outputs.found == 'true'
+        id: logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_id=${{ github.event.workflow_run.id }}
+          workflow_name="${{ github.event.workflow_run.name }}"
+          run_url="${{ github.event.workflow_run.html_url }}"
+          head_sha="${{ github.event.workflow_run.head_sha }}"
+
+          # Collect logs from all failed jobs
+          failed_logs=""
+          for job_id in $(gh api "repos/${{ github.repository }}/actions/runs/${run_id}/jobs" \
+            --jq '.jobs[] | select(.conclusion == "failure") | .id'); do
+            job_name=$(gh api "repos/${{ github.repository }}/actions/runs/${run_id}/jobs" \
+              --jq ".jobs[] | select(.id == ${job_id}) | .name")
+            logs=$(gh api "repos/${{ github.repository }}/actions/jobs/${job_id}/logs" 2>&1 | tail -100)
+            failed_logs="${failed_logs}
+          ### Job: ${job_name}
+          \`\`\`
+          ${logs}
+          \`\`\`
+          "
+          done
+
+          # Write outputs
+          {
+            echo "workflow_name=${workflow_name}"
+            echo "run_url=${run_url}"
+            echo "head_sha=${head_sha}"
+          } >> "$GITHUB_OUTPUT"
+
+          # Store logs in a file (too large for output variable)
+          echo "${failed_logs}" > /tmp/failed_logs.txt
+
+      - name: Comment on pull request
+        if: steps.pr.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="${{ steps.pr.outputs.number }}"
+          workflow_name="${{ steps.logs.outputs.workflow_name }}"
+          run_url="${{ steps.logs.outputs.run_url }}"
+          head_sha="${{ steps.logs.outputs.head_sha }}"
+          failed_logs=$(cat /tmp/failed_logs.txt)
+
+          cat > /tmp/comment.md <<EOF
+          ## CI Failure: ${workflow_name}
+
+          **Commit:** \`${head_sha}\`
+          **Run:** ${run_url}
+
+          The **${workflow_name}** workflow failed. Below are the logs from the failed jobs.
+
+          @copilot please investigate the failure and suggest a fix.
+
+          ## Failed Job Logs
+          ${failed_logs}
+          EOF
+
+          gh pr comment "${pr_number}" \
+            --repo "${{ github.repository }}" \
+            --body-file /tmp/comment.md

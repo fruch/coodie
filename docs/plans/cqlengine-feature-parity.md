@@ -985,5 +985,5 @@ Use this checklist when converting a cqlengine application to coodie:
 ### coodie Documentation
 
 - [coodie rewrite plan](../plan/rewrite-coodie-plan.md) — Original architecture and design decisions
-- [Integration test coverage](https://github.com/fruch/coodie/blob/341a470b35bf60696e2c067d6a22aaf448461102/docs/integration-test-coverage.md) — Current test coverage and gaps
+- [Integration test coverage](https://github.com/fruch/coodie/blob/341a470b35bf60696e2c067d6a22aaf448461102/docs/plans/integration-test-coverage.md) — Current test coverage and gaps
 - Source code: `src/coodie/` — current implementation

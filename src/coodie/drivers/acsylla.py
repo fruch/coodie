@@ -54,7 +54,15 @@ class AcsyllaDriver(AbstractDriver):
     (scripts, CLI tools, Django/Flask views).
     """
 
-    __slots__ = ("_acsylla", "_session", "_default_keyspace", "_prepared", "_loop", "_last_paging_state")
+    __slots__ = (
+        "_acsylla",
+        "_session",
+        "_default_keyspace",
+        "_prepared",
+        "_loop",
+        "_last_paging_state",
+        "_known_tables",
+    )
 
     def __init__(
         self,
@@ -72,6 +80,7 @@ class AcsyllaDriver(AbstractDriver):
         self._prepared: dict[str, Any] = {}
         self._loop = loop or asyncio.new_event_loop()
         self._last_paging_state: bytes | None = None
+        self._known_tables: dict[str, frozenset[str]] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -135,23 +144,35 @@ class AcsyllaDriver(AbstractDriver):
         cols: list[Any],
         table_options: dict[str, Any] | None = None,
     ) -> None:
+        cache_key = f"{keyspace}.{table}"
+        col_names = frozenset(col.name for col in cols)
+        if self._known_tables.get(cache_key) == col_names:
+            return  # table already synced this session with same columns
+
         from coodie.cql_builder import build_create_table, build_create_index
 
         create_cql = build_create_table(table, keyspace, cols, table_options=table_options)
         await self._session.execute(self._cql_to_statement(create_cql))
 
-        # Introspect existing columns and add missing ones
+        # Introspect existing columns to determine if ALTER TABLE is needed.
+        # If all model columns already exist, skip ALTER TABLE ADD queries.
         existing = await self._get_existing_columns_async(table, keyspace)
-        for col in cols:
-            if col.name not in existing:
-                alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
-                await self._session.execute(self._cql_to_statement(alter))
+        model_col_names = {col.name for col in cols}
+        is_new_table = existing == model_col_names
+
+        if not is_new_table:
+            for col in cols:
+                if col.name not in existing:
+                    alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
+                    await self._session.execute(self._cql_to_statement(alter))
 
         # Secondary indexes
         for col in cols:
             if col.index:
                 index_cql = build_create_index(table, keyspace, col)
                 await self._session.execute(self._cql_to_statement(index_cql))
+
+        self._known_tables[cache_key] = col_names
 
     async def close_async(self) -> None:
         await self._session.close()

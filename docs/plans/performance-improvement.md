@@ -764,7 +764,41 @@ Phase 2's table metadata cache, which is a separate feature (not a code optimiza
 
 ---
 
-## 11. Notes
+## 11. Phase 2 Results
+
+### 11.1 Phase 2 Changes Implemented
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.4 | `_known_tables` cache on both CassandraDriver and AcsyllaDriver — second `sync_table` call is a no-op | ✅ Done |
+| 3.5 | Skip ALTER TABLE when existing columns already match model columns (new table) | ✅ Done |
+
+### 11.2 Phase 2 Design
+
+**Task 3.4 — Table metadata cache:**
+- Added `_known_tables: set[str]` to `__slots__` on both `CassandraDriver` and `AcsyllaDriver`.
+- On `sync_table()` / `sync_table_async()`, the driver first checks `f"{keyspace}.{table}"` in `_known_tables`.
+- On cache hit: returns immediately (zero CQL queries).
+- On cache miss: runs the full sync flow, then adds the key to `_known_tables`.
+- The cache is per-driver-instance and lives for the session lifetime — no stale data across restarts.
+
+**Task 3.5 — Skip column introspection on create:**
+- After `CREATE TABLE IF NOT EXISTS`, the driver introspects `system_schema.columns` to get existing columns.
+- If the existing column set matches the model's column set exactly, the table was just created with all columns — `ALTER TABLE ADD` is skipped entirely.
+- For tables with extra DB-side columns (e.g., schema drift), the existing ALTER TABLE logic still runs.
+
+### 11.3 Remaining Priorities After Phase 2
+
+| Priority | Task | Expected Impact |
+|----------|------|-----------------|
+| P1 | 3.7 Skip intermediate dict on reads | Further read improvement |
+| P2 | 3.8 CQL query string cache | Eliminate CQL construction overhead |
+| P2 | 3.10 Reduce `_clone()` overhead | Faster query chain construction |
+| P2 | 7.4 Lazy parsing (LazyDocument) | Near-zero cost for PK-only reads |
+
+---
+
+## 12. Notes
 
 - coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for
   pure Python model construction. The overhead is in the ORM ↔ driver interface.

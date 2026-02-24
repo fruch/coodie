@@ -9,7 +9,7 @@ from coodie.drivers.base import AbstractDriver
 class CassandraDriver(AbstractDriver):
     """Driver backed by cassandra-driver / scylla-driver."""
 
-    __slots__ = ("_session", "_default_keyspace", "_prepared", "_last_paging_state")
+    __slots__ = ("_session", "_default_keyspace", "_prepared", "_last_paging_state", "_known_tables")
 
     def __init__(
         self,
@@ -20,6 +20,7 @@ class CassandraDriver(AbstractDriver):
         self._default_keyspace = default_keyspace
         self._prepared: dict[str, Any] = {}
         self._last_paging_state: bytes | None = None
+        self._known_tables: dict[str, frozenset[str]] = {}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -84,24 +85,35 @@ class CassandraDriver(AbstractDriver):
         cols: list[Any],
         table_options: dict[str, Any] | None = None,
     ) -> None:
+        cache_key = f"{keyspace}.{table}"
+        col_names = frozenset(col.name for col in cols)
+        if self._known_tables.get(cache_key) == col_names:
+            return  # table already synced this session with same columns
+
         from coodie.cql_builder import build_create_table, build_create_index
 
         create_cql = build_create_table(table, keyspace, cols, table_options=table_options)
         self._session.execute(create_cql)
 
-        # Introspect existing columns
+        # Introspect existing columns to determine if ALTER TABLE is needed.
+        # If all model columns already exist, skip ALTER TABLE ADD queries.
         existing = self._get_existing_columns(table, keyspace)
+        model_col_names = {col.name for col in cols}
+        is_new_table = existing == model_col_names
 
-        for col in cols:
-            if col.name not in existing:
-                alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
-                self._session.execute(alter)
+        if not is_new_table:
+            for col in cols:
+                if col.name not in existing:
+                    alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
+                    self._session.execute(alter)
 
         # Create secondary indexes
         for col in cols:
             if col.index:
                 index_cql = build_create_index(table, keyspace, col)
                 self._session.execute(index_cql)
+
+        self._known_tables[cache_key] = col_names
 
     def _get_existing_columns(self, table: str, keyspace: str) -> set[str]:
         rows = self._session.execute(

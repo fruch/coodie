@@ -69,7 +69,7 @@ def test_coodie_get_or_create_user(benchmark, bench_env):
     user.save()
 
     def _get_or_create():
-        results = CoodieArgusUser.objects.filter(id=uid).all()
+        results = CoodieArgusUser.find(id=uid).all()
         if not results:
             new_user = CoodieArgusUser(id=uid, username="fallback", roles=["ROLE_USER"])
             new_user.save()
@@ -116,7 +116,7 @@ def test_coodie_filter_runs_by_status(benchmark, bench_env):
         run.save()
 
     def _filter():
-        CoodieArgusTestRun.objects.filter(build_id=build).all()
+        CoodieArgusTestRun.find(build_id=build).all()
 
     benchmark.group = "argus-filter-runs-by-partition"
     benchmark(_filter)
@@ -152,7 +152,7 @@ def test_coodie_latest_runs(benchmark, bench_env):
         run.save()
 
     def _latest():
-        CoodieArgusTestRun.objects.filter(build_id=build).limit(3).all()
+        CoodieArgusTestRun.find(build_id=build).limit(3).all()
 
     benchmark.group = "argus-latest-runs"
     benchmark(_latest)
@@ -199,7 +199,7 @@ def test_coodie_list_mutation(benchmark, bench_env):
     user.save()
 
     def _mutate():
-        results = CoodieArgusUser.objects.filter(id=uid).all()
+        results = CoodieArgusUser.find(id=uid).all()
         u = results[0]
         if "ROLE_MANAGER" not in u.roles:
             u.roles.append("ROLE_MANAGER")
@@ -309,7 +309,7 @@ def test_coodie_notification_feed(benchmark, bench_env):
         n.save()
 
     def _feed():
-        CoodieArgusNotification.objects.filter(receiver=receiver).limit(10).all()
+        CoodieArgusNotification.find(receiver=receiver).limit(10).all()
 
     benchmark.group = "argus-notification-feed"
     benchmark(_feed)
@@ -347,7 +347,7 @@ def test_coodie_status_update(benchmark, bench_env):
     run.save()
 
     def _update():
-        runs = CoodieArgusTestRun.objects.filter(build_id=build).limit(1).all()
+        runs = CoodieArgusTestRun.find(build_id=build).limit(1).all()
         r = runs[0]
         r.status = "running"
         r.heartbeat = int(time.time())
@@ -449,9 +449,9 @@ def test_coodie_multi_model_lookup(benchmark, bench_env):
     evt.save()
 
     def _lookup():
-        events = CoodieArgusEvent.objects.filter(id=eid).all()
+        events = CoodieArgusEvent.find(id=eid).all()
         event = events[0]
-        CoodieArgusUser.objects.filter(id=event.user_id).all()
+        CoodieArgusUser.find(id=event.user_id).all()
 
     benchmark.group = "argus-multi-model-lookup"
     benchmark(_lookup)

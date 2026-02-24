@@ -21,6 +21,11 @@ guide/filtering
 guide/collections
 guide/counters
 guide/ttl
+guide/lwt
+guide/batch-operations
+guide/sync-vs-async
+guide/drivers
+guide/exceptions
 ```
 
 ```{toctree}

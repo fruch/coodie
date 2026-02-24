@@ -16,8 +16,9 @@
 4. [Task 3 — Merge sync/async unit tests](#4-task-3--merge-syncasync-unit-tests)
 5. [Task 4 — Split `test_integration.py`](#5-task-4--split-test_integrationpy)
 6. [Task 5 — Parametrize extended-type roundtrips](#6-task-5--parametrize-extended-type-roundtrips)
-7. [Implementation Order](#7-implementation-order)
-8. [Verification](#8-verification)
+7. [Task 6 — Deduplicate ScyllaDB testcontainer fixtures with benchmarks](#7-task-6--deduplicate-scylladb-testcontainer-fixtures-with-benchmarks)
+8. [Implementation Order](#8-implementation-order)
+9. [Verification](#9-verification)
 
 ---
 
@@ -444,7 +445,165 @@ parametrized test since the model and assertion differ.
 
 ---
 
-## 7. Implementation Order
+## 7. Task 6 — Deduplicate ScyllaDB testcontainer fixtures with benchmarks
+
+**Status:** ❌ Not started
+**Effort:** Medium
+**Depends on:** Task 4, PR #31 (benchmarks)
+
+### 7.1 Problem
+
+PR #31 adds `benchmarks/conftest.py` with ScyllaDB testcontainer fixtures that
+are nearly identical to the ones in `tests/test_integration.py`:
+
+| Fixture / helper | `tests/test_integration.py` | `benchmarks/conftest.py` |
+|---|---|---|
+| `scylla_container` | ✅ session-scoped, DockerContainer | ✅ session-scoped, DockerContainer (identical) |
+| `_LocalhostTranslator` | ✅ translates to 127.0.0.1 | ✅ translates to 127.0.0.1 (identical) |
+| `scylla_session` / `cql_session` | ✅ Cluster → Session, retry loop | ✅ Cluster → Session, retry loop (same logic, different keyspace) |
+
+When Task 4 moves integration fixtures to `tests/integration/conftest.py`, the
+duplication becomes two separate `conftest.py` files with copy-pasted container
+setup code. Changes to the container image, startup flags, or retry logic would
+need to be applied in both places.
+
+### 7.2 Solution — Extract shared fixtures to a `conftest_shared.py` plugin
+
+Create a shared module that both `tests/integration/conftest.py` and
+`benchmarks/conftest.py` can import:
+
+```
+tests/
+├── conftest_scylla.py          # Shared ScyllaDB container + session helpers
+├── conftest.py                 # Existing: MockDriver, driver_type option
+├── integration/
+│   └── conftest.py             # imports from conftest_scylla
+benchmarks/
+    └── conftest.py             # imports from conftest_scylla
+```
+
+**`tests/conftest_scylla.py`** (new shared module):
+
+```python
+"""Shared ScyllaDB testcontainer fixtures.
+
+Import these into integration test or benchmark conftest.py files to avoid
+duplicating the container setup, address translator, and session creation.
+"""
+from __future__ import annotations
+
+import time
+from typing import Any
+
+import pytest
+
+
+class LocalhostTranslator:
+    """Translate container-internal IPs back to 127.0.0.1."""
+    def translate(self, addr: str) -> str:
+        return "127.0.0.1"
+
+
+@pytest.fixture(scope="session")
+def scylla_container():
+    """Start a ScyllaDB container once for the entire test session."""
+    try:
+        from testcontainers.core.container import DockerContainer
+        from testcontainers.core.waiting_utils import wait_for_logs
+    except ImportError as exc:
+        pytest.skip(f"testcontainers not installed: {exc}")
+
+    with (
+        DockerContainer("scylladb/scylla:latest")
+        .with_command(
+            "--smp 1 --memory 512M --developer-mode 1 "
+            "--skip-wait-for-gossip-to-settle=0"
+        )
+        .with_exposed_ports(9042) as container
+    ):
+        wait_for_logs(container, "Starting listening for CQL clients", timeout=120)
+        yield container
+
+
+def create_cql_session(scylla_container: Any, keyspace: str) -> Any:
+    """Create a cassandra-driver Session connected to the given keyspace.
+
+    Handles the retry loop for container startup and creates the keyspace
+    if it doesn't exist.
+    """
+    from cassandra.cluster import Cluster, NoHostAvailable
+
+    port = int(scylla_container.get_exposed_port(9042))
+    cluster = Cluster(
+        ["127.0.0.1"],
+        port=port,
+        connect_timeout=10,
+        address_translator=LocalhostTranslator(),
+    )
+
+    for attempt in range(10):
+        try:
+            session = cluster.connect()
+            break
+        except NoHostAvailable:
+            if attempt == 9:
+                raise
+            time.sleep(2)
+
+    session.execute(
+        f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
+        "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}"
+    )
+    return session, cluster
+```
+
+### 7.3 Update integration `conftest.py`
+
+```python
+# tests/integration/conftest.py
+from tests.conftest_scylla import scylla_container, create_cql_session  # noqa: F401
+
+@pytest.fixture(scope="session")
+def scylla_session(scylla_container, driver_type):
+    if driver_type == "acsylla":
+        yield None
+        return
+    session, cluster = create_cql_session(scylla_container, "test_ks")
+    yield session
+    cluster.shutdown()
+```
+
+### 7.4 Update benchmarks `conftest.py`
+
+```python
+# benchmarks/conftest.py
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from tests.conftest_scylla import scylla_container, create_cql_session  # noqa: F401
+
+@pytest.fixture(scope="session")
+def cql_session(scylla_container):
+    session, cluster = create_cql_session(scylla_container, "bench_ks")
+    session.set_keyspace("bench_ks")
+    yield session
+    cluster.shutdown()
+```
+
+### 7.5 Audit checklist
+
+Before merging, verify:
+
+- [ ] `tests/conftest_scylla.py` contains the single source of truth for `scylla_container`, `LocalhostTranslator`, and `create_cql_session`
+- [ ] `tests/integration/conftest.py` imports (not copies) the shared fixtures
+- [ ] `benchmarks/conftest.py` imports (not copies) the shared fixtures
+- [ ] No duplicate `DockerContainer("scylladb/scylla:latest")` code exists outside `conftest_scylla.py`
+- [ ] Integration tests pass: `uv run pytest -m integration -v --timeout=120`
+- [ ] Benchmarks pass: `uv run pytest benchmarks/ -v --benchmark-enable` (requires Docker)
+- [ ] Both `test_ks` and `bench_ks` keyspaces are created correctly (different keyspaces to avoid interference)
+
+---
+
+## 8. Implementation Order
 
 Tasks are independent; each can be merged as a separate PR.
 
@@ -455,12 +614,13 @@ Tasks are independent; each can be merged as a separate PR.
 | 3 | Merge sync/async unit tests | `tests/sync/`, `tests/aio/`, `tests/conftest.py` | — |
 | 4 | Split `test_integration.py` | `tests/test_integration.py` → `tests/integration/` | — |
 | 5 | Parametrize extended roundtrips | `tests/integration/test_extended.py` | Task 4 |
+| 6 | Deduplicate ScyllaDB fixtures | `tests/conftest_scylla.py`, `tests/integration/conftest.py`, `benchmarks/conftest.py` | Task 4 + PR #31 |
 
 **Recommended start:** Task 1 (lowest risk, validates the approach).
 
 ---
 
-## 8. Verification
+## 9. Verification
 
 After each task:
 

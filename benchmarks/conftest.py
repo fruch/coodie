@@ -17,19 +17,13 @@ of ``--driver-type`` (cqlengine has no acsylla backend).
 from __future__ import annotations
 
 import asyncio
-import sys
-import os
 from typing import Any
 from uuid import uuid4
 
 import pytest
 
-# Ensure the project root is on sys.path so ``tests.conftest_scylla`` is
-# importable even when benchmarks are collected standalone.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from tests.conftest_scylla import create_acsylla_session, create_cql_session  # noqa: E402, F401
-from tests.conftest_scylla import scylla_container  # noqa: E402, F401
+from tests.conftest_scylla import create_acsylla_session, create_cql_session  # noqa: F401
+from tests.conftest_scylla import scylla_container  # noqa: F401
 
 
 # ---------------------------------------------------------------------------

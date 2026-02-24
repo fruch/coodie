@@ -159,6 +159,24 @@ def _get_discriminator_value(doc_cls: type) -> str | None:
     return getattr(settings, "__discriminator_value__", None)
 
 
+def _own_annotations(cls: type) -> dict[str, Any]:
+    """Return *only* the annotations declared directly on *cls*.
+
+    On Python 3.14+ (PEP 749) annotations may be lazily stored via an
+    ``__annotate__`` function rather than an ``__annotations__`` dict in
+    ``cls.__dict__``.  Accessing ``cls.__annotations__`` (the descriptor)
+    materialises them, but includes inherited annotations.  We therefore
+    try ``annotationlib.get_annotations`` first (3.14+), then fall back to
+    the ``__dict__`` lookup used by earlier Pythons.
+    """
+    try:
+        import annotationlib  # Python 3.14+
+
+        return annotationlib.get_annotations(cls, format=annotationlib.Format.FORWARDREF)
+    except ImportError:
+        return cls.__dict__.get("__annotations__", {})
+
+
 def _resolve_polymorphic_base(doc_cls: type) -> type | None:
     """Return the class that defines the discriminator column.
 
@@ -169,7 +187,7 @@ def _resolve_polymorphic_base(doc_cls: type) -> type | None:
     if disc_col is None:
         return None
     for cls in doc_cls.__mro__:
-        own_annotations = cls.__dict__.get("__annotations__", {})
+        own_annotations = _own_annotations(cls)
         if disc_col in own_annotations:
             return cls
     return None

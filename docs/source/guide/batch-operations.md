@@ -78,12 +78,37 @@ Cassandra supports three batch types:
 ### Logged Batch (Default)
 
 Logged batches guarantee that either all statements succeed or none do.
-This is the default:
+This is the default — matching both CQL semantics and cqlengine
+convention:
 
 ```python
 with BatchQuery(logged=True) as batch:  # logged=True is the default
     ...
 ```
+
+```{warning}
+Logged batches have important limitations:
+
+- **Batch log overhead**: Before executing, the coordinator writes the
+  entire batch to a distributed batch log. This adds latency and I/O on
+  every logged batch.
+- **Multi-partition atomicity is limited**: Across partitions, logged
+  batches guarantee that all mutations *eventually* apply (durability),
+  but other clients may see partial results during execution — there is
+  no isolation.
+- **Single-partition batches don't need logging**: If all statements
+  target the same partition, use `logged=False`. Single-partition writes
+  are already atomic in Cassandra/ScyllaDB, so the batch log adds cost
+  with no benefit.
+- **Size limits**: ScyllaDB rejects batches exceeding
+  `batch_size_fail_threshold_in_kb` (default 1 MB) and warns above
+  `batch_size_warn_threshold_in_kb` (default 128 KB).
+```
+
+For more details on batch semantics and limits, see:
+
+- [ScyllaDB — BATCH statement](https://opensource.docs.scylladb.com/stable/cql/dml/batch.html)
+- [Cassandra — BATCH statement](https://cassandra.apache.org/doc/latest/cassandra/cql/dml.html#batch)
 
 ### Unlogged Batch
 

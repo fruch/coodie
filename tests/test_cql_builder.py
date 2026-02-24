@@ -680,3 +680,39 @@ def test_build_create_keyspace_network_topology_overrides_strategy():
 def test_build_drop_keyspace():
     cql = build_drop_keyspace("my_ks")
     assert cql == "DROP KEYSPACE IF EXISTS my_ks"
+
+
+# ------------------------------------------------------------------
+# Phase A: Migration Strategy — Enhanced sync_table helpers
+# ------------------------------------------------------------------
+
+
+def test_build_drop_index():
+    from coodie.cql_builder import build_drop_index
+
+    cql = build_drop_index("users_email_idx", "ks")
+    assert cql == "DROP INDEX IF EXISTS ks.users_email_idx"
+
+
+def test_build_alter_table_options_single():
+    from coodie.cql_builder import build_alter_table_options
+
+    cql = build_alter_table_options("products", "ks", {"default_time_to_live": 3600})
+    assert cql == "ALTER TABLE ks.products WITH default_time_to_live = 3600"
+
+
+def test_build_alter_table_options_multiple():
+    from coodie.cql_builder import build_alter_table_options
+
+    cql = build_alter_table_options("products", "ks", {"default_time_to_live": 3600, "gc_grace_seconds": 864000})
+    assert "ALTER TABLE ks.products WITH" in cql
+    assert "default_time_to_live = 3600" in cql
+    assert "gc_grace_seconds = 864000" in cql
+    assert " AND " in cql
+
+
+def test_build_alter_table_options_string_value():
+    from coodie.cql_builder import build_alter_table_options
+
+    cql = build_alter_table_options("products", "ks", {"comment": "my table"})
+    assert cql == "ALTER TABLE ks.products WITH comment = 'my table'"

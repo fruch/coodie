@@ -94,6 +94,26 @@ def build_create_index(
     return f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
 
 
+def build_drop_index(index_name: str, keyspace: str) -> str:
+    """Build a ``DROP INDEX IF EXISTS`` CQL statement."""
+    return f"DROP INDEX IF EXISTS {keyspace}.{index_name}"
+
+
+def build_alter_table_options(
+    table: str,
+    keyspace: str,
+    options: dict[str, Any],
+) -> str:
+    """Build an ``ALTER TABLE … WITH`` statement for table option changes."""
+    parts = []
+    for k, v in options.items():
+        if isinstance(v, str):
+            parts.append(f"{k} = '{v}'")
+        else:
+            parts.append(f"{k} = {v}")
+    return f"ALTER TABLE {keyspace}.{table} WITH " + " AND ".join(parts)
+
+
 def build_drop_table(table: str, keyspace: str) -> str:
     return f"DROP TABLE IF EXISTS {keyspace}.{table}"
 

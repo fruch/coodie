@@ -137,25 +137,50 @@ class AcsyllaDriver(AbstractDriver):
         rows = await self.execute_async(stmt, [keyspace, table])
         return {row["column_name"] for row in rows}
 
+    async def _get_current_table_options_async(self, table: str, keyspace: str) -> dict[str, Any]:
+        """Introspect current table options from ``system_schema.tables``."""
+        stmt = "SELECT * FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?"
+        rows = await self.execute_async(stmt, [keyspace, table])
+        if rows:
+            return rows[0]
+        return {}
+
+    async def _get_existing_indexes_async(self, table: str, keyspace: str) -> set[str]:
+        """Introspect existing index names from ``system_schema.indexes``."""
+        stmt = "SELECT index_name FROM system_schema.indexes WHERE keyspace_name = ? AND table_name = ?"
+        rows = await self.execute_async(stmt, [keyspace, table])
+        return {row["index_name"] for row in rows}
+
     async def sync_table_async(
         self,
         table: str,
         keyspace: str,
         cols: list[Any],
         table_options: dict[str, Any] | None = None,
-    ) -> None:
+        dry_run: bool = False,
+        drop_removed_indexes: bool = False,
+    ) -> list[str]:
         cache_key = f"{keyspace}.{table}"
         col_names = frozenset(col.name for col in cols)
-        if self._known_tables.get(cache_key) == col_names:
-            return  # table already synced this session with same columns
+        if not dry_run and self._known_tables.get(cache_key) == col_names:
+            return []  # table already synced this session with same columns
 
-        from coodie.cql_builder import build_create_table, build_create_index
+        from coodie.cql_builder import (
+            build_create_table,
+            build_create_index,
+            build_drop_index,
+            build_alter_table_options,
+        )
 
+        planned: list[str] = []
+
+        # 1. CREATE TABLE IF NOT EXISTS
         create_cql = build_create_table(table, keyspace, cols, table_options=table_options)
-        await self._session.execute(self._cql_to_statement(create_cql))
+        planned.append(create_cql)
+        if not dry_run:
+            await self._session.execute(self._cql_to_statement(create_cql))
 
-        # Introspect existing columns to determine if ALTER TABLE is needed.
-        # If all model columns already exist, skip ALTER TABLE ADD queries.
+        # 2. Introspect existing columns and add missing ones
         existing = await self._get_existing_columns_async(table, keyspace)
         model_col_names = {col.name for col in cols}
         is_new_table = existing == model_col_names
@@ -164,15 +189,61 @@ class AcsyllaDriver(AbstractDriver):
             for col in cols:
                 if col.name not in existing:
                     alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
-                    await self._session.execute(self._cql_to_statement(alter))
+                    planned.append(alter)
+                    if not dry_run:
+                        await self._session.execute(self._cql_to_statement(alter))
 
-        # Secondary indexes
+        # 3. Schema drift detection — warn on DB columns not in model
+        drift_cols = existing - model_col_names
+        if drift_cols:
+            import logging
+
+            logger = logging.getLogger("coodie")
+            logger.warning(
+                "Schema drift detected: columns %s exist in %s.%s but are not defined in the model",
+                drift_cols,
+                keyspace,
+                table,
+            )
+
+        # 4. Table option changes
+        if table_options:
+            current_options = await self._get_current_table_options_async(table, keyspace)
+            changed = {}
+            for k, v in table_options.items():
+                if str(current_options.get(k)) != str(v):
+                    changed[k] = v
+            if changed:
+                alter_cql = build_alter_table_options(table, keyspace, changed)
+                planned.append(alter_cql)
+                if not dry_run:
+                    await self._session.execute(self._cql_to_statement(alter_cql))
+
+        # 5. Create secondary indexes
+        model_indexes: dict[str, Any] = {}
         for col in cols:
             if col.index:
+                idx_name = col.index_name or f"{table}_{col.name}_idx"
+                model_indexes[idx_name] = col
                 index_cql = build_create_index(table, keyspace, col)
-                await self._session.execute(self._cql_to_statement(index_cql))
+                planned.append(index_cql)
+                if not dry_run:
+                    await self._session.execute(self._cql_to_statement(index_cql))
 
-        self._known_tables[cache_key] = col_names
+        # 6. Drop removed indexes
+        if drop_removed_indexes:
+            existing_indexes = await self._get_existing_indexes_async(table, keyspace)
+            for idx_name in existing_indexes:
+                if idx_name not in model_indexes:
+                    drop_cql = build_drop_index(idx_name, keyspace)
+                    planned.append(drop_cql)
+                    if not dry_run:
+                        await self._session.execute(self._cql_to_statement(drop_cql))
+
+        if not dry_run:
+            self._known_tables[cache_key] = col_names
+
+        return planned
 
     async def close_async(self) -> None:
         await self._session.close()
@@ -210,8 +281,19 @@ class AcsyllaDriver(AbstractDriver):
         keyspace: str,
         cols: list[Any],
         table_options: dict[str, Any] | None = None,
-    ) -> None:
-        self._loop.run_until_complete(self.sync_table_async(table, keyspace, cols, table_options=table_options))
+        dry_run: bool = False,
+        drop_removed_indexes: bool = False,
+    ) -> list[str]:
+        return self._loop.run_until_complete(
+            self.sync_table_async(
+                table,
+                keyspace,
+                cols,
+                table_options=table_options,
+                dry_run=dry_run,
+                drop_removed_indexes=drop_removed_indexes,
+            )
+        )
 
     def close(self) -> None:
         self._loop.run_until_complete(self.close_async())

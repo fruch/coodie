@@ -535,3 +535,139 @@ def QS(variant):
     from coodie.aio.query import QuerySet
 
     return QuerySet
+
+
+# ---------------------------------------------------------------------------
+# Phase A migration-strategy models & fixtures
+# ---------------------------------------------------------------------------
+
+
+class SyncPhaseAProduct(SyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    brand: Annotated[str, Indexed()] = "Unknown"
+    price: float = 0.0
+
+    class Settings:
+        name = "it_phase_a"
+        keyspace = "test_ks"
+
+
+class AsyncPhaseAProduct(AsyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    brand: Annotated[str, Indexed()] = "Unknown"
+    price: float = 0.0
+
+    class Settings:
+        name = "it_phase_a"
+        keyspace = "test_ks"
+
+
+class SyncPhaseATTL(SyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_ttl"
+        keyspace = "test_ks"
+        __default_ttl__ = 7200
+
+
+class AsyncPhaseATTL(AsyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_ttl"
+        keyspace = "test_ks"
+        __default_ttl__ = 7200
+
+
+class SyncPhaseADrift(SyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_drift"
+        keyspace = "test_ks"
+
+
+class AsyncPhaseADrift(AsyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_drift"
+        keyspace = "test_ks"
+
+
+class SyncPhaseAIndex(SyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_idx"
+        keyspace = "test_ks"
+
+
+class AsyncPhaseAIndex(AsyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_idx"
+        keyspace = "test_ks"
+
+
+class SyncPhaseADryRun(SyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_drytest"
+        keyspace = "test_ks"
+
+
+class AsyncPhaseADryRun(AsyncDocument):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+
+    class Settings:
+        name = "it_phase_a_drytest"
+        keyspace = "test_ks"
+
+
+@pytest.fixture
+def PhaseAProduct(variant):
+    if variant == "sync":
+        return SyncPhaseAProduct
+    return AsyncPhaseAProduct
+
+
+@pytest.fixture
+def PhaseATTL(variant):
+    if variant == "sync":
+        return SyncPhaseATTL
+    return AsyncPhaseATTL
+
+
+@pytest.fixture
+def PhaseADrift(variant):
+    if variant == "sync":
+        return SyncPhaseADrift
+    return AsyncPhaseADrift
+
+
+@pytest.fixture
+def PhaseAIndex(variant):
+    if variant == "sync":
+        return SyncPhaseAIndex
+    return AsyncPhaseAIndex
+
+
+@pytest.fixture
+def PhaseADryRun(variant):
+    if variant == "sync":
+        return SyncPhaseADryRun
+    return AsyncPhaseADryRun

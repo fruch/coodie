@@ -104,17 +104,33 @@ class Document(BaseModel):
         return options or None
 
     @classmethod
-    def sync_table(cls) -> None:
-        """Idempotently create or update the table in the database."""
+    def sync_table(
+        cls,
+        dry_run: bool = False,
+        drop_removed_indexes: bool = False,
+    ) -> list[str]:
+        """Idempotently create or update the table in the database.
+
+        Args:
+            dry_run: When ``True``, return the planned CQL statements without
+                executing them.
+            drop_removed_indexes: When ``True``, drop secondary indexes that
+                exist in the database but are no longer defined in the model.
+
+        Returns:
+            List of CQL statements that were (or would be) executed.
+        """
         settings = getattr(cls, "Settings", None)
         if settings and getattr(settings, "__abstract__", False):
-            return
+            return []
         schema = cls._schema()
-        cls._get_driver().sync_table(
+        return cls._get_driver().sync_table(
             cls._get_table(),
             cls._get_keyspace(),
             schema,
             table_options=cls._get_table_options(),
+            dry_run=dry_run,
+            drop_removed_indexes=drop_removed_indexes,
         )
 
     @classmethod

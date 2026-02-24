@@ -157,6 +157,41 @@ await Product.find(brand="Discontinued").allow_filtering().delete()
 | `Indexed(index_name=None)` | Secondary index |
 | `Counter()` | Counter column |
 
+## Versioning
+
+The package version is derived automatically from git tags using
+[hatch-vcs](https://github.com/ofek/hatch-vcs) (backed by
+[setuptools-scm](https://github.com/pypa/setuptools_scm)).
+
+| Situation | Example version |
+|---|---|
+| Exactly on tag `v1.2.3` | `1.2.3` |
+| 4 commits after `v1.2.3` | `1.2.3.dev4+gabcdef1` |
+| No tags in history | `0.1.dev2+gd2cd605` |
+
+```python
+import coodie
+print(coodie.__version__)   # e.g. "1.2.3"
+```
+
+### Creating a new release
+
+1. Make sure your changes are merged to `main` and CI is green.
+2. Create and push an annotated git tag — the tag name drives the new version:
+
+   ```bash
+   git tag -a v1.2.3 -m "Release v1.2.3"
+   git push origin v1.2.3
+   ```
+
+3. The CI release workflow picks up the tag, builds the wheel/sdist, and publishes
+   to PyPI automatically.
+
+> **Note:** `uv_build` would be the preferred build backend (it is used for all
+> other projects in this repo), but it does not yet support VCS-based dynamic
+> versioning. We will switch back once
+> [astral-sh/uv#14037](https://github.com/astral-sh/uv/issues/14037) lands.
+
 ## Contributors ✨
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):

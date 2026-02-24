@@ -141,3 +141,6 @@ cython_debug/
 
 # Pycharm
 .idea/
+
+# Generated version file (from hatch-vcs)
+src/coodie/_version.py

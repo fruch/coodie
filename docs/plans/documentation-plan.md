@@ -1148,8 +1148,8 @@ make clean html    # Clean build — like clearing your browser cache but useful
 ## 9. Milestones
 
 ### Phase 1: Foundation (Core Docs)
-- [ ] README overhaul: add comparison table (coodie vs beanie vs cqlengine)
-- [ ] README overhaul: add copy-pastable quick start commands
+- [x] README overhaul: add comparison table (coodie vs beanie vs cqlengine)
+- [x] README overhaul: add copy-pastable quick start commands
 - [x] Update `CONTRIBUTING.md` with uv-based setup and copy-pastable commands
 - [x] Installation & quickstart guide
 - [x] Defining Documents (models) guide
@@ -1178,11 +1178,11 @@ make clean html    # Clean build — like clearing your browser cache but useful
 - [ ] Integration examples (FastAPI, Flask)
 
 ### Phase 5: Polish & Ship
-- [ ] Review all examples for accuracy and humor quality
-- [ ] Test all code examples against a live cluster
-- [ ] Proofread for consistency and tone
-- [ ] Set up Read the Docs deployment
-- [ ] Announce docs release with a terrible pun
+- [x] Review all examples for accuracy and humor quality
+- [x] Test all code examples against a live cluster
+- [x] Proofread for consistency and tone
+- [x] Set up Read the Docs deployment
+- [x] Announce docs release with a terrible pun
 
 ---
 

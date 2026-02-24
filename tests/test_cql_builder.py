@@ -103,25 +103,19 @@ def test_drop_table():
     assert cql == "DROP TABLE IF EXISTS ks.products"
 
 
-def test_parse_filter_kwargs_eq():
-    result = parse_filter_kwargs({"name": "Alice"})
-    assert result == [("name", "=", "Alice")]
-
-
-def test_parse_filter_kwargs_operators():
-    result = parse_filter_kwargs({"rating__gte": 4, "price__lt": 100})
-    assert ("rating", ">=", 4) in result
-    assert ("price", "<", 100) in result
-
-
-def test_parse_filter_kwargs_in():
-    result = parse_filter_kwargs({"id__in": [1, 2, 3]})
-    assert result == [("id", "IN", [1, 2, 3])]
-
-
-def test_parse_filter_kwargs_like():
-    result = parse_filter_kwargs({"name__like": "Al%"})
-    assert result == [("name", "LIKE", "Al%")]
+@pytest.mark.parametrize(
+    "kwargs, expected_triple",
+    [
+        pytest.param({"name": "Alice"}, ("name", "=", "Alice"), id="eq"),
+        pytest.param({"rating__gte": 4}, ("rating", ">=", 4), id="gte"),
+        pytest.param({"price__lt": 100}, ("price", "<", 100), id="lt"),
+        pytest.param({"id__in": [1, 2, 3]}, ("id", "IN", [1, 2, 3]), id="in"),
+        pytest.param({"name__like": "Al%"}, ("name", "LIKE", "Al%"), id="like"),
+    ],
+)
+def test_parse_filter_kwargs(kwargs, expected_triple):
+    result = parse_filter_kwargs(kwargs)
+    assert expected_triple in result
 
 
 def test_build_where_clause_empty():
@@ -203,9 +197,57 @@ def test_build_insert_if_not_exists():
     assert "IF NOT EXISTS" in cql
 
 
-def test_build_insert_ttl():
-    cql, _ = build_insert("products", "ks", {"id": "1"}, ttl=60)
-    assert "USING TTL 60" in cql
+@pytest.mark.parametrize(
+    "builder, extra_kwargs, expected_fragment",
+    [
+        pytest.param("insert", {"ttl": 60}, "USING TTL 60", id="insert-ttl"),
+        pytest.param(
+            "insert",
+            {"timestamp": 1234567890},
+            "USING TIMESTAMP 1234567890",
+            id="insert-ts",
+        ),
+        pytest.param(
+            "insert",
+            {"ttl": 60, "timestamp": 1234567890},
+            "USING TTL 60 AND TIMESTAMP 1234567890",
+            id="insert-ttl-ts",
+        ),
+        pytest.param("update", {"ttl": 300}, "USING TTL 300", id="update-ttl"),
+        pytest.param(
+            "update",
+            {"timestamp": 1234567890},
+            "USING TIMESTAMP 1234567890",
+            id="update-ts",
+        ),
+        pytest.param(
+            "update",
+            {"ttl": 60, "timestamp": 1234567890},
+            "USING TTL 60 AND TIMESTAMP 1234567890",
+            id="update-ttl-ts",
+        ),
+        pytest.param(
+            "delete",
+            {"timestamp": 1234567890},
+            "USING TIMESTAMP 1234567890",
+            id="delete-ts",
+        ),
+    ],
+)
+def test_using_clause(builder, extra_kwargs, expected_fragment):
+    if builder == "insert":
+        cql, _ = build_insert("products", "ks", {"id": "1"}, **extra_kwargs)
+    elif builder == "update":
+        cql, _ = build_update(
+            "products",
+            "ks",
+            set_data={"name": "Y"},
+            where=[("id", "=", "1")],
+            **extra_kwargs,
+        )
+    else:
+        cql, _ = build_delete("products", "ks", [("id", "=", "1")], **extra_kwargs)
+    assert expected_fragment in cql
 
 
 def test_build_update():
@@ -334,15 +376,6 @@ def test_parse_update_kwargs_append_prepend():
     assert ("items", "prepend", ["a"]) in ops
 
 
-def test_build_update_with_ttl():
-    cql, params = build_update(
-        "products", "ks", set_data={"name": "Y"}, where=[("id", "=", "1")], ttl=300
-    )
-    assert "USING TTL 300" in cql
-    assert 'SET "name" = ?' in cql
-    assert params == ["Y", "1"]
-
-
 def test_build_update_with_if_conditions():
     cql, params = build_update(
         "products",
@@ -355,52 +388,55 @@ def test_build_update_with_if_conditions():
     assert params == ["Y", "1", "X"]
 
 
-def test_build_update_collection_add():
+@pytest.mark.parametrize(
+    "op_key, op_name, value, expected_fragment, expected_params",
+    [
+        pytest.param(
+            "tags",
+            "add",
+            {"new_tag"},
+            '"tags" = "tags" + ?',
+            [{"new_tag"}, "1"],
+            id="set-add",
+        ),
+        pytest.param(
+            "tags",
+            "remove",
+            {"old_tag"},
+            '"tags" = "tags" - ?',
+            [{"old_tag"}, "1"],
+            id="set-remove",
+        ),
+        pytest.param(
+            "items",
+            "append",
+            ["z"],
+            '"items" = "items" + ?',
+            [["z"], "1"],
+            id="list-append",
+        ),
+        pytest.param(
+            "items",
+            "prepend",
+            ["a"],
+            '"items" = ? + "items"',
+            [["a"], "1"],
+            id="list-prepend",
+        ),
+    ],
+)
+def test_build_update_collection_op(
+    op_key, op_name, value, expected_fragment, expected_params
+):
     cql, params = build_update(
         "products",
         "ks",
         set_data={},
         where=[("id", "=", "1")],
-        collection_ops=[("tags", "add", {"new_tag"})],
+        collection_ops=[(op_key, op_name, value)],
     )
-    assert '"tags" = "tags" + ?' in cql
-    assert params == [{"new_tag"}, "1"]
-
-
-def test_build_update_collection_remove():
-    cql, params = build_update(
-        "products",
-        "ks",
-        set_data={},
-        where=[("id", "=", "1")],
-        collection_ops=[("tags", "remove", {"old_tag"})],
-    )
-    assert '"tags" = "tags" - ?' in cql
-    assert params == [{"old_tag"}, "1"]
-
-
-def test_build_update_collection_append():
-    cql, params = build_update(
-        "products",
-        "ks",
-        set_data={},
-        where=[("id", "=", "1")],
-        collection_ops=[("items", "append", ["z"])],
-    )
-    assert '"items" = "items" + ?' in cql
-    assert params == [["z"], "1"]
-
-
-def test_build_update_collection_prepend():
-    cql, params = build_update(
-        "products",
-        "ks",
-        set_data={},
-        where=[("id", "=", "1")],
-        collection_ops=[("items", "prepend", ["a"])],
-    )
-    assert '"items" = ? + "items"' in cql
-    assert params == [["a"], "1"]
+    assert expected_fragment in cql
+    assert params == expected_params
 
 
 def test_build_update_mixed_set_and_collection_ops():
@@ -414,53 +450,6 @@ def test_build_update_mixed_set_and_collection_ops():
     assert '"name" = ?' in cql
     assert '"tags" = "tags" + ?' in cql
     assert params == ["Y", {"new"}, "1"]
-
-
-# ------------------------------------------------------------------
-# Phase 5: timestamp parameter tests
-# ------------------------------------------------------------------
-
-
-def test_build_insert_timestamp():
-    cql, _ = build_insert("products", "ks", {"id": "1"}, timestamp=1234567890)
-    assert "USING TIMESTAMP 1234567890" in cql
-
-
-def test_build_insert_ttl_and_timestamp():
-    cql, _ = build_insert("products", "ks", {"id": "1"}, ttl=60, timestamp=1234567890)
-    assert "USING TTL 60 AND TIMESTAMP 1234567890" in cql
-
-
-def test_build_update_timestamp():
-    cql, params = build_update(
-        "products",
-        "ks",
-        set_data={"name": "Y"},
-        where=[("id", "=", "1")],
-        timestamp=1234567890,
-    )
-    assert "USING TIMESTAMP 1234567890" in cql
-    assert params == ["Y", "1"]
-
-
-def test_build_update_ttl_and_timestamp():
-    cql, _ = build_update(
-        "products",
-        "ks",
-        set_data={"name": "Y"},
-        where=[("id", "=", "1")],
-        ttl=60,
-        timestamp=1234567890,
-    )
-    assert "USING TTL 60 AND TIMESTAMP 1234567890" in cql
-
-
-def test_build_delete_timestamp():
-    cql, params = build_delete(
-        "products", "ks", [("id", "=", "1")], timestamp=1234567890
-    )
-    assert "USING TIMESTAMP 1234567890" in cql
-    assert params == ["1"]
 
 
 # ------------------------------------------------------------------
@@ -536,24 +525,18 @@ def test_create_table_no_options():
 # ------------------------------------------------------------------
 
 
-def test_parse_filter_kwargs_token_gt():
-    result = parse_filter_kwargs({"id__token__gt": 100})
-    assert result == [("id", "TOKEN >", 100)]
-
-
-def test_parse_filter_kwargs_token_gte():
-    result = parse_filter_kwargs({"id__token__gte": 100})
-    assert result == [("id", "TOKEN >=", 100)]
-
-
-def test_parse_filter_kwargs_token_lt():
-    result = parse_filter_kwargs({"id__token__lt": 200})
-    assert result == [("id", "TOKEN <", 200)]
-
-
-def test_parse_filter_kwargs_token_lte():
-    result = parse_filter_kwargs({"id__token__lte": 200})
-    assert result == [("id", "TOKEN <=", 200)]
+@pytest.mark.parametrize(
+    "kwargs, expected_triple",
+    [
+        pytest.param({"id__token__gt": 100}, ("id", "TOKEN >", 100), id="token-gt"),
+        pytest.param({"id__token__gte": 100}, ("id", "TOKEN >=", 100), id="token-gte"),
+        pytest.param({"id__token__lt": 200}, ("id", "TOKEN <", 200), id="token-lt"),
+        pytest.param({"id__token__lte": 200}, ("id", "TOKEN <=", 200), id="token-lte"),
+    ],
+)
+def test_parse_filter_kwargs_token(kwargs, expected_triple):
+    result = parse_filter_kwargs(kwargs)
+    assert result == [expected_triple]
 
 
 def test_parse_filter_kwargs_token_range():

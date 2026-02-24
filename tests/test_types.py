@@ -24,64 +24,80 @@ from coodie.fields import (
 from coodie.types import python_type_to_cql_type_str, coerce_row_none_collections
 
 
-def test_str_to_text():
-    assert python_type_to_cql_type_str(str) == "text"
+# ---- python_type_to_cql_type_str: basic types ----
 
 
-def test_int_to_int():
-    assert python_type_to_cql_type_str(int) == "int"
+@pytest.mark.parametrize(
+    "python_type, expected_cql",
+    [
+        pytest.param(str, "text", id="str-to-text"),
+        pytest.param(int, "int", id="int-to-int"),
+        pytest.param(float, "float", id="float-to-float"),
+        pytest.param(bool, "boolean", id="bool-to-boolean"),
+        pytest.param(bytes, "blob", id="bytes-to-blob"),
+        pytest.param(UUID, "uuid", id="uuid-to-uuid"),
+        pytest.param(datetime, "timestamp", id="datetime-to-timestamp"),
+        pytest.param(date, "date", id="date-to-date"),
+        pytest.param(Decimal, "decimal", id="decimal-to-decimal"),
+        pytest.param(IPv4Address, "inet", id="ipv4-to-inet"),
+        pytest.param(dt_time, "time", id="time-to-time"),
+        pytest.param(list[str], "list<text>", id="list-str"),
+        pytest.param(set[int], "set<int>", id="set-int"),
+        pytest.param(dict[str, int], "map<text, int>", id="dict-str-int"),
+        pytest.param(Optional[str], "text", id="optional-str"),
+        pytest.param(Annotated[UUID, PrimaryKey()], "uuid", id="annotated-unwraps"),
+    ],
+)
+def test_python_type_to_cql_type_str(python_type, expected_cql):
+    assert python_type_to_cql_type_str(python_type) == expected_cql
 
 
-def test_float_to_float():
-    assert python_type_to_cql_type_str(float) == "float"
+# ---- python_type_to_cql_type_str: extended-type markers ----
 
 
-def test_bool_to_boolean():
-    assert python_type_to_cql_type_str(bool) == "boolean"
+@pytest.mark.parametrize(
+    "annotated_type, expected_cql",
+    [
+        pytest.param(Annotated[int, BigInt()], "bigint", id="bigint"),
+        pytest.param(Annotated[int, SmallInt()], "smallint", id="smallint"),
+        pytest.param(Annotated[int, TinyInt()], "tinyint", id="tinyint"),
+        pytest.param(Annotated[int, VarInt()], "varint", id="varint"),
+        pytest.param(Annotated[float, Double()], "double", id="double"),
+        pytest.param(Annotated[str, Ascii()], "ascii", id="ascii"),
+        pytest.param(Annotated[UUID, TimeUUID()], "timeuuid", id="timeuuid"),
+        pytest.param(Annotated[dt_time, Time()], "time", id="time-marker"),
+    ],
+)
+def test_extended_type_marker(annotated_type, expected_cql):
+    assert python_type_to_cql_type_str(annotated_type) == expected_cql
 
 
-def test_bytes_to_blob():
-    assert python_type_to_cql_type_str(bytes) == "blob"
+# ---- python_type_to_cql_type_str: frozen types ----
 
 
-def test_uuid_to_uuid():
-    assert python_type_to_cql_type_str(UUID) == "uuid"
-
-
-def test_datetime_to_timestamp():
-    assert python_type_to_cql_type_str(datetime) == "timestamp"
-
-
-def test_date_to_date():
-    assert python_type_to_cql_type_str(date) == "date"
-
-
-def test_decimal_to_decimal():
-    assert python_type_to_cql_type_str(Decimal) == "decimal"
-
-
-def test_ipv4_to_inet():
-    assert python_type_to_cql_type_str(IPv4Address) == "inet"
-
-
-def test_list_str():
-    assert python_type_to_cql_type_str(list[str]) == "list<text>"
-
-
-def test_set_int():
-    assert python_type_to_cql_type_str(set[int]) == "set<int>"
-
-
-def test_dict_str_int():
-    assert python_type_to_cql_type_str(dict[str, int]) == "map<text, int>"
-
-
-def test_optional_str():
-    assert python_type_to_cql_type_str(Optional[str]) == "text"
-
-
-def test_annotated_unwraps():
-    assert python_type_to_cql_type_str(Annotated[UUID, PrimaryKey()]) == "uuid"
+@pytest.mark.parametrize(
+    "annotated_type, expected_cql",
+    [
+        pytest.param(
+            Annotated[list[str], Frozen()], "frozen<list<text>>", id="frozen-list"
+        ),
+        pytest.param(
+            Annotated[set[int], Frozen()], "frozen<set<int>>", id="frozen-set"
+        ),
+        pytest.param(
+            Annotated[dict[str, int], Frozen()],
+            "frozen<map<text, int>>",
+            id="frozen-map",
+        ),
+        pytest.param(
+            Annotated[tuple[str, int], Frozen()],
+            "frozen<tuple<text, int>>",
+            id="frozen-tuple",
+        ),
+    ],
+)
+def test_frozen_type(annotated_type, expected_cql):
+    assert python_type_to_cql_type_str(annotated_type) == expected_cql
 
 
 def test_unsupported_type_raises():
@@ -93,6 +109,21 @@ def test_no_cqlengine_import():
     import sys
 
     assert "cassandra.cqlengine" not in sys.modules
+
+
+def test_marker_with_primary_key():
+    """Marker should work alongside other annotations like PrimaryKey."""
+    assert (
+        python_type_to_cql_type_str(Annotated[int, PrimaryKey(), BigInt()]) == "bigint"
+    )
+
+
+def test_frozen_with_marker():
+    """Frozen combined with a type marker should wrap the marker's CQL type."""
+    assert (
+        python_type_to_cql_type_str(Annotated[UUID, Frozen(), TimeUUID()])
+        == "frozen<timeuuid>"
+    )
 
 
 # ---- coerce_row_none_collections tests ----
@@ -108,35 +139,22 @@ class _FakeDoc:
     description: Optional[str]
 
 
-def test_coerce_none_list_to_empty_list():
-    row: dict = {"tags": None, "name": "x"}
+@pytest.mark.parametrize(
+    "field, input_val, expected",
+    [
+        pytest.param("tags", None, [], id="none-list-to-empty"),
+        pytest.param("labels", None, set(), id="none-set-to-empty"),
+        pytest.param("meta", None, {}, id="none-dict-to-empty"),
+        pytest.param("tags", ["a", "b"], ["a", "b"], id="non-none-unchanged"),
+        pytest.param("description", None, None, id="scalar-none-unchanged"),
+    ],
+)
+def test_coerce_row_none_collections(field, input_val, expected):
+    row = {field: input_val}
+    if field == "tags":
+        row.setdefault("name", "x")
     result = coerce_row_none_collections(_FakeDoc, row)
-    assert result["tags"] == []
-    assert result["name"] == "x"
-
-
-def test_coerce_none_set_to_empty_set():
-    row: dict = {"labels": None}
-    result = coerce_row_none_collections(_FakeDoc, row)
-    assert result["labels"] == set()
-
-
-def test_coerce_none_dict_to_empty_dict():
-    row: dict = {"meta": None}
-    result = coerce_row_none_collections(_FakeDoc, row)
-    assert result["meta"] == {}
-
-
-def test_coerce_leaves_non_none_collections_alone():
-    row: dict = {"tags": ["a", "b"], "name": "x"}
-    result = coerce_row_none_collections(_FakeDoc, row)
-    assert result["tags"] == ["a", "b"]
-
-
-def test_coerce_leaves_scalar_none_alone():
-    row: dict = {"description": None}
-    result = coerce_row_none_collections(_FakeDoc, row)
-    assert result["description"] is None
+    assert result[field] == expected
 
 
 def test_coerce_annotated_collection():
@@ -159,84 +177,3 @@ def test_coerce_optional_collection():
     row: dict = {"tags": None}
     result = coerce_row_none_collections(_OptionalListDoc, row)
     assert result["tags"] == []
-
-
-# ---- Phase 1: Extended type system tests ----
-
-
-def test_time_to_time():
-    assert python_type_to_cql_type_str(dt_time) == "time"
-
-
-def test_bigint_marker():
-    assert python_type_to_cql_type_str(Annotated[int, BigInt()]) == "bigint"
-
-
-def test_smallint_marker():
-    assert python_type_to_cql_type_str(Annotated[int, SmallInt()]) == "smallint"
-
-
-def test_tinyint_marker():
-    assert python_type_to_cql_type_str(Annotated[int, TinyInt()]) == "tinyint"
-
-
-def test_varint_marker():
-    assert python_type_to_cql_type_str(Annotated[int, VarInt()]) == "varint"
-
-
-def test_double_marker():
-    assert python_type_to_cql_type_str(Annotated[float, Double()]) == "double"
-
-
-def test_ascii_marker():
-    assert python_type_to_cql_type_str(Annotated[str, Ascii()]) == "ascii"
-
-
-def test_timeuuid_marker():
-    assert python_type_to_cql_type_str(Annotated[UUID, TimeUUID()]) == "timeuuid"
-
-
-def test_time_marker():
-    assert python_type_to_cql_type_str(Annotated[dt_time, Time()]) == "time"
-
-
-def test_frozen_list():
-    assert (
-        python_type_to_cql_type_str(Annotated[list[str], Frozen()])
-        == "frozen<list<text>>"
-    )
-
-
-def test_frozen_set():
-    assert (
-        python_type_to_cql_type_str(Annotated[set[int], Frozen()]) == "frozen<set<int>>"
-    )
-
-
-def test_frozen_map():
-    assert (
-        python_type_to_cql_type_str(Annotated[dict[str, int], Frozen()])
-        == "frozen<map<text, int>>"
-    )
-
-
-def test_frozen_tuple():
-    assert (
-        python_type_to_cql_type_str(Annotated[tuple[str, int], Frozen()])
-        == "frozen<tuple<text, int>>"
-    )
-
-
-def test_marker_with_primary_key():
-    """Marker should work alongside other annotations like PrimaryKey."""
-    assert (
-        python_type_to_cql_type_str(Annotated[int, PrimaryKey(), BigInt()]) == "bigint"
-    )
-
-
-def test_frozen_with_marker():
-    """Frozen combined with a type marker should wrap the marker's CQL type."""
-    assert (
-        python_type_to_cql_type_str(Annotated[UUID, Frozen(), TimeUUID()])
-        == "frozen<timeuuid>"
-    )

@@ -7,16 +7,16 @@
       <span class="review-rating">{{ "★" * r.rating }}{{ "☆" * (5 - r.rating) }}</span>
     </span>
     <span>
-      <span class="review-date">{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</span>
+      <span class="review-date">{{ r.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</span>
       <button class="btn btn-danger btn-sm"
               hx-delete="/ui/products/{{ r.product_id }}/reviews/{{ r.created_at.isoformat() }}"
               hx-target="#review-list" hx-swap="innerHTML"
-              hx-confirm="Delete this review?">✕</button>
+              hx-confirm="Redact this field report?">✕</button>
     </span>
   </div>
   {% if r.content %}<div class="review-content">{{ r.content }}</div>{% endif %}
 </div>
 {% endfor %}
 {% else %}
-<div class="empty">No reviews yet — be the first!</div>
+<div class="empty">No field intel on this artifact — submit a report below</div>
 {% endif %}

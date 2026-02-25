@@ -27,6 +27,23 @@ jobs:
         run: uv sync --extra docs
       - name: Build docs
         run: uv run sphinx-build -b html docs/source docs/build/html
+      - name: Include benchmark history from gh-pages
+        if: github.ref == 'refs/heads/master'
+        run: |
+          git fetch origin gh-pages 2>/dev/null || true
+          if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+            git checkout origin/gh-pages -- benchmarks/ 2>/dev/null || true
+            if [ -d benchmarks ]; then
+              mkdir -p docs/build/html/benchmarks
+              cp -rT benchmarks/ docs/build/html/benchmarks/
+              echo "✅ Benchmark history included in docs deployment"
+            else
+              echo "ℹ️ No benchmark data found on gh-pages branch"
+            fi
+          else
+            echo "ℹ️ gh-pages branch not found, skipping benchmark history"
+          fi
+
       - name: Upload artifact
         if: github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3

@@ -253,6 +253,7 @@ await Product.find(brand="Discontinued").allow_filtering().delete()
 |---|---|
 | 📖 **Full Documentation** | [fruch.github.io/coodie](https://fruch.github.io/coodie/) |
 | 🚀 **Quick Start Guide** | [Installation & Quickstart](https://fruch.github.io/coodie/quickstart.html) |
+| 📊 **Benchmark History** | [Performance Trends](https://fruch.github.io/coodie/benchmarks/) |
 | 🔄 **Migrating from cqlengine** | [Migration Guide](https://fruch.github.io/coodie/migration/from-cqlengine.html) |
 | 🤝 **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 📋 **Changelog** | [CHANGELOG.md](CHANGELOG.md) |

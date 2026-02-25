@@ -57,4 +57,4 @@ html_static_path = ["_static"]
 
 # Serve llms.txt and llms-full.txt at the documentation root
 # See https://llmstxt.org/ for the specification
-html_extra_path = ["llms.txt", "llms-full.txt"]
+html_extra_path = ["llms.txt", "llms-full.txt", "_benchmarks_extra"]

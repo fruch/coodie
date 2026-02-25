@@ -424,19 +424,41 @@ async def test_cassandra_driver_execute_async(cassandra_driver, mock_cassandra_s
 
 
 async def test_cassandra_driver_sync_table_async(cassandra_driver, mock_cassandra_session):
-    """sync_table_async delegates to sync_table via run_in_executor."""
+    """sync_table_async uses native async callbacks — no run_in_executor."""
+    import asyncio
     from coodie.schema import ColumnDefinition
 
     cols = [
         ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
     ]
     SysRow = namedtuple("SysRow", ["column_name"])
-    mock_cassandra_session.execute.side_effect = [
-        None,  # CREATE TABLE
-        [SysRow(column_name="id")],  # system_schema
-    ]
+
+    # The CREATE TABLE call uses raw CQL via execute_async (not prepared)
+    # The introspection call also uses execute_async with params
+    call_count = 0
+
+    def fake_execute_async(stmt, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        future = MagicMock()
+
+        if call_count == 1:
+            # CREATE TABLE — returns None
+            result = None
+        else:
+            # system_schema introspection — returns rows
+            result = [SysRow(column_name="id")]
+
+        def add_callbacks(on_success, on_error):
+            loop = asyncio.get_event_loop()
+            loop.call_soon(on_success, result)
+
+        future.add_callbacks = add_callbacks
+        return future
+
+    mock_cassandra_session.execute_async.side_effect = fake_execute_async
     await cassandra_driver.sync_table_async("t", "test_ks", cols)
-    assert mock_cassandra_session.execute.call_count >= 1
+    assert mock_cassandra_session.execute_async.call_count >= 1
 
 
 async def test_cassandra_driver_close_async(cassandra_driver, mock_cassandra_session):

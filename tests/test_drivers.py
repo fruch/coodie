@@ -653,6 +653,52 @@ def test_acsylla_driver_sync_close(acsylla_driver, mock_acsylla_session):
     assert not acsylla_driver._bg_thread.is_alive()
 
 
+def test_acsylla_driver_sync_execute_with_fetch_size(acsylla_driver, mock_acsylla_session):
+    """Sync execute() with fetch_size correctly propagates _last_paging_state."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "1"}, {"id": "2"}]))
+    mock_result.has_more_pages.return_value = True
+    mock_result.page_state.return_value = b"next-page-token"
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
+
+    rows = acsylla_driver.execute("SELECT * FROM test_ks.t", [], fetch_size=2)
+
+    assert rows == [{"id": "1"}, {"id": "2"}]
+    # _last_paging_state must be readable from the calling thread after execute() returns
+    assert acsylla_driver._last_paging_state == b"next-page-token"
+
+    prepared = mock_acsylla_session.create_prepared.return_value
+    prepared.bind.assert_called_with([], page_size=2)
+
+
+def test_acsylla_driver_sync_execute_no_more_pages(acsylla_driver, mock_acsylla_session):
+    """Sync execute() clears _last_paging_state when there are no more pages."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "3"}]))
+    mock_result.has_more_pages.return_value = False
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
+
+    acsylla_driver.execute("SELECT * FROM test_ks.t", [], fetch_size=2)
+
+    assert acsylla_driver._last_paging_state is None
+
+
+def test_acsylla_driver_sync_execute_with_paging_state(acsylla_driver, mock_acsylla_session):
+    """Sync execute() passes paging_state to the statement (cursor-based pagination)."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "4"}]))
+    mock_result.has_more_pages.return_value = False
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
+
+    rows = acsylla_driver.execute("SELECT * FROM test_ks.t", [], fetch_size=2, paging_state=b"page-token")
+
+    assert rows == [{"id": "4"}]
+    assert acsylla_driver._last_paging_state is None
+    prepared = mock_acsylla_session.create_prepared.return_value
+    statement = prepared.bind.return_value
+    statement.set_page_state.assert_called_once_with(b"page-token")
+
+
 # ------------------------------------------------------------------
 # Phase A: Enhanced sync_table — dry_run, drift, options, indexes
 # ------------------------------------------------------------------

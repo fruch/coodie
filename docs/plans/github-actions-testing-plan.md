@@ -335,7 +335,7 @@ primary testing mechanism. Developers can install it optionally.
 
 ### Phase 2: Shell Script Extraction & Bats Tests (Priority: High)
 
-**Goal:** Extract the complex shell logic from `pr-rebase-squash.yml` and `self-healing-ci.yml` into standalone scripts and test them with Bats.
+**Goal:** Extract the complex shell logic from `pr-rebase-squash.yml` and `self-healing-ci.yml` into standalone scripts, test them with Bats, and integrate Bats into the existing pytest suite via a custom pytest plugin.
 
 | Task | Description |
 |---|---|
@@ -348,8 +348,99 @@ primary testing mechanism. Developers can install it optionally.
 | 2.7 | Write Bats tests for `parse-command.sh`: `/rebase`, `/squash`, `/rebase squash`, mixed-case, leading whitespace, invalid input |
 | 2.8 | Write Bats tests for `build-squash-message.sh`: Copilot success, Copilot failure (fallback to PR title), error-message rejection, empty body |
 | 2.9 | Write Bats tests for `collect-failed-logs.sh`: no failed jobs, one failed job, multiple failed jobs, API error |
-| 2.10 | Add a CI job that installs `bats-core` and runs all Bats tests on PRs touching `.github/` |
-| 2.11 | Verify: all Bats tests pass locally and in CI |
+| 2.10 | Create `tests/workflows/conftest.py` — a pytest-bats plugin that collects `.bats` files as pytest items, parses individual `@test` blocks, and runs them via `bats`, reporting pass/fail per test case (see [§2.10 Plugin Design](#210-plugin-design) below) |
+| 2.11 | Add a CI job that installs `bats-core` and runs all Bats tests via `pytest tests/workflows/` on PRs touching `.github/` |
+| 2.12 | Verify: all Bats tests pass locally and in CI via both `bats` directly and `pytest tests/workflows/` |
+
+#### 2.10 Plugin Design
+
+A custom pytest-bats conftest plugin in `tests/workflows/conftest.py`
+lets developers run Bats tests with the standard `pytest` command,
+getting unified reporting, familiar CLI flags (`-v`, `-k`, `--tb`), and
+integration with the existing CI pipeline without a separate Bats job.
+
+```python
+"""pytest-bats plugin — collect and run .bats files as pytest items."""
+
+from __future__ import annotations
+
+import re
+import shutil
+import subprocess
+
+import pytest
+
+
+def pytest_collect_file(parent, file_path):
+    """Collect .bats files as pytest test modules."""
+    if file_path.suffix == ".bats" and file_path.name.startswith("test_"):
+        return BatsFile.from_parent(parent, path=file_path)
+
+
+class BatsFile(pytest.File):
+    """A .bats file containing one or more @test blocks."""
+
+    def collect(self):
+        # Parse @test "name" { ... } blocks from the file
+        content = self.path.read_text()
+        for match in re.finditer(r"@test\s+\"([^\"]+)\"", content):
+            name = match.group(1)
+            yield BatsItem.from_parent(self, name=name)
+        # If no @test blocks found, treat the whole file as one item
+        if not list(re.finditer(r"@test\s+\"([^\"]+)\"", content)):
+            yield BatsItem.from_parent(self, name=self.path.stem)
+
+
+class BatsItem(pytest.Item):
+    """A single @test case from a .bats file."""
+
+    def runtest(self):
+        if not shutil.which("bats"):
+            pytest.skip("bats is not installed")
+        result = subprocess.run(
+            ["bats", "--filter", re.escape(self.name), str(self.path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            raise BatsTestFailure(result.stdout, result.stderr)
+
+    def repr_failure(self, excinfo, style=None):
+        if isinstance(excinfo.value, BatsTestFailure):
+            return f"Bats test failed: {self.name}\n{excinfo.value}"
+        return super().repr_failure(excinfo, style)
+
+    def reportinfo(self):
+        return self.path, None, f"bats: {self.name}"
+
+
+class BatsTestFailure(Exception):
+    """Raised when a bats test case fails."""
+
+    def __init__(self, stdout: str, stderr: str):
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def __str__(self):
+        parts = []
+        if self.stdout.strip():
+            parts.append(f"stdout:\n{self.stdout}")
+        if self.stderr.strip():
+            parts.append(f"stderr:\n{self.stderr}")
+        return "\n".join(parts) or "(no output)"
+```
+
+**Key design decisions:**
+- **Individual test granularity:** Parses `@test "name"` blocks so each
+  Bats test case appears as a separate pytest item (pass/fail/skip per case)
+- **`--filter` flag:** Runs only the matching `@test` block per item, so
+  failure isolation is accurate
+- **`shutil.which("bats")` guard:** Skips gracefully when `bats` is not
+  installed (developer machines without it, or CI without the install step)
+- **30 s timeout:** Prevents runaway shell scripts from hanging CI
+- **Custom `repr_failure`:** Shows Bats stdout/stderr inline in pytest
+  output for easy debugging
 
 ### Phase 3: Python Convention Checks (Priority: Medium)
 

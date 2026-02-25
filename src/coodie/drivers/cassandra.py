@@ -89,7 +89,7 @@ class CassandraDriver(AbstractDriver):
     ) -> list[str]:
         cache_key = f"{keyspace}.{table}"
         col_names = frozenset(col.name for col in cols)
-        if not dry_run and self._known_tables.get(cache_key) == col_names:
+        if not dry_run and not drop_removed_indexes and self._known_tables.get(cache_key) == col_names:
             return []  # table already synced this session with same columns
 
         from coodie.cql_builder import (

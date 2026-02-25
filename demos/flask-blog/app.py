@@ -44,12 +44,7 @@ def create_app() -> Flask:
         post = Post.find_one(id=post_id)
         if post is None:
             abort(404)
-        comments = (
-            Comment.find(post_id=post_id)
-            .order_by("-created_at")
-            .limit(50)
-            .all()
-        )
+        comments = Comment.find(post_id=post_id).order_by("-created_at").limit(50).all()
         return render_template("post_detail.html", post=post, comments=comments)
 
     @app.get("/new")
@@ -167,12 +162,7 @@ def create_app() -> Flask:
     @app.get("/api/posts/<uuid:post_id>/comments")
     def api_list_comments(post_id: UUID):
         """List comments for a post as JSON."""
-        comments = (
-            Comment.find(post_id=post_id)
-            .order_by("-created_at")
-            .limit(50)
-            .all()
-        )
+        comments = Comment.find(post_id=post_id).order_by("-created_at").limit(50).all()
         return [c.model_dump(mode="json") for c in comments]
 
     @app.post("/api/posts/<uuid:post_id>/comments")

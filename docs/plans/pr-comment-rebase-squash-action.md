@@ -27,8 +27,9 @@
    - [5.5 Repository Setup Checklist](#55-repository-setup-checklist)
 6. [Workflow YAML Design](#6-workflow-yaml-design)
    - [6.1 Trigger & Permissions](#61-trigger--permissions)
-   - [6.2 Step-by-Step Pseudocode](#62-step-by-step-pseudocode)
-   - [6.3 Draft Workflow YAML](#63-draft-workflow-yaml)
+   - [6.2 Commit Authorship](#62-commit-authorship)
+   - [6.3 Step-by-Step Pseudocode](#63-step-by-step-pseudocode)
+   - [6.4 Draft Workflow YAML](#64-draft-workflow-yaml)
 7. [Security Considerations](#7-security-considerations)
 8. [Test Plan](#8-test-plan)
 9. [References](#9-references)
@@ -295,7 +296,29 @@ on:
 | `pull-requests: write` | Repository | Post summary comments, add reactions |
 | `issues: write` | Repository | Add reaction to the trigger comment |
 
-### 6.2 Step-by-Step Pseudocode
+### 6.2 Commit Authorship
+
+Rebased and squashed commits are attributed to the **user who posted the
+slash-command comment**, not to the bot or the PAT owner. The workflow extracts
+the comment author's GitHub username and noreply email from the event payload:
+
+```yaml
+git config user.name "${{ github.event.comment.user.login }}"
+git config user.email "${{ github.event.comment.user.id }}+${{ github.event.comment.user.login }}@users.noreply.github.com"
+```
+
+| Actor | Role |
+|---|---|
+| **Comment author** (`github.event.comment.user.login`) | Git committer and author on the rebased/squashed commits |
+| **`GITHUB_TOKEN`** (github-actions bot) | Used for `git push`, PR comments, and reactions — no commits are made under this identity |
+| **`COPILOT_PAT` owner** | Used **only** for Copilot API calls (`gh copilot suggest`) — never appears in Git history |
+
+> **Why the comment author?** This preserves `git blame` accuracy and makes
+> the commit history reflect who actually requested the operation. GitHub's
+> noreply email format (`ID+login@users.noreply.github.com`) ensures the
+> commits are linked to the correct GitHub profile.
+
+### 6.3 Step-by-Step Pseudocode
 
 ```
 1.  Trigger: issue_comment created
@@ -304,7 +327,7 @@ on:
 4.  Guard: is the author a collaborator with write access?
 5.  React "eyes" to the comment
 6.  Checkout PR branch (full history)
-7.  Configure git identity (github-actions[bot])
+7.  Configure git identity (comment author's name + noreply email)
 8.  Parse command:
       - /rebase        → run REBASE
       - /squash        → run SQUASH
@@ -334,7 +357,7 @@ on:
 12. React "rocket" on success or "confused" on failure
 ```
 
-### 6.3 Draft Workflow YAML
+### 6.4 Draft Workflow YAML
 
 ```yaml
 name: PR Rebase & Squash
@@ -410,8 +433,8 @@ jobs:
 
       - name: Configure Git identity
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "${{ github.event.comment.user.login }}"
+          git config user.email "${{ github.event.comment.user.id }}+${{ github.event.comment.user.login }}@users.noreply.github.com"
 
       # ── 4. Parse command ─────────────────────────────────────
       - name: Parse slash command

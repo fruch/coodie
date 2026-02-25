@@ -206,8 +206,8 @@ jobs:
           # Try Copilot CLI for a full commit body description.
           # NOTE: stderr goes to /dev/null — never capture it into the message
           # variable, since error text would bypass the empty-string fallback.
-          gh extension install github/gh-copilot 2>/dev/null || true
-          BODY=$(gh copilot suggest \
+          npm install -g @github/copilot 2>/dev/null || true
+          BODY=$(copilot -p \
             "Write a git commit body (no subject line) summarising these changes. \
              Be concise. Commits: $LOG --- Diff stat: $STAT" \
             2>/dev/null) || true

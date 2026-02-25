@@ -83,8 +83,6 @@ async def init_coodie_async(
         session = await cluster.create_session(keyspace=keyspace)
 
     if driver_type == "acsylla":
-        import asyncio
-
         from coodie.drivers.acsylla import AcsyllaDriver
 
         if session is None:
@@ -92,8 +90,7 @@ async def init_coodie_async(
                 "AcsyllaDriver requires a pre-created acsylla session. "
                 "Pass session= or use init_coodie_async() with hosts."
             )
-        loop = asyncio.get_running_loop()
-        driver: AbstractDriver = AcsyllaDriver(session=session, default_keyspace=keyspace, loop=loop)
+        driver: AbstractDriver = AcsyllaDriver(session=session, default_keyspace=keyspace)
         register_driver(name, driver, default=True)
         return driver
 

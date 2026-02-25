@@ -91,8 +91,7 @@ async def coodie_driver(
         from coodie.drivers.acsylla import AcsyllaDriver
 
         acsylla_session = await create_acsylla_session(scylla_container, "test_ks")
-        loop = asyncio.get_running_loop()
-        acsylla_driver = AcsyllaDriver(session=acsylla_session, default_keyspace="test_ks", loop=loop)
+        acsylla_driver = AcsyllaDriver(session=acsylla_session, default_keyspace="test_ks")
         from coodie.drivers import register_driver
 
         register_driver("default", acsylla_driver, default=True)
@@ -442,11 +441,6 @@ async def _retry(fn, retries=5, delay=1):
 
 @pytest.fixture(params=["sync", "async"])
 def variant(request, driver_type):
-    if request.param == "sync" and driver_type == "acsylla":
-        pytest.skip(
-            "acsylla sync bridge uses loop.run_until_complete() which "
-            "conflicts with pytest-asyncio's already-running event loop"
-        )
     return request.param
 
 

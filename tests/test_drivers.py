@@ -545,7 +545,13 @@ def acsylla_driver(mock_acsylla_session):
     with patch.dict("sys.modules", {"acsylla": MagicMock()}):
         from coodie.drivers.acsylla import AcsyllaDriver
 
-        return AcsyllaDriver(session=mock_acsylla_session, default_keyspace="test_ks")
+        driver = AcsyllaDriver(session=mock_acsylla_session, default_keyspace="test_ks")
+        try:
+            yield driver
+        finally:
+            # Stop the background event loop thread started by the driver
+            driver._bg_loop.call_soon_threadsafe(driver._bg_loop.stop)
+            driver._bg_thread.join(timeout=10)
 
 
 async def test_acsylla_driver_execute_async(acsylla_driver, mock_acsylla_session):
@@ -681,6 +687,43 @@ async def test_acsylla_driver_execute_async_with_paging_state(acsylla_driver, mo
     prepared = mock_acsylla_session.create_prepared.return_value
     statement = prepared.bind.return_value
     statement.set_page_state.assert_called_once_with(b"page-token")
+
+
+# ------------------------------------------------------------------
+# Sync bridge: execute(), sync_table(), close() via background loop
+# ------------------------------------------------------------------
+
+
+def test_acsylla_driver_sync_execute(acsylla_driver, mock_acsylla_session):
+    """execute() works from a non-async context via the background loop."""
+    rows = acsylla_driver.execute("SELECT * FROM test_ks.t", ["p1"])
+    assert rows == [{"id": "1", "name": "Alice"}]
+
+
+def test_acsylla_driver_sync_execute_from_running_loop(acsylla_driver, mock_acsylla_session):
+    """execute() works even when called from within a running event loop."""
+    import asyncio
+
+    async def call_sync_from_loop():
+        # run_in_executor ensures execute() is called from a thread while the
+        # current loop is still running — this would have raised RuntimeError
+        # with the old run_until_complete approach.
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, acsylla_driver.execute, "SELECT * FROM test_ks.t", ["p1"]
+        )
+
+    rows = asyncio.run(call_sync_from_loop())
+    assert rows == [{"id": "1", "name": "Alice"}]
+
+
+def test_acsylla_driver_sync_close(acsylla_driver, mock_acsylla_session):
+    """close() runs close_async() on the background loop and stops it."""
+    acsylla_driver.close()
+    mock_acsylla_session.close.assert_called_once()
+    # Background loop should be stopped and thread should have exited after close()
+    assert not acsylla_driver._bg_loop.is_running()
+    assert not acsylla_driver._bg_thread.is_alive()
 
 
 # ------------------------------------------------------------------

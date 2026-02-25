@@ -5,7 +5,7 @@
 #
 # Slash-commands (via PR comment):
 #   /rebase        — Rebase the PR branch onto the base branch
-#   /squash        — Squash all PR commits into one with a Copilot-generated message
+#   /squash        — Squash all PR commits into one using the PR title as commit message
 #   /rebase squash — Rebase first, then squash
 #
 # Manual testing (via Actions tab → "Run workflow"):
@@ -164,39 +164,12 @@ jobs:
             echo "status=conflict" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Resolve conflicts with Copilot CLI
+      - name: Abort on rebase conflicts
         if: steps.rebase.outputs.status == 'conflict'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
-          # Install GitHub Copilot CLI extension (requires COPILOT_PAT secret)
-          gh extension install github/gh-copilot || true
-
-          UNRESOLVED=""
-          for FILE in $(git diff --name-only --diff-filter=U); do
-            echo "Attempting to resolve conflict in: $FILE"
-
-            # Extract conflict context and ask Copilot for resolution
-            CONFLICT_CONTENT=$(cat "$FILE")
-            SUGGESTION=$(gh copilot suggest \
-              "Resolve the git merge conflict in this file. Keep the most \
-               appropriate changes from both sides: $FILE" 2>&1) || true
-
-            if [ -n "$SUGGESTION" ]; then
-              git add "$FILE"
-            else
-              UNRESOLVED="$UNRESOLVED $FILE"
-            fi
-          done
-
-          if [ -n "$UNRESOLVED" ]; then
-            git rebase --abort
-            echo "Could not resolve conflicts in:$UNRESOLVED" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-          git rebase --continue --no-edit
+          git rebase --abort
+          echo "Rebase failed due to merge conflicts. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Push rebased branch
         if: steps.cmd.outputs.do_rebase == 'true'
@@ -207,7 +180,6 @@ jobs:
         if: steps.cmd.outputs.do_squash == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           BASE="${{ steps.pr.outputs.base_ref }}"
           git fetch origin "$BASE"
@@ -219,23 +191,14 @@ jobs:
             exit 0
           fi
 
-          # Collect context for Copilot
-          LOG=$(git log --oneline "$MERGE_BASE..HEAD")
-          STAT=$(git diff --stat "$MERGE_BASE..HEAD")
+          # Use the PR title as the squash commit message (already follows
+          # Conventional Commits format by project convention).
+          PR_NUMBER="${{ steps.ctx.outputs.pr_number }}"
+          MESSAGE=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" --jq '.title') || true
 
-          # Install GitHub Copilot CLI extension (requires COPILOT_PAT secret)
-          gh extension install github/gh-copilot || true
-
-          # Generate a Conventional Commits message via Copilot CLI
-          MESSAGE=$(gh copilot suggest -t shell \
-            "Write a single conventional commit message (type(scope): subject) \
-             summarising these changes. Types: feat fix docs style refactor perf \
-             test build ci chore revert. No period at end. Lowercase first letter. \
-             Commits: $LOG --- Diff stat: $STAT" 2>&1) || true
-
-          # Fallback if Copilot CLI fails
+          # Fallback if PR title is unavailable
           if [ -z "$MESSAGE" ]; then
-            MESSAGE="chore: squash $(echo "$COMMIT_COUNT") commits"
+            MESSAGE="chore: squash ${COMMIT_COUNT} commits"
           fi
 
           # Squash

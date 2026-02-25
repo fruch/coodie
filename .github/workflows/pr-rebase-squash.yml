@@ -208,9 +208,24 @@ jobs:
           # variable, since error text would bypass the empty-string fallback.
           npm install -g @github/copilot 2>/dev/null || true
           BODY=$(copilot -p \
-            "Write a git commit body (no subject line) summarising these changes. \
-             Be concise. Commits: $LOG --- Diff stat: $STAT" \
+            "Write ONLY a git commit body (no subject line) summarising these changes. \
+             Output plain text only — no markdown fences, no code blocks, no tool \
+             calls, no reasoning steps. Be concise. \
+             Commits: $LOG --- Diff stat: $STAT" \
             2>/dev/null) || true
+
+          # Clean copilot output: if the response is wrapped in a fenced code
+          # block (```...```) with tool-call / reasoning preamble before it,
+          # extract only the content between the first pair of ``` markers.
+          if [ -n "$BODY" ] && echo "$BODY" | grep -q '^```'; then
+            BODY=$(echo "$BODY" | awk '/^```/{if(f){exit}else{f=1;next}} f{print}')
+          fi
+
+          # Strip any remaining copilot agent step-output lines
+          # (● action headers, $ shell commands, └ result summaries)
+          if [ -n "$BODY" ]; then
+            BODY=$(echo "$BODY" | grep -vE '^\s*(●|└|\$ )')
+          fi
 
           # Reject output that looks like error messages rather than real content
           if [ -n "$BODY" ] && echo "$BODY" | grep -qiE '(error:|unknown option|--help|installed successfully)'; then

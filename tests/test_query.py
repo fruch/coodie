@@ -508,3 +508,63 @@ async def test_rows_to_docs_none_collection_coerced(variant, queryset_cls, regis
     results = await _maybe_await(queryset_cls(TagDoc).all)
     assert len(results) == 1
     assert results[0].tags == []
+
+
+# -- _clone() optimization (Phase 4: Task 3.10) ------------------------------
+
+
+def test_clone_preserves_all_state(Item, queryset_cls, registered_mock_driver):
+    """_clone() without overrides copies all slot values."""
+    qs = queryset_cls(Item)
+    qs = qs.filter(name="foo").limit(10).allow_filtering()
+    cloned = qs._clone()
+    assert cloned is not qs
+    assert cloned._where == qs._where
+    assert cloned._limit_val == qs._limit_val
+    assert cloned._allow_filtering_val is True
+    assert cloned._doc_cls is qs._doc_cls
+
+
+def test_clone_applies_single_override(Item, queryset_cls, registered_mock_driver):
+    """_clone() with a single override changes only that field."""
+    qs = queryset_cls(Item).filter(name="bar").limit(5)
+    cloned = qs._clone(limit_val=20)
+    assert cloned._limit_val == 20
+    assert cloned._where == qs._where  # unchanged
+
+
+def test_clone_is_fast_path(Item, queryset_cls, registered_mock_driver):
+    """_clone() uses object.__new__() — the new QS is a QuerySet instance."""
+    qs = queryset_cls(Item)
+    cloned = qs._clone(limit_val=1)
+    assert isinstance(cloned, queryset_cls)
+    assert cloned._limit_val == 1
+
+
+# -- QuerySet.all(lazy=True) (Phase 4: Task 7.4) -----------------------------
+
+
+async def test_all_lazy_returns_lazy_documents(Item, queryset_cls, registered_mock_driver):
+    """all(lazy=True) returns LazyDocument instances."""
+    from coodie.lazy import LazyDocument
+
+    pid = uuid4()
+    registered_mock_driver.set_return_rows([{"id": pid, "name": "A", "rating": 5}])
+    results = await _maybe_await(queryset_cls(Item).all, lazy=True)
+    assert len(results) == 1
+    assert isinstance(results[0], LazyDocument)
+    assert results[0].name == "A"
+    assert results[0].id == pid
+
+
+async def test_all_lazy_defers_parsing(Item, queryset_cls, registered_mock_driver):
+    """LazyDocument does not parse until field access."""
+    from coodie.lazy import LazyDocument
+
+    pid = uuid4()
+    registered_mock_driver.set_return_rows([{"id": pid, "name": "B", "rating": 3}])
+    results = await _maybe_await(queryset_cls(Item).all, lazy=True)
+    lazy = results[0]
+    assert lazy._parsed is None
+    _ = lazy.name
+    assert lazy._parsed is not None

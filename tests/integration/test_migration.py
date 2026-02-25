@@ -23,6 +23,17 @@ pytestmark = [
 class TestMigrationPhaseA:
     """Integration tests for Phase A enhanced sync_table."""
 
+    @pytest.fixture(autouse=True)
+    def _clear_known_tables_cache(self, coodie_driver) -> None:
+        """Clear the driver's _known_tables cache before each test.
+
+        The cache persists across variants (sync/async) because the driver is
+        session-scoped and both variants share the same CQL table names.
+        Without clearing, the async variant hits the cache populated by the
+        sync variant and returns ``[]`` — skipping all DDL.
+        """
+        coodie_driver._known_tables.clear()
+
     async def test_sync_table_returns_planned_cql(self, coodie_driver, PhaseAProduct) -> None:
         """sync_table should return a list of CQL that were executed."""
         planned = await _maybe_await(PhaseAProduct.sync_table)

@@ -1,41 +1,45 @@
-<div class="card" style="margin-bottom:1rem;">
-  <h2>{{ product.name }}</h2>
-  <p style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem;">
-    {{ product.brand }} · {{ product.category }} · <span class="product-price">${{ "%.2f"|format(product.price) }}</span>
-  </p>
-  {% if product.description %}<p style="font-size:0.9rem;margin-bottom:0.5rem;">{{ product.description }}</p>{% endif %}
-  {% for tag in product.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
-  <p style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem;">ID: {{ product.id }}</p>
+<div class="card" style="margin-bottom:1.25rem;">
+  <h2>🔬 Artifact Report</h2>
+  <div style="font-size:1.05rem;font-weight:700;margin-bottom:0.75rem;color:var(--accent);">{{ product.name }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Origin Dimension <span>🌀 {{ product.brand }}</span></div>
+    <div class="detail-meta-item">Artifact Class <span>{{ product.category }}</span></div>
+    <div class="detail-meta-item">Estimated Value <span style="color:var(--success);">⚡ {{ "%.2f"|format(product.price) }} gc</span></div>
+    <div class="detail-meta-item">Registered <span>{{ product.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</span></div>
+  </div>
+  {% if product.description %}<p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem;line-height:1.6;">{{ product.description }}</p>{% endif %}
+  <div>{% for tag in product.tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>
+  <div class="artifact-id">ARTIFACT-ID: {{ product.id }}</div>
 </div>
 
-<div class="card" style="margin-bottom:1rem;">
-  <h2>💬 Reviews</h2>
+<div class="card" style="margin-bottom:1.25rem;">
+  <h2>📡 Field Intel</h2>
   <div id="review-list"
        hx-get="/ui/products/{{ product.id }}/reviews"
        hx-trigger="load" hx-swap="innerHTML">
-    <div class="empty">Loading reviews…</div>
+    <div class="empty">Decrypting field reports…</div>
   </div>
 </div>
 
 <div class="card">
-  <h2>✍️ Add Review</h2>
+  <h2>✍️ Submit Field Report</h2>
   <form hx-post="/ui/products/{{ product.id }}/reviews" hx-target="#review-list" hx-swap="innerHTML"
         hx-on::after-request="if(event.detail.successful) this.reset()">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
-      <div><label for="author">Author</label><input id="author" name="author" required placeholder="Jane"></div>
+      <div><label for="author">Agent Callsign</label><input id="author" name="author" required placeholder="Agent Cipher"></div>
       <div>
-        <label for="rating">Rating</label>
+        <label for="rating">Threat Level</label>
         <select id="rating" name="rating">
-          <option value="5">★★★★★ (5)</option>
-          <option value="4">★★★★☆ (4)</option>
-          <option value="3">★★★☆☆ (3)</option>
-          <option value="2">★★☆☆☆ (2)</option>
-          <option value="1">★☆☆☆☆ (1)</option>
+          <option value="5">★★★★★ Critical (5)</option>
+          <option value="4">★★★★☆ Severe (4)</option>
+          <option value="3">★★★☆☆ Moderate (3)</option>
+          <option value="2">★★☆☆☆ Low (2)</option>
+          <option value="1">★☆☆☆☆ Minimal (1)</option>
         </select>
       </div>
     </div>
-    <label for="content">Comment</label>
-    <textarea id="content" name="content" placeholder="Write your review…"></textarea>
-    <button class="btn btn-primary" type="submit">Submit Review</button>
+    <label for="content">Intel Report</label>
+    <textarea id="content" name="content" placeholder="Describe observed anomalous behavior, containment notes, dimensional interference…"></textarea>
+    <button class="btn btn-primary" type="submit">📡 Transmit Report</button>
   </form>
 </div>

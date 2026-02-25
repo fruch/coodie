@@ -4,18 +4,20 @@
      hx-get="/ui/products/{{ p.id }}" hx-target="#detail-panel" hx-swap="innerHTML">
   <div>
     <div class="product-name">{{ p.name }}</div>
-    <div class="product-meta">{{ p.brand }} · {{ p.category }}</div>
+    <div class="product-meta">
+      <span class="dimension-badge">🌀 {{ p.brand }}</span> · {{ p.category }}
+    </div>
     {% for tag in p.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
   </div>
   <div style="text-align:right;">
-    <div class="product-price">${{ "%.2f"|format(p.price) }}</div>
+    <div class="product-price">⚡ {{ "%.2f"|format(p.price) }} gc</div>
     <button class="btn btn-danger btn-sm"
             hx-delete="/ui/products/{{ p.id }}" hx-target="#product-list" hx-swap="innerHTML"
-            hx-confirm="Delete {{ p.name }}?"
+            hx-confirm="Decommission artifact {{ p.name }}? This cannot be undone."
             onclick="event.stopPropagation()">✕</button>
   </div>
 </div>
 {% endfor %}
 {% else %}
-<div class="empty">No products yet — create one above!</div>
+<div class="empty">No artifacts detected — register one above or run seed.py to populate the Bazaar</div>
 {% endif %}

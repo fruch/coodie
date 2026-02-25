@@ -54,6 +54,11 @@ cd coodie
 # Install dependencies with uv (recommended)
 uv sync --all-extras
 
+# Install bats for workflow shell script tests (optional)
+# macOS:  brew install bats-core
+# Ubuntu: sudo apt-get install bats
+# Or from source: https://bats-core.readthedocs.io/en/stable/installation.html
+
 # Or with pip
 pip install -e ".[scylla]"
 pip install pytest pytest-cov pytest-asyncio pre-commit
@@ -68,7 +73,11 @@ uv run pytest tests/ -v
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 
-# Or run all pre-commit hooks at once
+# Lint GitHub Actions workflows
+# (requires actionlint: https://github.com/rhysd/actionlint)
+actionlint
+
+# Or run all pre-commit hooks at once (includes actionlint)
 uv run pre-commit run --all-files
 ```
 
@@ -158,6 +167,32 @@ To run a subset of tests:
 ```bash
 uv run pytest tests/ -k "test_something" -v
 ```
+
+## Workflow Testing
+
+The repository's GitHub Actions workflows are tested at three levels:
+
+1. **Static Analysis** — [`actionlint`](https://github.com/rhysd/actionlint) runs via pre-commit (which CI also runs) to catch YAML and expression errors.
+2. **Shell Script Unit Tests** — Complex shell logic is extracted into `.github/scripts/` and tested with [Bats](https://github.com/bats-core/bats-core). A custom pytest-bats plugin (`tests/workflows/conftest.py`) collects `.bats` files as pytest items, so they run alongside regular Python tests:
+   ```bash
+   # Direct (requires bats installed)
+   bats tests/workflows/
+
+   # Via pytest (the conftest.py plugin runs each @test block as a pytest item;
+   # skips gracefully if bats is not installed)
+   uv run pytest tests/workflows/ -v
+   ```
+3. **Convention Checks** — `tests/test_workflow_conventions.py` enforces project-level rules (pinned actions, concurrency groups, `GH_TOKEN`, etc.) via pytest.
+
+### Manual Smoke Tests (workflow_dispatch)
+
+The `PR Rebase & Squash` and `Self-Healing CI` workflows support `workflow_dispatch` triggers for manual testing:
+
+1. Go to **Actions** → select the workflow → **Run workflow**.
+2. For `PR Rebase & Squash`: enter a PR number and select the command (`rebase`, `squash`, or `rebase squash`).
+3. For `Self-Healing CI`: enter a workflow run ID to inspect.
+4. Verify the expected comment is posted on the PR.
+5. **Cleanup:** If the operation modified the PR branch (rebase/squash), restore it with `git reflog` and `git push --force-with-lease`.
 
 ## Making a new release
 

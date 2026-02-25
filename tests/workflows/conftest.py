@@ -19,7 +19,7 @@ class BatsFile(pytest.File):
     """A .bats file containing one or more @test blocks."""
 
     def collect(self):
-        content = self.path.read_text()
+        content = self.path.read_text(encoding="utf-8")
         tests_found = False
         for match in re.finditer(r"@test\s+\"([^\"]+)\"", content):
             tests_found = True

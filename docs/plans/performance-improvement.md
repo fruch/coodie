@@ -1194,9 +1194,10 @@ Changes:
 - New `_wrap_future()` method — single bridge point for cassandra-driver `ResponseFuture`
   to `asyncio.Future` conversion. Uses `asyncio.get_running_loop()` (not deprecated
   `get_event_loop()`).
-- `execute_async()` — unified code path for all queries (paginated and non-paginated).
-  Sets `fetch_size` and `paging_state` on the bound statement, reads `paging_state`
-  from the result.
+- `execute_async()` — native async for non-paginated queries via `_wrap_future()`.
+  Paginated queries (`fetch_size is not None`) still use `run_in_executor` because the
+  cassandra-driver's `add_callbacks` delivers a plain `list` to the callback, not a
+  `ResultSet`, so `current_rows` and `paging_state` are unavailable via the async path.
 - New `_execute_cql_async()` — executes raw CQL strings asynchronously (for DDL).
 - New `_execute_bound_async()` — executes parameterised CQL strings asynchronously
   (for system_schema introspection).
@@ -1205,10 +1206,12 @@ Changes:
   ALTER TABLE ADD, schema drift warnings, table options, secondary indexes,
   and drop removed indexes.
 
-**Savings**: Eliminates all `run_in_executor()` calls from the CassandraDriver async
-path. Each `run_in_executor` added ~20–50 µs of thread pool overhead per call.
-For `sync_table_async()`, which performs 2–6 sequential DB operations, the savings
-compound to ~100–300 µs per sync_table call.
+**Savings**: Eliminates `run_in_executor()` from `sync_table_async()` and
+non-paginated `execute_async()`. Each `run_in_executor` added ~20–50 µs of
+thread pool overhead per call. For `sync_table_async()`, which performs 2–6
+sequential DB operations, the savings compound to ~100–300 µs per sync_table call.
+Paginated queries retain `run_in_executor` due to cassandra-driver callback
+limitations.
 
 ### 13B.3 Remaining Priorities After Phase 5
 

@@ -80,6 +80,7 @@ pytest-benchmark compare 0001_scylla 0002_acsylla --group-by=group
 | `bench_batch.py` | Batch INSERT (10 rows), batch INSERT (100 rows) |
 | `bench_schema.py` | `sync_table` create, `sync_table` idempotent no-op |
 | `bench_collections.py` | Collection field write/read/round-trip (list\<str\>) |
+| `bench_udt.py` | UDT serialization, instantiation, nested UDT, DDL generation |
 | `bench_serialization.py` | Model instantiation and serialization (no DB) |
 
 ## Interpreting Results

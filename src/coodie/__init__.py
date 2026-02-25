@@ -48,6 +48,7 @@ from coodie.fields import (
 )
 from coodie.lazy import LazyDocument
 from coodie.results import LWTResult, PagedResult
+from coodie.usertype import UserType
 
 __all__ = [
     "Document",
@@ -83,4 +84,5 @@ __all__ = [
     "Frozen",
     "LWTResult",
     "PagedResult",
+    "UserType",
 ]

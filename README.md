@@ -69,6 +69,7 @@ serialization, and query building — with both **sync** and **async** APIs.
 | **LWT (Compare-and-Set)** | ✅ `if_not_exists()` | N/A | ✅ `iff()` |
 | **Batch Operations** | ✅ `BatchQuery` | ❌ | ✅ `BatchQuery` |
 | **Counter Columns** | ✅ `Counter()` | ❌ | ✅ `columns.Counter` |
+| **User-Defined Types** | ✅ `UserType` | ❌ | ✅ `UserType` |
 | **TTL Support** | ✅ Per-save TTL | ❌ | ✅ Per-save TTL |
 | **Pagination** | ✅ Token-based `PagedResult` | ✅ Cursor-based | ❌ Manual |
 | **Multiple Drivers** | ✅ 3 drivers | motor only | cassandra-driver only |

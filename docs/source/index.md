@@ -55,6 +55,7 @@ guide/keys-and-indexes
 guide/crud
 guide/querying
 guide/filtering
+guide/user-defined-types
 guide/collections
 guide/counters
 guide/ttl
@@ -87,6 +88,7 @@ api/document
 api/queryset
 api/fields
 api/types
+api/usertype
 api/drivers
 api/exceptions
 api/results

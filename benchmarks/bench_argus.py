@@ -14,6 +14,8 @@ Patterns covered:
 import time
 import uuid
 
+import pytest
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -460,7 +462,10 @@ def test_coodie_multi_model_lookup(benchmark, bench_env):
 
 def test_cqlengine_argus_model_instantiation(benchmark):
     """cqlengine: instantiate a large TestRun model (no DB)."""
-    from benchmarks.models_argus_cqlengine import CqlArgusTestRun
+    try:
+        from benchmarks.models_argus_cqlengine import CqlArgusTestRun
+    except (ImportError, ModuleNotFoundError):
+        pytest.skip("cqlengine not available")
 
     def _inst():
         CqlArgusTestRun(

@@ -509,6 +509,37 @@ def build_counter_update(
     return cql, params
 
 
+def build_create_type(
+    type_name: str,
+    keyspace: str,
+    fields: list[tuple[str, str]],
+) -> str:
+    """Build a ``CREATE TYPE IF NOT EXISTS`` CQL statement.
+
+    Args:
+        type_name: Name of the UDT.
+        keyspace: Keyspace for the type.
+        fields: List of ``(field_name, cql_type_str)`` tuples.
+    """
+    field_defs = ", ".join(f'"{name}" {cql_type}' for name, cql_type in fields)
+    return f"CREATE TYPE IF NOT EXISTS {keyspace}.{type_name} ({field_defs})"
+
+
+def build_drop_type(type_name: str, keyspace: str) -> str:
+    """Build a ``DROP TYPE IF EXISTS`` CQL statement."""
+    return f"DROP TYPE IF EXISTS {keyspace}.{type_name}"
+
+
+def build_alter_type_add(
+    type_name: str,
+    keyspace: str,
+    field_name: str,
+    cql_type: str,
+) -> str:
+    """Build an ``ALTER TYPE … ADD`` CQL statement."""
+    return f'ALTER TYPE {keyspace}.{type_name} ADD "{field_name}" {cql_type}'
+
+
 def build_batch(
     statements: list[tuple[str, list[Any]]],
     logged: bool = True,

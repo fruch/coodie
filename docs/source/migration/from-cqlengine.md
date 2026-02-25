@@ -323,6 +323,66 @@ experience in several ways:
 - **Schema sync returns CQL** — `sync_table()` returns the list of CQL
   statements it plans to execute, so you can review or log them.
 
+## Migrating User-Defined Types (UDTs)
+
+coodie provides full UDT support via the `UserType` base class.
+
+### Before (cqlengine)
+
+```python
+from cassandra.cqlengine.usertype import UserType
+from cassandra.cqlengine import columns
+from cassandra.cqlengine.management import sync_type
+
+class Address(UserType):
+    __type_name__ = "address"
+    street = columns.Text()
+    city = columns.Text()
+    zipcode = columns.Integer()
+
+class User(Model):
+    id = columns.UUID(primary_key=True)
+    home = columns.UserDefinedType(Address)
+    others = columns.List(columns.UserDefinedType(Address))
+
+# Must sync types manually in dependency order
+sync_type("my_ks", Address)
+sync_table(User)
+```
+
+### After (coodie)
+
+```python
+from coodie.usertype import UserType
+from coodie.sync import Document
+from coodie.fields import PrimaryKey
+
+class Address(UserType):
+    street: str
+    city: str
+    zipcode: int
+
+    class Settings:
+        __type_name__ = "address"   # optional — defaults to snake_case
+
+class User(Document):
+    id: Annotated[UUID, PrimaryKey()]
+    home: Address                       # auto-detected as frozen<address>
+    others: list[Address] = []          # list<frozen<address>>
+
+# sync_type() auto-resolves dependencies
+Address.sync_type()
+User.sync_table()
+```
+
+Key differences:
+- **No `columns.UserDefinedType()` wrapper** — just use the `UserType` class directly as a type annotation.
+- **No `columns.*` field declarations** — use standard Python type annotations.
+- **Automatic dependency resolution** — `sync_type()` recursively syncs nested UDT dependencies.
+- **`Settings.__type_name__`** instead of class-level `__type_name__`.
+
+See the {doc}`/guide/user-defined-types` guide for full details.
+
 (cqlengine-features-not-yet-in-coodie)=
 ## cqlengine Features Not Yet in coodie
 
@@ -332,7 +392,6 @@ If your application relies on any of them, you will need a workaround
 
 | cqlengine Feature | Notes |
 |---|---|
-| **User-Defined Types (UDT)** — `UserType` base class, `columns.UserDefinedType()`, `management.sync_type()` | No UDT support. Use `frozen<>` collections or separate tables as a workaround. |
 | **Static columns** — `columns.Text(static=True)` | Not implemented. Use a separate table or denormalise the static data. |
 | **`Model.create()` class method** | Use `MyModel(**kwargs).save()` instead. |
 | **`__like` filter operator** (SASI / SAI indexes) | No LIKE queries. SASI/SAI pattern matching (`col LIKE 'prefix%'`) is not supported; filter at the application level or use a full-text search engine. |
@@ -385,7 +444,8 @@ Use this checklist when converting a cqlengine application to coodie:
 - [ ] **Convert `objects.get()`:** `Model.objects.get(...)` → `Model.get(...)`
 - [ ] **Convert batch operations:** `BatchQuery()` context manager → coodie `BatchQuery()` with `.save(batch=batch)`
 - [ ] **Handle async:** If migrating to async, add `await` before all Document and QuerySet terminal methods
-- [ ] **Check for unsupported features:** Review the [feature gaps](#cqlengine-features-not-yet-in-coodie) table — if you use UDTs, static columns, or `__like`, plan workarounds
+- [ ] **Check for unsupported features:** Review the [feature gaps](#cqlengine-features-not-yet-in-coodie) table — if you use static columns, plan workarounds
+- [ ] **Migrate UDTs:** Convert `UserType` + `columns.*` to `UserType` + type annotations; replace `sync_type()` with `Address.sync_type()` (see above)
 - [ ] **Test thoroughly:** Run your existing test suite against coodie to verify parity
 
 ## What's Next?

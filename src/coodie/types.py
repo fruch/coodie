@@ -66,7 +66,9 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
         if cql_override is not None:
             return f"frozen<{cql_override}>" if has_frozen else cql_override
         inner = python_type_to_cql_type_str(args[0])
-        return f"frozen<{inner}>" if has_frozen else inner
+        if has_frozen and not inner.startswith("frozen<"):
+            return f"frozen<{inner}>"
+        return inner
 
     # Optional[X] == Union[X, None] -> unwrap to X
     if origin is Union:
@@ -101,6 +103,12 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
     # Scalar lookup
     if annotation in _SCALAR_CQL_TYPES:
         return _SCALAR_CQL_TYPES[annotation]
+
+    # UserType subclass → frozen<type_name>
+    from coodie.usertype import _is_usertype
+
+    if _is_usertype(annotation):
+        return f"frozen<{annotation.type_name()}>"
 
     raise InvalidQueryError(f"Cannot map Python type {annotation!r} to a CQL type")
 

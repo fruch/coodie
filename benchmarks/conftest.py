@@ -53,7 +53,10 @@ def driver_type(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(scope="session")
 def cql_session(scylla_container: Any):  # noqa: F811
     """Return a cassandra-driver ``Session`` connected to the bench keyspace."""
-    session, cluster = create_cql_session(scylla_container, "bench_ks")
+    try:
+        session, cluster = create_cql_session(scylla_container, "bench_ks")
+    except (ImportError, ModuleNotFoundError):
+        pytest.skip("cassandra-driver not available")
     session.set_keyspace("bench_ks")
     yield session
     cluster.shutdown()

@@ -100,73 +100,73 @@ Legend:
 
 ## 4. Implementation Phases
 
-### Phase 1: Core Workflow Scaffold (Priority: High)
+### Phase 1: Core Workflow Scaffold ✅
 
 **Goal:** Create the workflow file with correct trigger, permissions, checkout, and permission guard.
 
-| Task | Description |
-|---|---|
-| 1.1 | Create `.github/workflows/pr-rebase-squash.yml` with `issue_comment` trigger filtered to `/rebase`, `/squash`, `/rebase squash` |
-| 1.2 | **Prerequisite:** Generate a fine-grained PAT with "Copilot Requests" permission and store it as repo secret `COPILOT_PAT` (see [§5 Copilot CLI Setup](#5-copilot-cli-setup--credentials)) |
-| 1.3 | Add permission check: verify comment author is a collaborator (write access) or the PR author |
-| 1.4 | Checkout PR branch with `fetch-depth: 0` and configure Git identity (`github-actions[bot]`) |
-| 1.5 | Add "eyes" reaction to the trigger comment to acknowledge the command |
-| 1.6 | Add error-handling step that posts a comment if any step fails |
-| 1.7 | Manual smoke test: verify the workflow triggers on a `/rebase` comment in a test PR |
+| Task | Description | Status |
+|---|---|---|
+| 1.1 | Create `.github/workflows/pr-rebase-squash.yml` with `issue_comment` trigger filtered to `/rebase`, `/squash`, `/rebase squash` | ✅ |
+| 1.2 | **Prerequisite:** Generate a fine-grained PAT with "Copilot Requests" permission and store it as repo secret `COPILOT_PAT` (see [§5 Copilot CLI Setup](#5-copilot-cli-setup--credentials)) | ⚙️ Manual step — repo owner must create and store the PAT |
+| 1.3 | Add permission check: verify comment author is a collaborator (write access) or the PR author | ✅ |
+| 1.4 | Checkout PR branch with `fetch-depth: 0` and configure Git identity (`github-actions[bot]`) | ✅ |
+| 1.5 | Add "eyes" reaction to the trigger comment to acknowledge the command | ✅ |
+| 1.6 | Add error-handling step that posts a comment if any step fails | ✅ |
+| 1.7 | Manual smoke test: verify the workflow triggers on a `/rebase` comment in a test PR | 🔲 Requires merge to default branch |
 
-### Phase 2: Rebase & Conflict Resolution (Priority: High)
+### Phase 2: Rebase & Conflict Resolution ✅
 
 **Goal:** Implement the `/rebase` command with Copilot CLI fallback for conflict resolution.
 
-| Task | Description |
-|---|---|
-| 2.1 | Fetch and determine the default branch (`origin/main` or `origin/master`) |
-| 2.2 | Run `git rebase origin/<default-branch>` and capture exit code |
-| 2.3 | On conflict: install `gh copilot` extension, iterate over conflicted files, use Copilot CLI to suggest resolutions |
-| 2.4 | Apply suggested resolutions, `git add` resolved files, `git rebase --continue` |
-| 2.5 | If Copilot CLI cannot resolve a conflict, abort rebase and post a comment listing unresolved files |
-| 2.6 | On success: `git push --force-with-lease` and post a summary comment (commits rebased, conflicts resolved) |
-| 2.7 | Manual test: create a PR with a known conflict, trigger `/rebase`, verify resolution |
+| Task | Description | Status |
+|---|---|---|
+| 2.1 | Fetch and determine the default branch (`origin/main` or `origin/master`) | ✅ Uses PR base ref |
+| 2.2 | Run `git rebase origin/<default-branch>` and capture exit code | ✅ |
+| 2.3 | On conflict: install `gh copilot` extension, iterate over conflicted files, use Copilot CLI to suggest resolutions | ✅ |
+| 2.4 | Apply suggested resolutions, `git add` resolved files, `git rebase --continue` | ✅ |
+| 2.5 | If Copilot CLI cannot resolve a conflict, abort rebase and post a comment listing unresolved files | ✅ |
+| 2.6 | On success: `git push --force-with-lease` and post a summary comment (commits rebased, conflicts resolved) | ✅ |
+| 2.7 | Manual test: create a PR with a known conflict, trigger `/rebase`, verify resolution | 🔲 Requires merge to default branch |
 
-### Phase 3: Squash & Commit-Message Rewrite (Priority: High)
+### Phase 3: Squash & Commit-Message Rewrite ✅
 
 **Goal:** Implement the `/squash` command with Copilot CLI-generated Conventional Commits message.
 
-| Task | Description |
-|---|---|
-| 3.1 | Determine merge-base between PR branch and default branch |
-| 3.2 | Collect all commit messages since merge-base (`git log --oneline merge-base..HEAD`) |
-| 3.3 | Generate full diff summary (`git diff merge-base..HEAD --stat`) |
-| 3.4 | Call Copilot CLI with the commit log + diff stat as context, requesting a Conventional Commits message that follows the project's commitlint rules |
-| 3.5 | Squash via `git reset --soft <merge-base>` + `git commit -m "<generated message>"` |
-| 3.6 | Push with `git push --force-with-lease` |
-| 3.7 | Post a summary comment with the generated commit message |
-| 3.8 | Manual test: create a multi-commit PR, trigger `/squash`, verify single commit with well-formed message |
+| Task | Description | Status |
+|---|---|---|
+| 3.1 | Determine merge-base between PR branch and default branch | ✅ |
+| 3.2 | Collect all commit messages since merge-base (`git log --oneline merge-base..HEAD`) | ✅ |
+| 3.3 | Generate full diff summary (`git diff merge-base..HEAD --stat`) | ✅ |
+| 3.4 | Call Copilot CLI with the commit log + diff stat as context, requesting a Conventional Commits message that follows the project's commitlint rules | ✅ |
+| 3.5 | Squash via `git reset --soft <merge-base>` + `git commit -m "<generated message>"` | ✅ |
+| 3.6 | Push with `git push --force-with-lease` | ✅ |
+| 3.7 | Post a summary comment with the generated commit message | ✅ |
+| 3.8 | Manual test: create a multi-commit PR, trigger `/squash`, verify single commit with well-formed message | 🔲 Requires merge to default branch |
 
-### Phase 4: Safety Gates & Edge Cases (Priority: Medium)
+### Phase 4: Safety Gates & Edge Cases ✅
 
 **Goal:** Handle edge cases and add guardrails to prevent data loss or misuse.
 
-| Task | Description |
-|---|---|
-| 4.1 | Block operation if the PR has merge-queue label or is in a review-required state |
-| 4.2 | Block if the PR is closed or merged |
-| 4.3 | Handle `/rebase squash` combined command (rebase first, then squash) |
-| 4.4 | Add concurrency group per PR number to prevent parallel runs |
-| 4.5 | Log each step's output to the workflow summary (`$GITHUB_STEP_SUMMARY`) |
-| 4.6 | Add a "rocket" reaction on the trigger comment upon success, or "confused" on failure |
-| 4.7 | Test edge cases: empty diff, single-commit PR (no-op squash), already up-to-date rebase |
+| Task | Description | Status |
+|---|---|---|
+| 4.1 | Block operation if the PR has merge-queue label or is in a review-required state | ⏭️ Skipped — not applicable to this repo |
+| 4.2 | Block if the PR is closed or merged | ✅ |
+| 4.3 | Handle `/rebase squash` combined command (rebase first, then squash) | ✅ |
+| 4.4 | Add concurrency group per PR number to prevent parallel runs | ✅ |
+| 4.5 | Log each step's output to the workflow summary (`$GITHUB_STEP_SUMMARY`) | ✅ |
+| 4.6 | Add a "rocket" reaction on the trigger comment upon success, or "confused" on failure | ✅ |
+| 4.7 | Test edge cases: empty diff, single-commit PR (no-op squash), already up-to-date rebase | 🔲 Requires merge to default branch |
 
-### Phase 5: Documentation & Rollout (Priority: Medium)
+### Phase 5: Documentation & Rollout ✅
 
 **Goal:** Document the feature and prepare for merge to the default branch.
 
-| Task | Description |
-|---|---|
-| 5.1 | Add usage instructions to `CONTRIBUTING.md` (slash-command reference table) |
-| 5.2 | Add a section in `README.md` or `CONTRIBUTING.md` explaining when to use `/rebase` vs `/squash` |
-| 5.3 | Note in the workflow file that `issue_comment` workflows must exist on the default branch to fire |
-| 5.4 | Update this plan with ✅ status for completed phases |
+| Task | Description | Status |
+|---|---|---|
+| 5.1 | Add usage instructions to `CONTRIBUTING.md` (slash-command reference table) | ✅ |
+| 5.2 | Add a section in `README.md` or `CONTRIBUTING.md` explaining when to use `/rebase` vs `/squash` | ✅ |
+| 5.3 | Note in the workflow file that `issue_comment` workflows must exist on the default branch to fire | ✅ |
+| 5.4 | Update this plan with ✅ status for completed phases | ✅ |
 
 ---
 

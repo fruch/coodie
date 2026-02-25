@@ -1,0 +1,234 @@
+# NOTE: The `issue_comment` trigger runs the workflow from the **default branch**,
+# not the PR branch. This workflow YAML must be merged to the default branch
+# before it will respond to comments. This is a GitHub Actions platform
+# constraint, not a bug.
+#
+# Slash-commands:
+#   /rebase        — Rebase the PR branch onto the base branch
+#   /squash        — Squash all PR commits into one with a Copilot-generated message
+#   /rebase squash — Rebase first, then squash
+#
+# See docs/plans/pr-comment-rebase-squash-action.md for full design details.
+
+name: PR Rebase & Squash
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: pr-rebase-squash-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  rebase-squash:
+    name: Rebase / Squash
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.issue.pull_request &&
+      (
+        contains(github.event.comment.body, '/rebase') ||
+        contains(github.event.comment.body, '/squash')
+      )
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      # ── 1. Permission check ──────────────────────────────────
+      - name: Check collaborator permission
+        id: permission
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PERM=$(gh api "repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission" \
+            --jq '.permission')
+          if [[ "$PERM" != "admin" && "$PERM" != "write" && "$PERM" != "maintain" ]]; then
+            echo "User ${{ github.event.comment.user.login }} lacks write access (has: $PERM)"
+            exit 1
+          fi
+
+      # ── 2. Acknowledge ───────────────────────────────────────
+      - name: React to comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='eyes' --silent
+
+      # ── 3. Checkout PR ───────────────────────────────────────
+      - name: Get PR metadata
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_JSON=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}")
+          echo "head_ref=$(echo "$PR_JSON" | jq -r '.head.ref')" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(echo "$PR_JSON" | jq -r '.head.sha')" >> "$GITHUB_OUTPUT"
+          echo "base_ref=$(echo "$PR_JSON" | jq -r '.base.ref')" >> "$GITHUB_OUTPUT"
+          echo "state=$(echo "$PR_JSON" | jq -r '.state')" >> "$GITHUB_OUTPUT"
+
+      - name: Abort if PR is not open
+        if: steps.pr.outputs.state != 'open'
+        run: |
+          echo "PR #${{ github.event.issue.number }} is ${{ steps.pr.outputs.state }}, not open."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "${{ github.event.comment.user.login }}"
+          git config user.email "${{ github.event.comment.user.id }}+${{ github.event.comment.user.login }}@users.noreply.github.com"
+
+      # ── 4. Parse command ─────────────────────────────────────
+      - name: Parse slash command
+        id: cmd
+        run: |
+          BODY="${{ github.event.comment.body }}"
+          DO_REBASE=false
+          DO_SQUASH=false
+          if echo "$BODY" | grep -qiE '^\s*/rebase\s+squash\s*$'; then
+            DO_REBASE=true
+            DO_SQUASH=true
+          elif echo "$BODY" | grep -qiE '^\s*/rebase\s*$'; then
+            DO_REBASE=true
+          elif echo "$BODY" | grep -qiE '^\s*/squash\s*$'; then
+            DO_SQUASH=true
+          fi
+          echo "do_rebase=$DO_REBASE" >> "$GITHUB_OUTPUT"
+          echo "do_squash=$DO_SQUASH" >> "$GITHUB_OUTPUT"
+
+      # ── 5. Rebase ───────────────────────────────────────────
+      - name: Rebase onto base branch
+        id: rebase
+        if: steps.cmd.outputs.do_rebase == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE="${{ steps.pr.outputs.base_ref }}"
+          git fetch origin "$BASE"
+
+          if git rebase "origin/$BASE"; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve conflicts with Copilot CLI
+        if: steps.rebase.outputs.status == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          # Install GitHub Copilot CLI extension (requires COPILOT_PAT secret)
+          gh extension install github/gh-copilot || true
+
+          UNRESOLVED=""
+          for FILE in $(git diff --name-only --diff-filter=U); do
+            echo "Attempting to resolve conflict in: $FILE"
+
+            # Extract conflict context and ask Copilot for resolution
+            CONFLICT_CONTENT=$(cat "$FILE")
+            SUGGESTION=$(gh copilot suggest \
+              "Resolve the git merge conflict in this file. Keep the most \
+               appropriate changes from both sides: $FILE" 2>&1) || true
+
+            if [ -n "$SUGGESTION" ]; then
+              git add "$FILE"
+            else
+              UNRESOLVED="$UNRESOLVED $FILE"
+            fi
+          done
+
+          if [ -n "$UNRESOLVED" ]; then
+            git rebase --abort
+            echo "Could not resolve conflicts in:$UNRESOLVED" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          git rebase --continue --no-edit
+
+      - name: Push rebased branch
+        if: steps.cmd.outputs.do_rebase == 'true'
+        run: git push --force-with-lease
+
+      # ── 6. Squash ───────────────────────────────────────────
+      - name: Squash commits
+        if: steps.cmd.outputs.do_squash == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          BASE="${{ steps.pr.outputs.base_ref }}"
+          git fetch origin "$BASE"
+          MERGE_BASE=$(git merge-base HEAD "origin/$BASE")
+
+          COMMIT_COUNT=$(git rev-list --count "$MERGE_BASE..HEAD")
+          if [ "$COMMIT_COUNT" -le 1 ]; then
+            echo "Only $COMMIT_COUNT commit(s) — nothing to squash." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Collect context for Copilot
+          LOG=$(git log --oneline "$MERGE_BASE..HEAD")
+          STAT=$(git diff --stat "$MERGE_BASE..HEAD")
+
+          # Install GitHub Copilot CLI extension (requires COPILOT_PAT secret)
+          gh extension install github/gh-copilot || true
+
+          # Generate a Conventional Commits message via Copilot CLI
+          MESSAGE=$(gh copilot suggest -t shell \
+            "Write a single conventional commit message (type(scope): subject) \
+             summarising these changes. Types: feat fix docs style refactor perf \
+             test build ci chore revert. No period at end. Lowercase first letter. \
+             Commits: $LOG --- Diff stat: $STAT" 2>&1) || true
+
+          # Fallback if Copilot CLI fails
+          if [ -z "$MESSAGE" ]; then
+            MESSAGE="chore: squash $(echo "$COMMIT_COUNT") commits"
+          fi
+
+          # Squash
+          git reset --soft "$MERGE_BASE"
+          git commit -m "$MESSAGE"
+          git push --force-with-lease
+
+          {
+            echo "### Squashed $COMMIT_COUNT commits"
+            echo ""
+            echo '```'
+            echo "$MESSAGE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 7. Summary comment ──────────────────────────────────
+      - name: Post summary comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATUS="${{ job.status }}"
+          PR_NUMBER="${{ github.event.issue.number }}"
+          REACTION="rocket"
+          if [ "$STATUS" != "success" ]; then
+            REACTION="confused"
+          fi
+
+          # Add reaction to original comment
+          gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content="$REACTION" --silent || true
+
+          # Post summary
+          if [ "$STATUS" = "success" ]; then
+            BODY="✅ **Done!** Rebase/squash completed successfully. See the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          else
+            BODY="❌ **Failed.** The rebase/squash operation did not complete. See the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          fi
+
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "$BODY"

@@ -3,6 +3,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+_DDL_PREFIXES = ("CREATE ", "DROP ", "ALTER ", "TRUNCATE ")
+
+
+def _is_ddl(cql: str) -> bool:
+    """Return ``True`` if *cql* is a DDL statement (cannot be prepared)."""
+    return cql.lstrip().upper().startswith(_DDL_PREFIXES)
+
 
 class AbstractDriver(ABC):
     """Abstract base class for coodie execution backends."""

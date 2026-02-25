@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from coodie.drivers.base import AbstractDriver
+from coodie.drivers.base import AbstractDriver, _is_ddl
 
 
 class CassandraDriver(AbstractDriver):
@@ -65,6 +65,10 @@ class CassandraDriver(AbstractDriver):
         fetch_size: int | None = None,
         paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
+        if not params and _is_ddl(stmt):
+            result = self._session.execute(stmt)
+            self._last_paging_state = None
+            return self._rows_to_dicts(result)
         prepared = self._prepare(stmt)
         bound = prepared.bind(params)
         if consistency is not None:

@@ -16,3 +16,7 @@ class ConfigurationError(CoodieError):
 
 class InvalidQueryError(CoodieError):
     """Raised when a query is constructed incorrectly."""
+
+
+class MigrationError(CoodieError):
+    """Raised when a migration operation fails."""

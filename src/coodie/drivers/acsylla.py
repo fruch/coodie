@@ -5,7 +5,7 @@ import threading
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from coodie.drivers.base import AbstractDriver
+from coodie.drivers.base import AbstractDriver, _is_ddl
 
 
 class AcsyllaDriver(AbstractDriver):
@@ -212,6 +212,9 @@ class AcsyllaDriver(AbstractDriver):
         fetch_size: int | None = None,
         paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
+        if not params and _is_ddl(stmt):
+            result = await self._session.execute(self._cql_to_statement(stmt))
+            return self._rows_to_dicts(result)
         prepared = await self._prepare(stmt)
         bind_kwargs: dict[str, Any] = {}
         if consistency is not None:

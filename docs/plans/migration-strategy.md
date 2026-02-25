@@ -498,14 +498,14 @@ communicates that it is an internal/system table.
 
 ### Phase B: Migration Framework Core (Tier 2)
 
-| Task | Description | Priority |
-|---|---|---|
-| B.1 | `coodie.migrations` module with `Migration` base class and `MigrationContext` | High |
-| B.2 | Migration file discovery and ordering (timestamp prefix) | High |
-| B.3 | `_coodie_migrations` state tracking table | High |
-| B.4 | `coodie migrate` CLI command (apply / rollback / status / dry-run) | High |
-| B.5 | LWT-based single-writer lock | Medium |
-| B.6 | Schema agreement wait before DDL | Medium |
+| Task | Description | Priority | Status |
+|---|---|---|---|
+| B.1 | `coodie.migrations` module with `Migration` base class and `MigrationContext` | High | ✅ Done |
+| B.2 | Migration file discovery and ordering (timestamp prefix) | High | ✅ Done |
+| B.3 | `_coodie_migrations` state tracking table | High | ✅ Done |
+| B.4 | `coodie migrate` CLI command (apply / rollback / status / dry-run) | High | ✅ Done |
+| B.5 | LWT-based single-writer lock | Medium | ✅ Done |
+| B.6 | Schema agreement wait before DDL | Medium | ✅ Done |
 
 ### Phase C: Auto-Generation
 

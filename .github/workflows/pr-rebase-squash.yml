@@ -3,10 +3,13 @@
 # before it will respond to comments. This is a GitHub Actions platform
 # constraint, not a bug.
 #
-# Slash-commands:
+# Slash-commands (via PR comment):
 #   /rebase        — Rebase the PR branch onto the base branch
 #   /squash        — Squash all PR commits into one with a Copilot-generated message
 #   /rebase squash — Rebase first, then squash
+#
+# Manual testing (via Actions tab → "Run workflow"):
+#   Provide the PR number and select the command to run.
 #
 # See docs/plans/pr-comment-rebase-squash-action.md for full design details.
 
@@ -15,9 +18,23 @@ name: PR Rebase & Squash
 on:
   issue_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number to operate on'
+        required: true
+        type: number
+      command:
+        description: 'Command to execute'
+        required: true
+        type: choice
+        options:
+          - rebase
+          - squash
+          - rebase squash
 
 concurrency:
-  group: pr-rebase-squash-${{ github.event.issue.number }}
+  group: pr-rebase-squash-${{ github.event.issue.number || inputs.pr_number }}
   cancel-in-progress: false
 
 jobs:
@@ -25,10 +42,13 @@ jobs:
     name: Rebase / Squash
     runs-on: ubuntu-latest
     if: >-
-      github.event.issue.pull_request &&
+      github.event_name == 'workflow_dispatch' ||
       (
-        contains(github.event.comment.body, '/rebase') ||
-        contains(github.event.comment.body, '/squash')
+        github.event.issue.pull_request &&
+        (
+          contains(github.event.comment.body, '/rebase') ||
+          contains(github.event.comment.body, '/squash')
+        )
       )
     permissions:
       contents: write
@@ -36,21 +56,41 @@ jobs:
       issues: write
 
     steps:
+      # ── 0. Normalize inputs across triggers ──────────────────
+      - name: Normalize inputs
+        id: ctx
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pr_number=${{ inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+            echo "actor=${{ github.actor }}" >> "$GITHUB_OUTPUT"
+            ACTOR_ID=$(gh api "users/${{ github.actor }}" --jq '.id')
+            echo "actor_id=$ACTOR_ID" >> "$GITHUB_OUTPUT"
+            echo "has_comment=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            echo "actor=${{ github.event.comment.user.login }}" >> "$GITHUB_OUTPUT"
+            echo "actor_id=${{ github.event.comment.user.id }}" >> "$GITHUB_OUTPUT"
+            echo "has_comment=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # ── 1. Permission check ──────────────────────────────────
       - name: Check collaborator permission
         id: permission
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PERM=$(gh api "repos/${{ github.repository }}/collaborators/${{ github.event.comment.user.login }}/permission" \
+          PERM=$(gh api "repos/${{ github.repository }}/collaborators/${{ steps.ctx.outputs.actor }}/permission" \
             --jq '.permission')
           if [[ "$PERM" != "admin" && "$PERM" != "write" && "$PERM" != "maintain" ]]; then
-            echo "User ${{ github.event.comment.user.login }} lacks write access (has: $PERM)"
+            echo "User ${{ steps.ctx.outputs.actor }} lacks write access (has: $PERM)"
             exit 1
           fi
 
       # ── 2. Acknowledge ───────────────────────────────────────
       - name: React to comment
+        if: steps.ctx.outputs.has_comment == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -63,7 +103,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_JSON=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}")
+          PR_JSON=$(gh api "repos/${{ github.repository }}/pulls/${{ steps.ctx.outputs.pr_number }}")
           echo "head_ref=$(echo "$PR_JSON" | jq -r '.head.ref')" >> "$GITHUB_OUTPUT"
           echo "head_sha=$(echo "$PR_JSON" | jq -r '.head.sha')" >> "$GITHUB_OUTPUT"
           echo "base_ref=$(echo "$PR_JSON" | jq -r '.base.ref')" >> "$GITHUB_OUTPUT"
@@ -72,7 +112,7 @@ jobs:
       - name: Abort if PR is not open
         if: steps.pr.outputs.state != 'open'
         run: |
-          echo "PR #${{ github.event.issue.number }} is ${{ steps.pr.outputs.state }}, not open."
+          echo "PR #${{ steps.ctx.outputs.pr_number }} is ${{ steps.pr.outputs.state }}, not open."
           exit 1
 
       - uses: actions/checkout@v4
@@ -83,22 +123,26 @@ jobs:
 
       - name: Configure Git identity
         run: |
-          git config user.name "${{ github.event.comment.user.login }}"
-          git config user.email "${{ github.event.comment.user.id }}+${{ github.event.comment.user.login }}@users.noreply.github.com"
+          git config user.name "${{ steps.ctx.outputs.actor }}"
+          git config user.email "${{ steps.ctx.outputs.actor_id }}+${{ steps.ctx.outputs.actor }}@users.noreply.github.com"
 
       # ── 4. Parse command ─────────────────────────────────────
       - name: Parse slash command
         id: cmd
         run: |
-          BODY="${{ github.event.comment.body }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            COMMAND="${{ inputs.command }}"
+          else
+            COMMAND="${{ github.event.comment.body }}"
+          fi
           DO_REBASE=false
           DO_SQUASH=false
-          if echo "$BODY" | grep -qiE '^\s*/rebase\s+squash\s*$'; then
+          if echo "$COMMAND" | grep -qiE '(^\s*/)?rebase\s+squash\s*$'; then
             DO_REBASE=true
             DO_SQUASH=true
-          elif echo "$BODY" | grep -qiE '^\s*/rebase\s*$'; then
+          elif echo "$COMMAND" | grep -qiE '(^\s*/)?rebase\s*$'; then
             DO_REBASE=true
-          elif echo "$BODY" | grep -qiE '^\s*/squash\s*$'; then
+          elif echo "$COMMAND" | grep -qiE '(^\s*/)?squash\s*$'; then
             DO_SQUASH=true
           fi
           echo "do_rebase=$DO_REBASE" >> "$GITHUB_OUTPUT"
@@ -214,15 +258,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           STATUS="${{ job.status }}"
-          PR_NUMBER="${{ github.event.issue.number }}"
-          REACTION="rocket"
-          if [ "$STATUS" != "success" ]; then
-            REACTION="confused"
-          fi
+          PR_NUMBER="${{ steps.ctx.outputs.pr_number }}"
 
-          # Add reaction to original comment
-          gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
-            -f content="$REACTION" --silent || true
+          # Add reaction to original comment (only for issue_comment trigger)
+          if [ "${{ steps.ctx.outputs.has_comment }}" = "true" ]; then
+            REACTION="rocket"
+            if [ "$STATUS" != "success" ]; then
+              REACTION="confused"
+            fi
+            gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+              -f content="$REACTION" --silent || true
+          fi
 
           # Post summary
           if [ "$STATUS" = "success" ]; then

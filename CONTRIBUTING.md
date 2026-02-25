@@ -140,6 +140,11 @@ comments to automate branch maintenance:
 After each operation the workflow posts a summary comment on the PR. A 🚀
 reaction is added on success, or 😕 on failure.
 
+The workflow can also be triggered manually from the **Actions** tab → **PR
+Rebase & Squash** → **Run workflow**, where you enter a PR number and select
+the command. This is useful for testing or when the comment trigger is not
+available.
+
 > **When to use `/rebase` vs `/squash`:** Use `/rebase` when your branch is
 > behind the base branch and you want to bring it up to date while preserving
 > individual commits. Use `/squash` when the PR has many small or

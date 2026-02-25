@@ -5,7 +5,7 @@ from typing import Any, ClassVar, TYPE_CHECKING
 from pydantic import BaseModel
 
 from coodie.cql_builder import (
-    build_insert,
+    build_insert_from_columns,
     build_delete,
     build_update,
     build_counter_update,
@@ -25,6 +25,7 @@ from coodie.schema import (
     ColumnDefinition,
     _find_discriminator_column,
     _get_discriminator_value,
+    _insert_columns,
     _resolve_polymorphic_base,
 )
 from coodie.aio.query import QuerySet
@@ -164,22 +165,25 @@ class Document(BaseModel):
         batch: AsyncBatchQuery | None = None,
     ) -> None:
         """Insert (upsert) this document."""
-        data = self.model_dump(exclude_none=False)
-        disc_col = _find_discriminator_column(self.__class__)
-        disc_val = _get_discriminator_value(self.__class__)
+        cls = self.__class__
+        columns = _insert_columns(cls)
+        values = [getattr(self, c) for c in columns]
+        disc_col = _find_discriminator_column(cls)
+        disc_val = _get_discriminator_value(cls)
         if disc_col and disc_val:
-            data[disc_col] = disc_val
-        cql, params = build_insert(
-            self.__class__._get_table(),
-            self.__class__._get_keyspace(),
-            data,
+            values[columns.index(disc_col)] = disc_val
+        cql, params = build_insert_from_columns(
+            cls._get_table(),
+            cls._get_keyspace(),
+            columns,
+            values,
             ttl=ttl,
             timestamp=timestamp,
         )
         if batch is not None:
             batch.add(cql, params)
         else:
-            await self.__class__._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
+            await cls._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
 
     async def insert(
         self,
@@ -190,15 +194,18 @@ class Document(BaseModel):
         batch: AsyncBatchQuery | None = None,
     ) -> None:
         """Insert IF NOT EXISTS (create-only)."""
-        data = self.model_dump(exclude_none=False)
-        disc_col = _find_discriminator_column(self.__class__)
-        disc_val = _get_discriminator_value(self.__class__)
+        cls = self.__class__
+        columns = _insert_columns(cls)
+        values = [getattr(self, c) for c in columns]
+        disc_col = _find_discriminator_column(cls)
+        disc_val = _get_discriminator_value(cls)
         if disc_col and disc_val:
-            data[disc_col] = disc_val
-        cql, params = build_insert(
-            self.__class__._get_table(),
-            self.__class__._get_keyspace(),
-            data,
+            values[columns.index(disc_col)] = disc_val
+        cql, params = build_insert_from_columns(
+            cls._get_table(),
+            cls._get_keyspace(),
+            columns,
+            values,
             ttl=ttl,
             if_not_exists=True,
             timestamp=timestamp,
@@ -206,7 +213,7 @@ class Document(BaseModel):
         if batch is not None:
             batch.add(cql, params)
         else:
-            await self.__class__._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
+            await cls._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
 
     async def delete(
         self,

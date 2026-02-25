@@ -140,6 +140,12 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
     return cols
 
 
+@functools.lru_cache(maxsize=128)
+def _insert_columns(doc_cls: type) -> tuple[str, ...]:
+    """Return ordered column names for INSERT, cached per model class."""
+    return tuple(doc_cls.model_fields.keys())
+
+
 # ------------------------------------------------------------------
 # Polymorphic (single-table inheritance) helpers
 # ------------------------------------------------------------------

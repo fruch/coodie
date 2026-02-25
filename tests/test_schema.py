@@ -174,6 +174,25 @@ def test_counter_table_mixed_columns_raises():
         build_schema(InvalidCounterDoc)
 
 
+# -- _insert_columns (Phase 3: Task 3.6) ---
+
+
+def test_insert_columns():
+    from coodie.schema import _insert_columns
+
+    cols = _insert_columns(SimpleDoc)
+    assert isinstance(cols, tuple)
+    assert cols == ("id", "name", "rating")
+
+
+def test_insert_columns_cached():
+    from coodie.schema import _insert_columns
+
+    cols1 = _insert_columns(SimpleDoc)
+    cols2 = _insert_columns(SimpleDoc)
+    assert cols1 is cols2
+
+
 # ---- Phase 1: Performance optimization tests ----
 
 

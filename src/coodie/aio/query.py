@@ -17,7 +17,7 @@ from coodie.schema import (
     _resolve_polymorphic_base,
     _build_subclass_map,
 )
-from coodie.types import coerce_row_none_collections
+from coodie.types import _collection_fields
 from coodie.drivers import get_driver as _get_driver_impl
 
 if TYPE_CHECKING:
@@ -226,20 +226,36 @@ class QuerySet:
         return self._rows_to_docs(rows)
 
     def _rows_to_docs(self, rows: list[dict[str, Any]]) -> list[Document]:
-        disc_col = _find_discriminator_column(self._doc_cls)
+        doc_cls = self._doc_cls
+        disc_col = _find_discriminator_column(doc_cls)
         if disc_col is not None:
-            base = _resolve_polymorphic_base(self._doc_cls) or self._doc_cls
+            base = _resolve_polymorphic_base(doc_cls) or doc_cls
             subclass_map = _build_subclass_map(base)
             result = []
             for row in rows:
                 disc_value = row.get(disc_col)
-                target_cls = subclass_map.get(disc_value, self._doc_cls)
-                coerced = coerce_row_none_collections(target_cls, row)
+                target_cls = subclass_map.get(disc_value, doc_cls)
+                coll = _collection_fields(target_cls)
+                if coll:
+                    for key, factory in coll.items():
+                        if key in row and row[key] is None:
+                            row[key] = factory()
                 known = target_cls.model_fields
-                filtered = {k: v for k, v in coerced.items() if k in known}
+                filtered = {k: v for k, v in row.items() if k in known}
                 result.append(target_cls.model_validate(filtered))
             return result
-        return [self._doc_cls.model_validate(coerce_row_none_collections(self._doc_cls, row)) for row in rows]
+        # Fast non-polymorphic path
+        coll = _collection_fields(doc_cls)
+        validate = doc_cls.model_validate
+        if not coll:
+            return [validate(row) for row in rows]
+        result = []
+        for row in rows:
+            for key, factory in coll.items():
+                if key in row and row[key] is None:
+                    row[key] = factory()
+            result.append(validate(row))
+        return result
 
     async def paged_all(self) -> PagedResult:
         """Execute query returning a :class:`PagedResult` with documents and paging state."""

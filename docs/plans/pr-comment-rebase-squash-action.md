@@ -19,13 +19,17 @@
    - [Phase 3: Squash & Commit-Message Rewrite](#phase-3-squash--commit-message-rewrite-priority-high)
    - [Phase 4: Safety Gates & Edge Cases](#phase-4-safety-gates--edge-cases-priority-medium)
    - [Phase 5: Documentation & Rollout](#phase-5-documentation--rollout-priority-medium)
-5. [Workflow YAML Design](#5-workflow-yaml-design)
-   - [5.1 Trigger & Permissions](#51-trigger--permissions)
-   - [5.2 Step-by-Step Pseudocode](#52-step-by-step-pseudocode)
-   - [5.3 Draft Workflow YAML](#53-draft-workflow-yaml)
-6. [Security Considerations](#6-security-considerations)
-7. [Test Plan](#7-test-plan)
-8. [References](#8-references)
+5. [Copilot CLI Setup & Credentials](#5-copilot-cli-setup--credentials)
+   - [5.1 Installation](#51-installation)
+   - [5.2 Authentication](#52-authentication)
+   - [5.3 Repository Setup Checklist](#53-repository-setup-checklist)
+6. [Workflow YAML Design](#6-workflow-yaml-design)
+   - [6.1 Trigger & Permissions](#61-trigger--permissions)
+   - [6.2 Step-by-Step Pseudocode](#62-step-by-step-pseudocode)
+   - [6.3 Draft Workflow YAML](#63-draft-workflow-yaml)
+7. [Security Considerations](#7-security-considerations)
+8. [Test Plan](#8-test-plan)
+9. [References](#9-references)
 
 ---
 
@@ -86,7 +90,7 @@ Legend:
 - Full checkout → `actions/checkout@v6` with `fetch-depth: 0` + explicit PR ref
 - Rebase logic → shell script with `git rebase`, fallback to Copilot CLI for conflicts
 - Squash logic → `git reset --soft` to default-branch merge-base + single commit
-- Copilot CLI integration → install `gh copilot` extension, use for conflict resolution and commit message generation
+- Copilot CLI integration → install `gh copilot` extension via `gh extension install github/gh-copilot`; requires a **fine-grained PAT** with the "Copilot Requests" permission stored as a repo secret (the default `GITHUB_TOKEN` does **not** include Copilot access)
 - Summary comment → reuse pattern from `self-healing-ci.yml`
 
 ---
@@ -100,11 +104,12 @@ Legend:
 | Task | Description |
 |---|---|
 | 1.1 | Create `.github/workflows/pr-rebase-squash.yml` with `issue_comment` trigger filtered to `/rebase`, `/squash`, `/rebase squash` |
-| 1.2 | Add permission check: verify comment author is a collaborator (write access) or the PR author |
-| 1.3 | Checkout PR branch with `fetch-depth: 0` and configure Git identity (`github-actions[bot]`) |
-| 1.4 | Add "eyes" reaction to the trigger comment to acknowledge the command |
-| 1.5 | Add error-handling step that posts a comment if any step fails |
-| 1.6 | Manual smoke test: verify the workflow triggers on a `/rebase` comment in a test PR |
+| 1.2 | **Prerequisite:** Generate a fine-grained PAT with "Copilot Requests" permission and store it as repo secret `COPILOT_PAT` (see [§5 Copilot CLI Setup](#5-copilot-cli-setup--credentials)) |
+| 1.3 | Add permission check: verify comment author is a collaborator (write access) or the PR author |
+| 1.4 | Checkout PR branch with `fetch-depth: 0` and configure Git identity (`github-actions[bot]`) |
+| 1.5 | Add "eyes" reaction to the trigger comment to acknowledge the command |
+| 1.6 | Add error-handling step that posts a comment if any step fails |
+| 1.7 | Manual smoke test: verify the workflow triggers on a `/rebase` comment in a test PR |
 
 ### Phase 2: Rebase & Conflict Resolution (Priority: High)
 
@@ -162,9 +167,69 @@ Legend:
 
 ---
 
-## 5. Workflow YAML Design
+## 5. Copilot CLI Setup & Credentials
 
-### 5.1 Trigger & Permissions
+### 5.1 Installation
+
+The workflow uses the [`gh-copilot`](https://github.com/github/gh-copilot) extension
+for the GitHub CLI. It is installed at runtime inside the workflow:
+
+```bash
+gh extension install github/gh-copilot || true
+```
+
+`ubuntu-latest` runners already include `gh` (GitHub CLI) pre-installed, so only
+the Copilot extension needs to be added.
+
+### 5.2 Authentication
+
+> **Important:** The default `GITHUB_TOKEN` provided by GitHub Actions does
+> **not** include Copilot API access. A dedicated token is required.
+
+| Requirement | Detail |
+|---|---|
+| **Token type** | Fine-grained Personal Access Token (PAT) starting with `github_pat_` |
+| **Required permission** | "Copilot Requests" (under the Copilot permission category) |
+| **Classic PATs** | **Not supported** — classic tokens (`ghp_...`) cannot access the Copilot API |
+| **Copilot subscription** | The GitHub account that owns the PAT must have an active GitHub Copilot subscription (Individual, Business, or Enterprise) |
+
+The Copilot CLI resolves credentials in this order:
+
+1. `COPILOT_GITHUB_TOKEN` environment variable
+2. `GH_TOKEN` environment variable
+3. `GITHUB_TOKEN` environment variable
+4. OAuth token from the system keychain (not available in CI)
+5. `gh auth` login fallback (not reliable in CI)
+
+In the workflow, the dedicated PAT is exposed via the `COPILOT_GITHUB_TOKEN`
+environment variable so it takes priority over the default `GITHUB_TOKEN`:
+
+```yaml
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}              # for gh api calls
+  COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}   # for gh copilot commands
+```
+
+### 5.3 Repository Setup Checklist
+
+Before the workflow can use Copilot CLI, a repository admin must complete these
+one-time steps:
+
+- [ ] **Generate a fine-grained PAT** — Go to [GitHub Settings → Developer settings → Fine-grained tokens](https://github.com/settings/tokens?type=beta), create a token with the "Copilot Requests" permission
+- [ ] **Add the PAT as a repo secret** — Go to the repository's Settings → Secrets and variables → Actions, add a secret named `COPILOT_PAT` with the token value
+- [ ] **Verify Copilot subscription** — Confirm the PAT owner has an active GitHub Copilot subscription
+- [ ] **Test locally** — Run `COPILOT_GITHUB_TOKEN=<token> gh copilot suggest "hello"` to verify the token works
+
+> **Fallback behavior:** If `COPILOT_PAT` is not configured or the token is
+> invalid, the workflow gracefully degrades — conflict resolution is skipped
+> (rebase aborts on conflict), and squash uses a generic commit message
+> (`chore: squash N commits`) instead of a Copilot-generated one.
+
+---
+
+## 6. Workflow YAML Design
+
+### 6.1 Trigger & Permissions
 
 ```yaml
 on:
@@ -183,7 +248,7 @@ on:
 | `pull-requests: write` | Repository | Post summary comments, add reactions |
 | `issues: write` | Repository | Add reaction to the trigger comment |
 
-### 5.2 Step-by-Step Pseudocode
+### 6.2 Step-by-Step Pseudocode
 
 ```
 1.  Trigger: issue_comment created
@@ -222,7 +287,7 @@ on:
 12. React "rocket" on success or "confused" on failure
 ```
 
-### 5.3 Draft Workflow YAML
+### 6.3 Draft Workflow YAML
 
 ```yaml
 name: PR Rebase & Squash
@@ -339,8 +404,9 @@ jobs:
         if: steps.rebase.outputs.status == 'conflict'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
-          # Install GitHub Copilot CLI extension
+          # Install GitHub Copilot CLI extension (requires COPILOT_PAT secret)
           gh extension install github/gh-copilot || true
 
           UNRESOLVED=""
@@ -377,6 +443,7 @@ jobs:
         if: steps.cmd.outputs.do_squash == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           BASE="${{ steps.pr.outputs.base_ref }}"
           git fetch origin "$BASE"
@@ -392,7 +459,7 @@ jobs:
           LOG=$(git log --oneline "$MERGE_BASE..HEAD")
           STAT=$(git diff --stat "$MERGE_BASE..HEAD")
 
-          # Install GitHub Copilot CLI extension
+          # Install GitHub Copilot CLI extension (requires COPILOT_PAT secret)
           gh extension install github/gh-copilot || true
 
           # Generate a Conventional Commits message via Copilot CLI
@@ -449,7 +516,7 @@ jobs:
 
 ---
 
-## 6. Security Considerations
+## 7. Security Considerations
 
 | Risk | Mitigation |
 |---|---|
@@ -458,7 +525,9 @@ jobs:
 | Copilot CLI leaking secrets in suggestions | Copilot CLI operates on diff context only; no secrets are passed as input |
 | Concurrent trigger on same PR | Concurrency group `pr-rebase-squash-${{ github.event.issue.number }}` ensures only one run at a time |
 | Malicious comment body injection | Command parsing uses strict regex anchored to `^\s*/rebase` or `^\s*/squash`; arbitrary text is not executed |
-| `GITHUB_TOKEN` scope | Token is scoped to the repository and expires after the workflow run; no PAT needed |
+| `GITHUB_TOKEN` scope | Default token is scoped to the repository and expires after the workflow run; used only for Git push and GitHub API calls |
+| `COPILOT_PAT` secret exposure | The PAT is only exposed via `COPILOT_GITHUB_TOKEN` env var in the two steps that call `gh copilot`; it is never logged or passed to other steps. If the secret is missing, the workflow degrades gracefully (no AI features) |
+| PAT owner's Copilot subscription | The PAT must belong to an account with an active Copilot subscription; if the subscription lapses, only the AI features stop working — rebase/squash still function manually |
 
 > **Note:** The `issue_comment` trigger runs the workflow from the **default branch**,
 > not the PR branch. This means the workflow YAML must be merged to the default branch
@@ -467,12 +536,12 @@ jobs:
 
 ---
 
-## 7. Test Plan
+## 8. Test Plan
 
 Because this is a workflow (not library code), testing is primarily manual and
 integration-based.
 
-### 7.1 Manual Test Matrix
+### 8.1 Manual Test Matrix
 
 | Test Case | Command | Expected Result | Phase |
 |---|---|---|---|
@@ -487,7 +556,7 @@ integration-based.
 | Concurrent triggers | `/squash` × 2 | Second run queues or is rejected by concurrency group | 4 |
 | Copilot CLI unavailable | `/squash` | Falls back to generic commit message | 3 |
 
-### 7.2 Automated Validation (Post-Push)
+### 8.2 Automated Validation (Post-Push)
 
 After the workflow pushes the rebased/squashed branch, the existing CI pipeline
 (`ci.yml`, `test-unit.yml`) runs automatically on the new commits, providing
@@ -497,10 +566,13 @@ Commits.
 
 ---
 
-## 8. References
+## 9. References
 
 - [GitHub Actions: `issue_comment` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#issue_comment)
 - [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
+- [Authenticating Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) — token types, env vars, CI setup
+- [Installing Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli)
+- [Fine-grained PAT creation](https://github.com/settings/tokens?type=beta) — token generation page
 - [Conventional Commits specification](https://www.conventionalcommits.org/)
 - [`commitlint` configuration](../../commitlint.config.mjs)
 - [Existing `self-healing-ci.yml`](../../.github/workflows/self-healing-ci.yml) — pattern for PR commenting

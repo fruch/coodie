@@ -228,24 +228,36 @@ class CassandraDriver(AbstractDriver):
         fetch_size: int | None = None,
         paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
+        if fetch_size is not None:
+            # Paginated queries: delegate to the sync execute() via
+            # run_in_executor.  The cassandra-driver's async callback
+            # mechanism delivers a plain list to add_callbacks, not a
+            # ResultSet, so current_rows / paging_state are unavailable.
+            # The sync path (session.execute) returns a proper ResultSet.
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                lambda: self.execute(
+                    stmt,
+                    params,
+                    consistency=consistency,
+                    timeout=timeout,
+                    fetch_size=fetch_size,
+                    paging_state=paging_state,
+                ),
+            )
         prepared = self._prepare(stmt)
         bound = prepared.bind(params)
         if consistency is not None:
             from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
 
             bound.consistency_level = getattr(ConsistencyLevel, consistency)
-        if fetch_size is not None:
-            bound.fetch_size = fetch_size
         execute_kwargs: dict[str, Any] = {}
         if timeout is not None:
             execute_kwargs["timeout"] = timeout
-        if paging_state is not None:
-            execute_kwargs["paging_state"] = paging_state
         future = self._session.execute_async(bound, **execute_kwargs)
         result = await self._wrap_future(future)
-        self._last_paging_state = getattr(result, "paging_state", None)
-        if fetch_size is not None:
-            return self._rows_to_dicts(result.current_rows)
+        self._last_paging_state = None
         return self._rows_to_dicts(result)
 
     async def _execute_cql_async(self, cql: str) -> Any:

@@ -56,8 +56,10 @@ Results are published to the `gh-pages` branch using
 [github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark).
 This provides:
 
-* **Historical trend charts** — viewable on the repository's GitHub Pages site
-  under the `/benchmarks/scylla/` and `/benchmarks/acsylla/` paths.
+* **Historical trend charts** — viewable on the repository's GitHub Pages site:
+  * [scylla driver benchmarks](https://fruch.github.io/coodie/benchmarks/scylla/)
+  * [acsylla driver benchmarks](https://fruch.github.io/coodie/benchmarks/acsylla/)
+  * [all benchmarks overview](https://fruch.github.io/coodie/benchmarks/)
 * **Regression alerts** — when a benchmark regresses beyond 150% of its
   previous value, an alert comment is posted on the commit or pull request.
 * **Workflow summary** — every CI run includes a benchmark summary in the

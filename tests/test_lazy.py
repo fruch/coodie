@@ -44,8 +44,10 @@ def variant(request):
 def document_cls(variant):
     if variant == "sync":
         from coodie.sync.document import Document
+
         return Document
     from coodie.aio.document import Document
+
     return Document
 
 

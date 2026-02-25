@@ -26,6 +26,8 @@ guide/batch-operations
 guide/sync-vs-async
 guide/drivers
 guide/exceptions
+guide/recipes
+guide/integrations
 guide/benchmarks
 ```
 
@@ -35,6 +37,20 @@ guide/benchmarks
 
 migration/from-cqlengine
 migration/argus-example
+```
+
+```{toctree}
+:caption: API Reference
+:maxdepth: 2
+
+api/document
+api/queryset
+api/fields
+api/types
+api/drivers
+api/exceptions
+api/results
+api/batch
 ```
 
 ```{toctree}

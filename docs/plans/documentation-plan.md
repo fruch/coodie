@@ -1192,10 +1192,10 @@ make clean html    # Clean build — like clearing your browser cache but useful
 - [x] Exceptions & error handling guide
 
 ### Phase 4: Reference & Migration
-- [ ] Auto-generated API reference (sphinx-autodoc)
-- [ ] Migration guide from cqlengine
-- [ ] Advanced patterns & recipes
-- [ ] Integration examples (FastAPI, Flask)
+- [x] Auto-generated API reference (sphinx-autodoc)
+- [x] Migration guide from cqlengine
+- [x] Advanced patterns & recipes
+- [x] Integration examples (FastAPI, Flask)
 
 ### Phase 5: Polish & Ship
 - [x] Review all examples for accuracy and humor quality

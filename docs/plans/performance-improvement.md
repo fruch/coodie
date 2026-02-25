@@ -1122,6 +1122,104 @@ Each `LazyDocument` is just 3 slots (~72 bytes) vs a full Pydantic model instanc
 
 ---
 
+## 13B. Phase 5 Implementation
+
+> **PR**: Phase 5 — `perf: implement Phase 5 optimizations (PK cache, native async)`
+
+### 13B.1 Phase 5 Changes Implemented
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 14.5.2 | Partial UPDATE PK cache — `_pk_columns()` cached helper eliminates per-call schema scan in `update()`, `delete()`, `_counter_update()` | ✅ Done |
+| 14.5.3 | Native async for CassandraDriver — eliminate `run_in_executor` from `execute_async()` (paginated) and `sync_table_async()` | ✅ Done |
+
+### 13B.2 Implementation Details
+
+#### Task 14.5.2 — Partial UPDATE PK cache
+
+**Before** (every `update()`, `delete()`, `_counter_update()` call):
+```
+schema = self.__class__._schema()              # builds full ColumnDefinition list
+pk_cols = [c for c in schema if c.primary_key or c.clustering_key]  # linear scan
+where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]     # attribute access via .name
+```
+
+**After**:
+```
+pk_names = _pk_columns(self.__class__)         # @lru_cache — returns tuple[str, ...]
+where = [(c, "=", getattr(self, c)) for c in pk_names]  # direct string iteration
+```
+
+Changes:
+- New `_pk_columns()` in `schema.py` with `@functools.lru_cache(maxsize=128)`.
+- Updated `delete()`, `update()`, `_counter_update()` in both `sync/document.py` and `aio/document.py`.
+
+**Savings**: Eliminates per-call `build_schema()` invocation (which was already cached
+on `__schema__` but still required the list comprehension filter + `ColumnDefinition`
+attribute access). The cached tuple of strings is ~10× cheaper to iterate than filtering
+a list of dataclass instances.
+
+#### Task 14.5.3 — Native async for CassandraDriver
+
+**Before** — `execute_async()` with pagination:
+```
+execute_async(stmt, params, fetch_size=10)
+  → loop.run_in_executor(None, lambda: self.execute(...))  # thread pool hop
+```
+
+**Before** — `sync_table_async()`:
+```
+sync_table_async(table, keyspace, cols, ...)
+  → loop.run_in_executor(None, self.sync_table, ...)       # thread pool hop
+```
+
+**After** — `execute_async()` with pagination:
+```
+execute_async(stmt, params, fetch_size=10)
+  → self._prepare(stmt).bind(params)     # set fetch_size + paging_state on bound
+  → self._session.execute_async(bound)   # native cassandra-driver async
+  → self._wrap_future(future)            # asyncio bridge via add_callbacks
+  → result.current_rows / result.paging_state  # extract paging state from result
+```
+
+**After** — `sync_table_async()`:
+```
+sync_table_async(table, keyspace, cols, ...)
+  → _execute_cql_async(create_cql)       # native async via _wrap_future
+  → _execute_bound_async(introspect_cql) # native async for parameterised queries
+  → ... (all DDL operations are native async)
+```
+
+Changes:
+- New `_wrap_future()` method — single bridge point for cassandra-driver `ResponseFuture`
+  to `asyncio.Future` conversion. Uses `asyncio.get_running_loop()` (not deprecated
+  `get_event_loop()`).
+- `execute_async()` — unified code path for all queries (paginated and non-paginated).
+  Sets `fetch_size` and `paging_state` on the bound statement, reads `paging_state`
+  from the result.
+- New `_execute_cql_async()` — executes raw CQL strings asynchronously (for DDL).
+- New `_execute_bound_async()` — executes parameterised CQL strings asynchronously
+  (for system_schema introspection).
+- `sync_table_async()` — fully reimplemented as native async, mirrors the sync
+  `sync_table()` logic but uses async helpers. Includes cache, CREATE TABLE,
+  ALTER TABLE ADD, schema drift warnings, table options, secondary indexes,
+  and drop removed indexes.
+
+**Savings**: Eliminates all `run_in_executor()` calls from the CassandraDriver async
+path. Each `run_in_executor` added ~20–50 µs of thread pool overhead per call.
+For `sync_table_async()`, which performs 2–6 sequential DB operations, the savings
+compound to ~100–300 µs per sync_table call.
+
+### 13B.3 Remaining Priorities After Phase 5
+
+| Priority | Task | Expected Impact |
+|----------|------|-----------------|
+| P0 | 14.5.1 Custom `dict_factory` | Eliminate `_rows_to_dicts()` overhead (−10–15% reads) |
+| P2 | 14.5.4 `__slots__` on LWTResult/PagedResult/BatchQuery | −2–5% on affected operations |
+| P2 | 14.5.6 Connection-level optimizations | −5–15% on real-world workloads |
+
+---
+
 ## 14. Notes
 
 - coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for

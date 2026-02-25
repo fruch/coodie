@@ -461,6 +461,80 @@ async def test_cassandra_driver_sync_table_async(cassandra_driver, mock_cassandr
     assert mock_cassandra_session.execute_async.call_count >= 1
 
 
+async def test_cassandra_driver_execute_async_with_paging(cassandra_driver, mock_cassandra_session):
+    """execute_async handles fetch_size natively without run_in_executor."""
+    import asyncio
+
+    result = MagicMock()
+    result.current_rows = [Row(id="1", name="Alice")]
+    result.paging_state = b"page-token"
+
+    def fake_execute_async(stmt, **kwargs):
+        future = MagicMock()
+
+        def add_callbacks(on_success, on_error):
+            loop = asyncio.get_event_loop()
+            loop.call_soon(on_success, result)
+
+        future.add_callbacks = add_callbacks
+        return future
+
+    mock_cassandra_session.execute_async.side_effect = fake_execute_async
+    rows = await cassandra_driver.execute_async(
+        "SELECT * FROM test_ks.t", [], fetch_size=10
+    )
+    assert rows == [{"id": "1", "name": "Alice"}]
+    assert cassandra_driver._last_paging_state == b"page-token"
+    # Verify fetch_size was set on the bound statement
+    prepared = mock_cassandra_session.prepare.return_value
+    assert prepared.bind.return_value.fetch_size == 10
+
+
+async def test_cassandra_driver_execute_async_with_paging_state(cassandra_driver, mock_cassandra_session):
+    """execute_async passes paging_state to execute_async kwargs."""
+    import asyncio
+
+    result = MagicMock()
+    result.current_rows = [Row(id="2", name="Bob")]
+    result.paging_state = None
+
+    def fake_execute_async(stmt, **kwargs):
+        future = MagicMock()
+
+        def add_callbacks(on_success, on_error):
+            loop = asyncio.get_event_loop()
+            loop.call_soon(on_success, result)
+
+        future.add_callbacks = add_callbacks
+        return future
+
+    mock_cassandra_session.execute_async.side_effect = fake_execute_async
+    rows = await cassandra_driver.execute_async(
+        "SELECT * FROM test_ks.t", [], fetch_size=10, paging_state=b"prev-token"
+    )
+    assert rows == [{"id": "2", "name": "Bob"}]
+    assert cassandra_driver._last_paging_state is None
+    # Verify paging_state was passed to execute_async
+    call_kwargs = mock_cassandra_session.execute_async.call_args
+    assert call_kwargs.kwargs.get("paging_state") == b"prev-token"
+
+
+async def test_cassandra_driver_sync_table_async_cache_hit(cassandra_driver, mock_cassandra_session):
+    """sync_table_async returns [] on cache hit without any DB calls."""
+    import asyncio
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    # Pre-populate the cache
+    cassandra_driver._known_tables["test_ks.t"] = frozenset(["id"])
+    result = await cassandra_driver.sync_table_async("t", "test_ks", cols)
+    assert result == []
+    # No DB calls should have been made
+    mock_cassandra_session.execute_async.assert_not_called()
+
+
 async def test_cassandra_driver_close_async(cassandra_driver, mock_cassandra_session):
     await cassandra_driver.close_async()
     mock_cassandra_session.cluster.shutdown.assert_called_once()

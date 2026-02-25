@@ -256,3 +256,33 @@ def test_build_schema_non_static_column_default():
     schema = build_schema(StaticDoc)
     col = next(c for c in schema if c.name == "value")
     assert col.static is False
+
+
+# ------------------------------------------------------------------
+# _pk_columns cache tests
+# ------------------------------------------------------------------
+
+
+def test_pk_columns_simple():
+    """_pk_columns returns only the PK column names for a simple model."""
+    from coodie.schema import _pk_columns
+
+    result = _pk_columns(SimpleDoc)
+    assert result == ("id",)
+
+
+def test_pk_columns_composite():
+    """_pk_columns returns PK + CK names for a composite-key model."""
+    from coodie.schema import _pk_columns
+
+    result = _pk_columns(CompositeDoc)
+    assert set(result) == {"product_id", "category", "created_at"}
+
+
+def test_pk_columns_cached():
+    """Calling _pk_columns twice returns the same cached object."""
+    from coodie.schema import _pk_columns
+
+    first = _pk_columns(SimpleDoc)
+    second = _pk_columns(SimpleDoc)
+    assert first is second

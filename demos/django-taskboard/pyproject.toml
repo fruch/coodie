@@ -1,0 +1,15 @@
+[project]
+name = "coodie-django-taskboard"
+version = "0.1.0"
+description = "Django Task Board demo showcasing coodie's sync API with Django"
+requires-python = ">=3.10"
+dependencies = [
+    "django>=4.2",
+    "coodie[scylla]",
+    "click>=8.0",
+    "faker>=18.0",
+    "rich>=13.0",
+]
+
+[tool.uv.sources]
+coodie = { path = "../..", editable = true }

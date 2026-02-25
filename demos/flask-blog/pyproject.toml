@@ -1,0 +1,16 @@
+[project]
+name = "coodie-flask-blog-demo"
+version = "0.1.0"
+description = "Flask Blog demo showcasing coodie's sync API"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0",
+    "jinja2>=3.1",
+    "coodie[scylla]",
+    "click>=8.0",
+    "faker>=18.0",
+    "rich>=13.0",
+]
+
+[tool.uv.sources]
+coodie = { path = "../..", editable = true }

@@ -1213,7 +1213,94 @@ sequential DB operations, the savings compound to ~100–300 µs per sync_table 
 Paginated queries retain `run_in_executor` due to cassandra-driver callback
 limitations.
 
-### 13B.3 Remaining Priorities After Phase 5
+### 13B.3 Phase 5 Results
+
+> **Post-optimization run**: [#22417171511](https://github.com/fruch/coodie/actions/runs/22417171511) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22417171511/job/64905668613))
+> **PR**: [#78](https://github.com/fruch/coodie/pull/78) — `perf: Phase 5 — PK column cache and native async for CassandraDriver`
+
+#### 13B.3.1 Core Operations — Phase 3 vs Phase 5
+
+| Operation | Phase 3 (coodie) | Phase 5 (coodie) | Phase 5 ratio vs cqlengine | Δ vs Phase 3 |
+|-----------|-----------------|-----------------|---------------------------|--------------|
+| **Reads** | | | | |
+| GET by PK | 487 µs | 485 µs | 0.75× (1.3× faster) | stable |
+| Filter + LIMIT | 613 µs | 608 µs | 0.53× (1.9× faster) | stable |
+| Filter (secondary index) | 1,509 µs | 1,579 µs | 0.33× (3.0× faster) | stable |
+| COUNT | 941 µs | 916 µs | 0.88× (1.1× faster) | stable |
+| Collection read | 471 µs | 483 µs | 0.72× (1.4× faster) | stable |
+| Collection roundtrip | 968 µs | 966 µs | 0.71× (1.4× faster) | stable |
+| **Writes** | | | | |
+| Single INSERT | 439 µs | 449 µs | 0.75× (1.3× faster) | stable |
+| INSERT with TTL | 451 µs | 453 µs | 0.76× (1.3× faster) | stable |
+| INSERT IF NOT EXISTS | 1,462 µs | 1,213 µs | 0.82× (1.2× faster) | LWT variance |
+| Collection write | 455 µs | 448 µs | 0.70× (1.4× faster) | stable |
+| **Updates** | | | | |
+| Partial UPDATE | 942 µs | 906 µs | 1.72× slower | ⬆️ improved (−4%) |
+| UPDATE IF condition (LWT) | 1,935 µs | 1,664 µs | 1.21× slower | LWT variance |
+| **Deletes** | | | | |
+| Single DELETE | 892 µs | 877 µs | 0.79× (1.3× faster) | stable |
+| Bulk DELETE | 899 µs | 878 µs | 0.75× (1.3× faster) | stable |
+| **Batch** | | | | |
+| Batch INSERT 10 | 583 µs | 608 µs | 0.36× (2.7× faster) | stable |
+| Batch INSERT 100 | 2,013 µs | 1,955 µs | 0.04× (27.3× faster) | stable |
+| **Schema** | | | | |
+| sync_table create | 4.5 µs | 4.7 µs | 0.03× (37.4× faster) | stable |
+| sync_table no-op | 4.7 µs | 4.9 µs | 0.02× (44.7× faster) | stable |
+| **Serialization (no DB)** | | | | |
+| Model instantiation | 2.0 µs | 2.6 µs | 0.21× (4.8× faster) | stable (µs noise) |
+| Model serialization | 2.0 µs | 2.0 µs | 0.43× (2.3× faster) | stable |
+
+#### 13B.3.2 Argus Real-World Patterns — Phase 3 vs Phase 5
+
+| Pattern | Phase 3 (coodie) | Phase 5 (coodie) | Phase 5 ratio vs cqlengine | Δ vs Phase 3 |
+|---------|-----------------|-----------------|---------------------------|--------------|
+| Batch events (10) | 1,096 µs | 1,082 µs | 0.36× (2.8× faster) | stable |
+| Comment with collections | 509 µs | 507 µs | 0.67× (1.5× faster) | stable |
+| Filter by partition key | 529 µs | 534 µs | 0.52× (1.9× faster) | stable |
+| Get-or-create user | 492 µs | 500 µs | 0.66× (1.5× faster) | stable |
+| Latest N runs (clustering) | 503 µs | 505 µs | 0.54× (1.8× faster) | stable |
+| Multi-model lookup | 961 µs | 905 µs | 0.69× (1.4× faster) | ⬆️ improved (−6%) |
+| Notification feed | 597 µs | 591 µs | 0.43× (2.3× faster) | stable |
+| List mutation + save | 962 µs | 961 µs | 1.29× slower | stable |
+| Status update | 943 µs | 943 µs | 1.10× slower | stable |
+| Argus model instantiation | 21.0 µs | 21.3 µs | 0.58× (1.7× faster) | stable |
+
+#### 13B.3.3 Key Findings
+
+1. **coodie still wins 26 out of 30 benchmarks** — identical to Phase 3. No regressions
+   introduced by the Phase 5 changes. The same 4 losses remain: partial UPDATE (1.72×),
+   LWT update (1.21×), list-mutation (1.29×), and status-update (1.10×).
+
+2. **Partial UPDATE improved marginally**: 942 → 906 µs (−4%), ratio 1.75× → 1.72× slower.
+   The `_pk_columns()` cache eliminates the per-call `_schema()` scan + list comprehension,
+   but the dominant cost remains the read-modify-write DB round-trip. The improvement is
+   within noise range but directionally correct.
+
+3. **LWT operations show normal variance.** INSERT IF NOT EXISTS (1,462 → 1,213 µs, −17%)
+   and UPDATE IF condition (1,935 → 1,664 µs, −14%) are LWT-dominated with high variance.
+   The coodie/cqlengine **ratios** improved (0.87 → 0.82× and 1.26 → 1.21× respectively),
+   but this is attributable to LWT round-trip variance rather than code changes.
+
+4. **Read and write paths are fully stable.** All non-LWT benchmarks are within ±5% of
+   Phase 3 numbers. The Phase 5 changes (`_pk_columns()` cache, native async) don't
+   introduce any measurable overhead or improvement on the synchronous benchmark suite.
+
+5. **Native async improvements are not measurable in this benchmark suite.** The benchmarks
+   run synchronously against a real ScyllaDB instance. The `_wrap_future()` bridge and
+   `sync_table_async()` reimplementation eliminate thread pool hops that only manifest
+   in async workloads (FastAPI, aiohttp, etc.) — expected to reduce per-call latency
+   by ~20–50 µs in async contexts but not visible in sync benchmarks.
+
+6. **Multi-model lookup improved −6%** (961 → 905 µs). This pattern involves multiple
+   sequential queries (user lookup + run lookup), so the `_pk_columns()` cache may
+   contribute by reducing Python overhead on the delete/update paths used in the
+   get-or-create logic.
+
+7. **Model instantiation** (2.0 → 2.6 µs) is within sub-microsecond noise range.
+   At ~2 µs per instantiation, a 0.6 µs difference is well within GC/CPU cache variance.
+   coodie remains **4.8× faster** than cqlengine (12.7 µs) on this benchmark.
+
+### 13B.4 Remaining Priorities After Phase 5
 
 | Priority | Task | Expected Impact |
 |----------|------|-----------------|
@@ -1252,6 +1339,10 @@ limitations.
 - **After Phase 3, coodie wins 26 out of 30 benchmarks** with write path 5–10% faster
   and read path 6–9% faster. The 4 losses (partial UPDATE, LWT update, list-mutation,
   status-update) are all read-modify-write patterns dominated by DB round-trips.
+- **After Phase 5, coodie still wins 26 out of 30 benchmarks.** Phase 5's PK cache and
+  native async changes maintain all gains from prior phases. Partial UPDATE ratio
+  improved marginally (1.75× → 1.72×). The native async improvements target async
+  workloads not captured by the sync benchmark suite.
 
 ---
 

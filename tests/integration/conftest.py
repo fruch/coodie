@@ -79,8 +79,6 @@ async def coodie_driver(
     When ``--driver-type=acsylla`` creates an acsylla session connecting to the
     same container and registers an AcsyllaDriver instead.
     """
-    import asyncio
-
     _registry.clear()
     if driver_type == "acsylla":
         try:
@@ -90,8 +88,10 @@ async def coodie_driver(
 
         from coodie.drivers.acsylla import AcsyllaDriver
 
-        acsylla_session = await create_acsylla_session(scylla_container, "test_ks")
-        acsylla_driver = AcsyllaDriver(session=acsylla_session, default_keyspace="test_ks")
+        acsylla_driver = AcsyllaDriver.connect(
+            session_factory=lambda: create_acsylla_session(scylla_container, "test_ks"),
+            default_keyspace="test_ks",
+        )
         from coodie.drivers import register_driver
 
         register_driver("default", acsylla_driver, default=True)

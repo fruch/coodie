@@ -19,6 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
+          - "3.12"
           - "3.13"
           - "3.14"
         driver-type:
@@ -26,8 +27,6 @@ jobs:
           - cassandra
           - acsylla
         exclude:
-          - python-version: "3.13"
-            driver-type: cassandra
           - python-version: "3.14"
             driver-type: cassandra
     runs-on: ubuntu-latest

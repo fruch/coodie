@@ -61,6 +61,16 @@ jobs:
           path: benchmark-results-${{ matrix.driver.name }}.json
           retention-days: 90
 
+      - name: Ensure gh-pages branch exists
+        run: |
+          if ! git ls-remote --exit-code origin gh-pages >/dev/null 2>&1; then
+            echo "ℹ️ gh-pages branch not found — creating it"
+            git switch --orphan gh-pages
+            git commit --allow-empty -m "chore: initialize gh-pages branch for benchmark history"
+            git push origin gh-pages
+            git switch -
+          fi
+
       - name: Store and compare benchmark results
         uses: benchmark-action/github-action-benchmark@v1
         with:

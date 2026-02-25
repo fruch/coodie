@@ -28,6 +28,7 @@ from coodie.exceptions import (
     MultipleDocumentsFound,
     ConfigurationError,
     InvalidQueryError,
+    MigrationError,
 )
 from coodie.fields import (
     Ascii,
@@ -67,6 +68,7 @@ __all__ = [
     "MultipleDocumentsFound",
     "ConfigurationError",
     "InvalidQueryError",
+    "MigrationError",
     "PrimaryKey",
     "ClusteringKey",
     "Indexed",

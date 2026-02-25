@@ -5,7 +5,7 @@
 #
 # Slash-commands (via PR comment):
 #   /rebase        — Rebase the PR branch onto the base branch
-#   /squash        — Squash all PR commits into one using the PR title as commit message
+#   /squash        — Squash all PR commits into one with a Copilot-generated message
 #   /rebase squash — Rebase first, then squash
 #
 # Manual testing (via Actions tab → "Run workflow"):
@@ -180,6 +180,7 @@ jobs:
         if: steps.cmd.outputs.do_squash == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           BASE="${{ steps.pr.outputs.base_ref }}"
           git fetch origin "$BASE"
@@ -191,14 +192,42 @@ jobs:
             exit 0
           fi
 
-          # Use the PR title as the squash commit message (already follows
-          # Conventional Commits format by project convention).
+          # Collect context for Copilot
           PR_NUMBER="${{ steps.ctx.outputs.pr_number }}"
-          MESSAGE=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" --jq '.title') || true
+          LOG=$(git log --oneline "$MERGE_BASE..HEAD")
+          STAT=$(git diff --stat "$MERGE_BASE..HEAD")
 
-          # Fallback if PR title is unavailable
-          if [ -z "$MESSAGE" ]; then
-            MESSAGE="chore: squash ${COMMIT_COUNT} commits"
+          # PR title is always the subject line (follows Conventional Commits)
+          TITLE=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" --jq '.title') || true
+          if [ -z "$TITLE" ]; then
+            TITLE="chore: squash ${COMMIT_COUNT} commits"
+          fi
+
+          # Try Copilot CLI for a full commit body description.
+          # NOTE: stderr goes to /dev/null — never capture it into the message
+          # variable, since error text would bypass the empty-string fallback.
+          gh extension install github/gh-copilot 2>/dev/null || true
+          BODY=$(gh copilot suggest \
+            "Write a git commit body (no subject line) summarising these changes. \
+             Be concise. Commits: $LOG --- Diff stat: $STAT" \
+            2>/dev/null) || true
+
+          # Reject output that looks like error messages rather than real content
+          if [ -n "$BODY" ] && echo "$BODY" | grep -qiE '(error:|unknown option|--help|installed successfully)'; then
+            BODY=""
+          fi
+
+          # Fallback: use PR body as description
+          if [ -z "$BODY" ]; then
+            BODY=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
+              --jq '.body // empty') || true
+          fi
+
+          # Build full commit message: subject + optional body
+          if [ -n "$BODY" ]; then
+            MESSAGE=$(printf '%s\n\n%s' "$TITLE" "$BODY")
+          else
+            MESSAGE="$TITLE"
           fi
 
           # Squash

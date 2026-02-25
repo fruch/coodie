@@ -46,6 +46,7 @@ from coodie.fields import (
     TinyInt,
     VarInt,
 )
+from coodie.lazy import LazyDocument
 from coodie.results import LWTResult, PagedResult
 
 __all__ = [
@@ -53,6 +54,7 @@ __all__ = [
     "CounterDocument",
     "MaterializedView",
     "QuerySet",
+    "LazyDocument",
     "init_coodie",
     "execute_raw",
     "create_keyspace",

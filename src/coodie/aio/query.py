@@ -11,6 +11,7 @@ from coodie.cql_builder import (
     parse_filter_kwargs,
     parse_update_kwargs,
 )
+from coodie.lazy import LazyDocument
 from coodie.results import LWTResult, PagedResult
 from coodie.schema import (
     _find_discriminator_column,
@@ -91,26 +92,27 @@ class QuerySet:
     # ------------------------------------------------------------------
 
     def _clone(self, **overrides: Any) -> QuerySet:
-        defaults = dict(
-            where=self._where,
-            limit_val=self._limit_val,
-            order_by_val=self._order_by_val,
-            allow_filtering_val=self._allow_filtering_val,
-            if_not_exists_val=self._if_not_exists_val,
-            if_exists_val=self._if_exists_val,
-            ttl_val=self._ttl_val,
-            timestamp_val=self._timestamp_val,
-            consistency_val=self._consistency_val,
-            timeout_val=self._timeout_val,
-            only_val=self._only_val,
-            defer_val=self._defer_val,
-            values_list_val=self._values_list_val,
-            per_partition_limit_val=self._per_partition_limit_val,
-            fetch_size_val=self._fetch_size_val,
-            paging_state_val=self._paging_state_val,
-        )
-        defaults.update(overrides)
-        return QuerySet(self._doc_cls, **defaults)
+        new = object.__new__(QuerySet)
+        new._doc_cls = self._doc_cls
+        new._where = self._where
+        new._limit_val = self._limit_val
+        new._order_by_val = self._order_by_val
+        new._allow_filtering_val = self._allow_filtering_val
+        new._if_not_exists_val = self._if_not_exists_val
+        new._if_exists_val = self._if_exists_val
+        new._ttl_val = self._ttl_val
+        new._timestamp_val = self._timestamp_val
+        new._consistency_val = self._consistency_val
+        new._timeout_val = self._timeout_val
+        new._only_val = self._only_val
+        new._defer_val = self._defer_val
+        new._values_list_val = self._values_list_val
+        new._per_partition_limit_val = self._per_partition_limit_val
+        new._fetch_size_val = self._fetch_size_val
+        new._paging_state_val = self._paging_state_val
+        for key, val in overrides.items():
+            setattr(new, f"_{key}", val)
+        return new
 
     # ------------------------------------------------------------------
     # Chainable builder methods
@@ -205,7 +207,7 @@ class QuerySet:
             return [c for c in all_cols if c not in self._defer_val]
         return None
 
-    async def all(self) -> list[Document] | list[tuple[Any, ...]]:
+    async def all(self, *, lazy: bool = False) -> list[Document] | list[LazyDocument] | list[tuple[Any, ...]]:
         columns = self._resolve_columns()
         cql, params = build_select(
             self._table(),
@@ -223,6 +225,9 @@ class QuerySet:
         if self._values_list_val is not None:
             vl_cols = self._values_list_val
             return [tuple(row.get(c) for c in vl_cols) for row in rows]
+        if lazy:
+            doc_cls = self._doc_cls
+            return [LazyDocument(doc_cls, row) for row in rows]
         return self._rows_to_docs(rows)
 
     def _rows_to_docs(self, rows: list[dict[str, Any]]) -> list[Document]:

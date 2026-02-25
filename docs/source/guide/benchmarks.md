@@ -44,7 +44,7 @@ See `benchmarks/README.md` for the full set of options.
 The **Benchmarks** workflow (`.github/workflows/benchmark.yml`) runs
 automatically on:
 
-* Every push to `main`
+* Every push to `master`
 * Pull requests labeled **`benchmark`**
 * Weekly schedule (Monday 06:00 UTC)
 
@@ -63,7 +63,7 @@ This provides:
 * **Workflow summary** — every CI run includes a benchmark summary in the
   GitHub Actions job summary.
 
-On pushes to `main`, results are automatically pushed to the `gh-pages` branch.
+On pushes to `master`, results are automatically pushed to the `gh-pages` branch.
 On pull requests the action compares against the stored baseline and reports
 regressions without modifying the `gh-pages` branch.
 

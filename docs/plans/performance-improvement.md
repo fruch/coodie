@@ -1034,13 +1034,95 @@ Particularly impactful for hot paths like `Model.find(id=pk).all()` and `doc.sav
 | Priority | Task | Expected Impact |
 |----------|------|-----------------|
 | P1 | Partial UPDATE optimization | Close 1.75× gap |
-| P2 | 3.10 Reduce `_clone()` overhead | Faster query chain construction |
-| P2 | 7.4 Lazy parsing (LazyDocument) | Near-zero cost for PK-only reads |
+| ~~P2~~ | ~~3.10 Reduce `_clone()` overhead~~ | ~~Faster query chain construction~~ ✅ Phase 4 |
+| ~~P2~~ | ~~7.4 Lazy parsing (LazyDocument)~~ | ~~Near-zero cost for PK-only reads~~ ✅ Phase 4 |
 | P2 | 3.11 Native async for CassandraDriver | Eliminate thread pool hop for async |
 
 ---
 
-## 13. Notes
+## 13. Phase 4 Implementation
+
+> **PR**: Phase 4 — `perf: implement Phase 4 optimizations (tasks 3.10, 7.4)`
+
+### 13.1 Phase 4 Changes Implemented
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.10 | Reduce `_clone()` overhead — replace `dict()` + `**kwargs` unpacking with `object.__new__()` + direct slot copy | ✅ Done |
+| 7.4 | Implement `LazyDocument` proxy — defers `model_validate()` until field access, available via `QuerySet.all(lazy=True)` | ✅ Done |
+
+### 13.2 Implementation Details
+
+#### Task 3.10 — Reduce `_clone()` overhead
+
+**Before** (every chained call — `.filter()`, `.limit()`, `.order_by()`, etc.):
+```
+_clone(**overrides)
+  → dict(where=..., limit_val=..., ...) [16 entries]
+  → defaults.update(overrides)
+  → QuerySet(doc_cls, **defaults)       [keyword unpacking + __init__ processing]
+```
+
+**After**:
+```
+_clone(**overrides)
+  → object.__new__(QuerySet)            [bare instance, no __init__]
+  → copy 17 slot values directly        [C-level attribute access]
+  → setattr(new, f"_{key}", val)        [only for overrides, typically 1-2]
+```
+
+Changes:
+- Updated `_clone()` in both `sync/query.py` and `aio/query.py`.
+- Uses `object.__new__(QuerySet)` to bypass `__init__()` entirely.
+- Copies all `__slots__` attributes via direct assignment (C-level speed for slotted classes).
+- Only applies the override dict, typically 1–2 entries per chain call.
+
+**Savings**: Eliminates `dict()` construction (16 key-value pairs), `dict.update()` call,
+keyword argument unpacking, and the `or []` guards inside `__init__`. For a typical
+4-method chain (`.filter().limit().allow_filtering().all()`), this removes 4× dict
+allocations and 4× `__init__` calls.
+
+#### Task 7.4 — Lazy parsing (LazyDocument)
+
+```python
+from coodie.lazy import LazyDocument
+
+# Usage — near-zero construction cost
+results = Model.find(status="active").all(lazy=True)  # list[LazyDocument]
+
+# Parsing deferred until field access
+for r in results:
+    print(r.id)    # triggers model_validate() on first access
+    print(r.name)  # cached — no re-parse
+```
+
+Implementation (`src/coodie/lazy.py`):
+- `LazyDocument` uses `__slots__ = ("_doc_cls", "_raw_data", "_parsed")` — minimal memory.
+- `__getattr__` triggers `_resolve()` on first non-slot attribute access.
+- `_resolve()` handles collection field coercion (None → empty container) before `model_validate()`.
+- Parsed document is cached in `_parsed` — subsequent accesses are free.
+- `__repr__` shows `parsed=False` before access, full document repr after.
+- `__eq__` resolves both sides and compares the underlying documents.
+
+Changes:
+- New module `src/coodie/lazy.py` with `LazyDocument` class.
+- `QuerySet.all(lazy=True)` in both `sync/query.py` and `aio/query.py`.
+- `LazyDocument` exported from `coodie.__init__` and added to `__all__`.
+
+**Savings**: For queries where not all rows are inspected (exists-checks, pagination,
+dashboards), rows that are never accessed have zero Pydantic validation cost.
+Each `LazyDocument` is just 3 slots (~72 bytes) vs a full Pydantic model instance.
+
+### 13.3 Remaining Priorities After Phase 4
+
+| Priority | Task | Expected Impact |
+|----------|------|-----------------|
+| P1 | Partial UPDATE optimization | Close 1.75× gap |
+| P2 | 3.11 Native async for CassandraDriver | Eliminate thread pool hop for async |
+
+---
+
+## 14. Notes
 
 - coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for
   pure Python model construction. The overhead is in the ORM ↔ driver interface.

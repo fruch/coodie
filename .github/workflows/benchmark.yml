@@ -65,12 +65,13 @@ jobs:
         run: |
           if ! git ls-remote --exit-code origin gh-pages >/dev/null 2>&1; then
             echo "ℹ️ gh-pages branch not found — creating it"
+            ORIG_SHA=$(git rev-parse HEAD)
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git switch --orphan gh-pages
             git commit --allow-empty -m "chore: initialize gh-pages branch for benchmark history"
             git push origin gh-pages
-            git switch -
+            git checkout "$ORIG_SHA"
           fi
 
       - name: Store and compare benchmark results

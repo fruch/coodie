@@ -146,6 +146,17 @@ def _insert_columns(doc_cls: type) -> tuple[str, ...]:
     return tuple(doc_cls.model_fields.keys())
 
 
+@functools.lru_cache(maxsize=128)
+def _pk_columns(doc_cls: type) -> tuple[str, ...]:
+    """Return primary key + clustering key column names, cached per class.
+
+    Eliminates the per-call ``_schema()`` + list-comprehension overhead in
+    ``update()`` and ``delete()``.
+    """
+    schema = build_schema(doc_cls)
+    return tuple(c.name for c in schema if c.primary_key or c.clustering_key)
+
+
 # ------------------------------------------------------------------
 # Polymorphic (single-table inheritance) helpers
 # ------------------------------------------------------------------

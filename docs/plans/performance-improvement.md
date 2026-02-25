@@ -1069,3 +1069,327 @@ Particularly impactful for hot paths like `Model.find(id=pk).all()` and `doc.sav
 - **After Phase 3, coodie wins 26 out of 30 benchmarks** with write path 5–10% faster
   and read path 6–9% faster. The 4 losses (partial UPDATE, LWT update, list-mutation,
   status-update) are all read-modify-write patterns dominated by DB round-trips.
+
+---
+
+## 14. Cython / Rust / Native Extension Evaluation
+
+> **Date**: 2026-02-25
+> **Context**: Post-Phase 3, coodie wins 26/30 benchmarks. Evaluate whether native
+> compilation (Cython or Rust via PyO3) can push performance further.
+
+### 14.1 Where Is the Remaining Time Spent?
+
+After three phases of pure-Python optimizations, the overhead breakdown for a
+typical single INSERT (~440 µs) looks like this:
+
+| Component | Time (approx.) | % of total | Already optimized? |
+|-----------|---------------|------------|-------------------|
+| Network round-trip (driver ↔ ScyllaDB) | ~300–350 µs | **~70–80%** | ❌ (hardware/network limit) |
+| cassandra-driver `bind()` + `execute()` (C code) | ~40–60 µs | ~10–15% | ✅ (C extension in driver) |
+| Pydantic `model_validate()` (Rust core) | ~15–25 µs | ~4–6% | ✅ (pydantic-core is Rust) |
+| CQL string building (`build_insert_from_columns`) | ~1–2 µs | <1% | ✅ (cached after first call) |
+| `_insert_columns()` / `_find_discriminator_column()` | <1 µs | <1% | ✅ (`@lru_cache`) |
+| `getattr()` field extraction in `save()` | ~2–5 µs | ~1% | ✅ (direct slot access) |
+| Python overhead (frame setup, dict ops, etc.) | ~10–20 µs | ~3–5% | Partially |
+
+For a typical GET by PK (~487 µs):
+
+| Component | Time (approx.) | % of total | Already optimized? |
+|-----------|---------------|------------|-------------------|
+| Network round-trip | ~300–350 µs | **~65–72%** | ❌ (hardware/network limit) |
+| `_rows_to_dicts()` (type check + dict conversion) | ~30–50 µs | ~7–10% | ✅ (type-check-once pattern) |
+| Pydantic `model_validate()` (Rust core) | ~15–25 µs | ~4–6% | ✅ (already Rust) |
+| CQL string building (`build_select`) | ~1–2 µs | <1% | ✅ (cached after first call) |
+| `_collection_fields()` coercion check | <1 µs | <1% | ✅ (`@lru_cache`) |
+| Driver `prepare()` + `bind()` (C code) | ~40–60 µs | ~10–12% | ✅ (C extension) |
+| Python overhead | ~10–20 µs | ~3–5% | Partially |
+
+**Key finding**: ~80–85% of wall-clock time on both reads and writes is in
+network I/O and C-level driver code. Only ~3–5% is in pure Python code that
+could benefit from native compilation.
+
+### 14.2 Cython Evaluation
+
+#### Candidates for Cython Compilation
+
+| Module / Function | Python Operations | Cython Speedup Estimate | Notes |
+|-------------------|-------------------|------------------------|-------|
+| `cql_builder.py` (full module) | f-string building, list comprehensions, dict ops | 10–30% on string ops | But CQL strings are **already cached** — speedup applies only to first call |
+| `parse_filter_kwargs()` | `str.rsplit()`, dict lookups, list append | 15–25% | Called per-query, but kwargs are typically 1–3 items |
+| `_rows_to_dicts()` | `hasattr()`, `._asdict()`, `dict()` per row | 20–30% on row loop | Most impactful for bulk reads (100+ rows) |
+| `_clone()` | dict creation + `QuerySet.__init__` | 5–10% | Called once per chain step, not per-row |
+| `types.py` (`_unwrap_annotation`, etc.) | `typing.get_origin/get_args`, isinstance checks | 10–20% | **All cached** — speedup applies only to first call per class |
+
+#### Cython Pros
+
+- **Easy integration**: Cython compiles `.pyx` files to C extensions that import
+  seamlessly. No API changes needed.
+- **Incremental adoption**: Can cythonize one module at a time (e.g., start with
+  `cql_builder.pyx`).
+- **Type annotations**: coodie already uses type hints extensively, which Cython
+  can leverage for `cdef` declarations.
+- **Build tooling**: Well-supported by `setuptools`, `hatchling`, and `maturin`.
+
+#### Cython Cons
+
+- **Marginal gains on cached paths**: `build_select()`, `build_insert_from_columns()`,
+  `_cached_type_hints()`, `_collection_fields()` are all behind `@lru_cache` or
+  module-level dict caches. Cython speeds up code that *runs*, but cached code
+  doesn't run on repeat calls.
+- **Build complexity**: Requires C compiler in CI and on user machines. Adds
+  `cython` build dependency. Wheels must be built per-platform (manylinux, macOS,
+  Windows).
+- **Debugging difficulty**: Cython tracebacks are harder to read. `cProfile` and
+  `py-spy` have limited visibility into cythonized code.
+- **Maintenance overhead**: Two languages (Python + Cython) in the same codebase.
+  Contributors need Cython knowledge.
+
+#### Cython Verdict
+
+**Not recommended at this time.** The realistic gain is ~2–5% on end-to-end
+operations (since ~80% of time is in I/O and C-level driver code). The build
+complexity and maintenance burden outweigh the marginal performance benefit.
+
+If coodie reaches a stage where Python overhead becomes the dominant bottleneck
+(e.g., in-memory-only benchmarks show >50% Python time), reconsider cythonizing
+`cql_builder.py` and the `_rows_to_dicts()` loop.
+
+### 14.3 Rust (PyO3 / maturin) Evaluation
+
+#### Candidates for Rust Extension
+
+| Module / Function | Rust Speedup Estimate | Feasibility | Notes |
+|-------------------|----------------------|-------------|-------|
+| `cql_builder.py` (full module) | 30–50% on string ops | Medium | Rust `String`/`format!` is fast, but CQL caching already eliminates repeat cost |
+| `parse_filter_kwargs()` | 40–60% | Medium | Rust regex + HashMap would be very fast, but kwargs are typically 1–3 items |
+| `_rows_to_dicts()` bulk conversion | 30–40% on the loop | Low | Requires C-API interop with cassandra-driver's `ResultSet` — complex FFI |
+| `build_where_clause()` | 20–30% | Medium | String operations, but result is cached as part of `build_select()` |
+| Full CQL builder as Rust crate | 40–60% on first call | High effort | Would need to handle all CQL dialects, edge cases, quoting rules |
+
+#### Rust (PyO3) Pros
+
+- **Maximum raw speed**: Rust is 10–100× faster than Python for CPU-bound code.
+  But the relevant code is I/O-bound, not CPU-bound.
+- **Memory safety**: No segfaults from C extensions.
+- **Pydantic precedent**: Pydantic v2 uses `pydantic-core` (Rust via PyO3)
+  successfully. Proves the pattern works for Python ORMs.
+- **maturin**: Excellent build tooling for Rust+Python projects. Handles wheel
+  building for all platforms.
+
+#### Rust (PyO3) Cons
+
+- **Disproportionate effort**: Writing `cql_builder.rs` requires reimplementing
+  all CQL generation logic in Rust, including edge cases for TOKEN queries,
+  collection operations, LWT conditions, batch statements, materialized views.
+  This is ~530 lines of Python → ~800+ lines of Rust + FFI glue.
+- **FFI overhead**: Each Python↔Rust boundary crossing adds ~0.1–0.5 µs. For
+  functions that are already <2 µs (cached CQL building), the FFI overhead
+  can eat the entire gain.
+- **Limited pool of contributors**: Rust+Python is a niche skillset. coodie is
+  a small project — adding Rust raises the contribution barrier significantly.
+- **Pydantic already covers the hot path**: `model_validate()` (the most
+  CPU-intensive per-row operation) is **already Rust** via pydantic-core.
+  Adding more Rust targets diminishing returns.
+- **Build matrix explosion**: Must build wheels for Linux (x86_64, aarch64),
+  macOS (x86_64, arm64), Windows (x86_64). CI time and complexity increase.
+
+#### Rust Verdict
+
+**Not recommended.** The effort-to-benefit ratio is unfavorable:
+- ~800+ lines of Rust code to save ~10–20 µs per operation (~2–4% improvement)
+- Pydantic v2 already uses Rust for the most CPU-intensive path
+- Contributors would need Rust+PyO3 knowledge
+
+The one scenario where Rust makes sense: if coodie adds a **custom wire-protocol
+parser** that replaces cassandra-driver's result-set processing entirely. This
+would eliminate the `_rows_to_dicts()` bottleneck at the protocol level. But this
+is a massive undertaking (CQL binary protocol v4/v5 implementation) and outside
+the scope of an ORM library.
+
+### 14.4 Why Native Compilation Has Diminishing Returns
+
+```
+Phase 0 (baseline)     → coodie 16/30 slower   (Python overhead dominant)
+Phase 1 (caching)      → coodie 24/30 faster    (eliminated redundant work)
+Phase 2 (sync_table)   → coodie 28/30 faster    (table cache)
+Phase 3 (query paths)  → coodie 26/30 faster    (CQL cache, skip model_dump)
+─────────────────────────────────────────────────────────────────────────────
+Phase N (Cython/Rust)  → coodie 26–27/30 faster (marginal: ~2–5% on I/O-bound ops)
+```
+
+The optimization journey follows the classic **Amdahl's Law** pattern:
+
+1. **Phase 1** removed O(N) redundant work (type-hint caching, per-row hasattr
+   elimination). This was **algorithmic improvement** — 40–91% speedup.
+2. **Phase 2** added caching to eliminate repeat work (sync_table). This was
+   **memoization** — 48.8× faster on the cached path.
+3. **Phase 3** cached CQL strings and eliminated intermediate dicts. This was
+   **allocation reduction** — 5–10% improvement.
+4. **Native compilation** would speed up the ~3–5% of wall-clock time that is
+   pure Python overhead. Even a 2× speedup on that slice yields only ~1.5–2.5%
+   end-to-end improvement.
+
+The remaining 4 benchmark losses (partial UPDATE 1.75×, LWT update 1.26×,
+list-mutation 1.31×, status-update 1.12×) are **not caused by Python overhead**.
+They are caused by coodie's read-modify-write pattern requiring extra DB
+round-trips compared to cqlengine's in-place mutation tracking.
+
+### 14.5 Alternative Optimization Strategies (Higher ROI)
+
+Instead of native compilation, the following pure-Python strategies offer better
+return on investment for the remaining performance gaps:
+
+#### 14.5.1 Custom `dict_factory` on cassandra-driver (Estimated: −10–15% on reads)
+
+Register a `dict_factory` on the cassandra-driver `Session` so rows arrive as
+dicts directly, eliminating `_rows_to_dicts()` entirely:
+
+```python
+from cassandra.query import dict_factory
+
+session.row_factory = dict_factory
+# Now execute() returns list[dict] — zero-copy, no _rows_to_dicts() needed
+```
+
+This removes ~30–50 µs per query on the read path. The `_rows_to_dicts()` method
+becomes a pass-through. **Zero code complexity increase.**
+
+| Metric | Current | With dict_factory | Δ |
+|--------|---------|-------------------|---|
+| GET by PK | 487 µs | ~440–460 µs | −5–10% |
+| Filter + LIMIT | 613 µs | ~570–590 µs | −4–7% |
+| 100-row query | ~2,000 µs | ~1,700–1,800 µs | −10–15% |
+
+#### 14.5.2 Partial UPDATE Optimization (Target: close 1.75× gap)
+
+The partial UPDATE benchmark is coodie's worst remaining loss. The root cause:
+coodie's `update()` method calls `_schema()` to find PK columns on every call.
+Pre-compute and cache PK column names per class:
+
+```python
+@functools.lru_cache(maxsize=128)
+def _pk_columns(doc_cls: type) -> tuple[str, ...]:
+    """Return primary key + clustering key column names, cached."""
+    schema = build_schema(doc_cls)
+    return tuple(c.name for c in schema if c.primary_key or c.clustering_key)
+```
+
+Then `update()` becomes:
+```python
+def update(self, **kwargs):
+    pk_cols = _pk_columns(self.__class__)
+    where = [(c, "=", getattr(self, c)) for c in pk_cols]
+    # ... rest unchanged
+```
+
+**Estimated impact**: −15–25% on partial UPDATE (eliminates per-call schema scan).
+
+#### 14.5.3 Native Async for CassandraDriver (Task 3.11 — Estimated: −20–40% async)
+
+The current async path uses `run_in_executor()` for paginated queries and
+`execute_async()` + callback bridge for non-paginated ones. The callback bridge
+adds ~20–50 µs of overhead per call (future creation, `call_soon_threadsafe`).
+
+Replace with a proper `asyncio.Future` that wraps cassandra-driver's
+`ResponseFuture` without thread-pool hops:
+
+```python
+async def execute_async(self, stmt, params, ...):
+    prepared = self._prepare(stmt)
+    bound = prepared.bind(params)
+    future = self._session.execute_async(bound)
+
+    loop = asyncio.get_running_loop()
+    result_future = loop.create_future()
+
+    def _on_result(result):
+        loop.call_soon_threadsafe(result_future.set_result, result)
+
+    def _on_error(exc):
+        loop.call_soon_threadsafe(result_future.set_exception, exc)
+
+    future.add_callbacks(_on_result, _on_error)
+    result = await result_future
+    return self._rows_to_dicts(result)
+```
+
+This is already partially implemented but the paginated path still falls back to
+`run_in_executor`. Fixing the paginated path would eliminate thread-pool overhead
+for all async operations.
+
+#### 14.5.4 Targeted `__slots__` on Remaining Classes (Estimated: −2–5%)
+
+While `QuerySet` and driver classes already have `__slots__`, other hot-path
+objects still use `__dict__`:
+
+- `LWTResult` — created on every LWT operation
+- `PagedResult` — created on every paginated query
+- `BatchQuery` — created for every batch operation
+
+Adding `__slots__` (or using `@dataclass(slots=True)`) saves ~40–60 bytes per
+instance and speeds up attribute access by ~10–20%.
+
+#### 14.5.5 `msgspec` for Internal Serialization (Estimated: −5–10% on writes)
+
+[msgspec](https://jcristharif.com/msgspec/) is a high-performance serialization
+library (~2–5× faster than Pydantic for simple struct operations). While coodie's
+public API must remain Pydantic-based (for user-facing models), internal paths
+like `_insert_columns()` value extraction could use msgspec structs:
+
+```python
+import msgspec
+
+class _InsertPayload(msgspec.Struct):
+    """Lightweight struct for INSERT parameter extraction."""
+    columns: tuple[str, ...]
+    values: list[Any]
+```
+
+However, this adds a dependency and the gain is marginal given that `getattr()`
+extraction is already ~2–5 µs. **Not recommended unless coodie needs sub-100 µs writes.**
+
+#### 14.5.6 Connection-Level Optimizations
+
+- **Prepared statement warming**: Pre-prepare common queries at `sync_table()` time
+  instead of lazily on first execute. Eliminates ~100–200 µs cold-start penalty.
+- **Protocol compression**: Enable LZ4 compression on the cassandra-driver connection
+  for large result sets. Reduces network transfer time for bulk reads.
+- **Speculative execution**: Enable cassandra-driver's speculative execution policy
+  to reduce tail latency for read-heavy workloads.
+
+These are driver-configuration changes, not code changes, but can yield 5–15%
+improvement on real-world workloads.
+
+### 14.6 Recommendation Matrix
+
+| Strategy | Effort | Impact | Risk | Priority |
+|----------|--------|--------|------|----------|
+| 14.5.1 Custom `dict_factory` | **Small** (5 lines) | **Medium** (−10–15% reads) | Low | **P0** |
+| 14.5.2 Partial UPDATE cache | **Small** (15 lines) | **Medium** (−15–25% updates) | Low | **P0** |
+| 14.5.3 Native async (paginated) | **Medium** (50 lines) | **High** (−20–40% async) | Medium | **P1** |
+| 14.5.4 `__slots__` on remaining classes | **Small** (10 lines) | **Low** (−2–5%) | Low | **P2** |
+| 14.5.6 Connection-level optimizations | **Small** (config) | **Medium** (−5–15%) | Low | **P2** |
+| Cython compilation | **Large** (build infra) | **Low** (−2–5%) | High | ❌ Not recommended |
+| Rust (PyO3) extension | **Very Large** (800+ LOC) | **Low** (−2–4%) | High | ❌ Not recommended |
+| 14.5.5 msgspec internals | **Medium** (new dep) | **Low** (−5–10%) | Medium | ❌ Not recommended now |
+
+### 14.7 Conclusion
+
+**Cython and Rust are not recommended for coodie at this stage.** The performance
+profile is overwhelmingly I/O-bound (~80% network + C-level driver), and the
+Python ORM overhead has been reduced to ~3–5% of wall-clock time through three
+phases of algorithmic optimization, caching, and allocation reduction.
+
+The remaining benchmark losses (partial UPDATE, LWT, list-mutation, status-update)
+are caused by **extra DB round-trips** in coodie's read-modify-write pattern, not
+by Python execution speed. Native compilation cannot fix I/O patterns.
+
+The highest-ROI next steps are:
+1. **Custom `dict_factory`** — eliminates `_rows_to_dicts()` overhead entirely (P0)
+2. **Partial UPDATE PK cache** — closes the 1.75× gap on the worst benchmark (P0)
+3. **Native async for paginated queries** — eliminates thread-pool overhead (P1)
+
+These three pure-Python changes are estimated to improve overall performance by
+10–25% on affected operations, far exceeding what Cython or Rust could deliver
+for a fraction of the implementation effort.

@@ -22,7 +22,9 @@
 5. [Copilot CLI Setup & Credentials](#5-copilot-cli-setup--credentials)
    - [5.1 Installation](#51-installation)
    - [5.2 Authentication](#52-authentication)
-   - [5.3 Repository Setup Checklist](#53-repository-setup-checklist)
+   - [5.3 Generating the Fine-Grained PAT](#53-generating-the-fine-grained-pat-step-by-step)
+   - [5.4 Adding the Token as a Repository Secret](#54-adding-the-token-as-a-repository-secret)
+   - [5.5 Repository Setup Checklist](#55-repository-setup-checklist)
 6. [Workflow YAML Design](#6-workflow-yaml-design)
    - [6.1 Trigger & Permissions](#61-trigger--permissions)
    - [6.2 Step-by-Step Pseudocode](#62-step-by-step-pseudocode)
@@ -210,15 +212,60 @@ env:
   COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}   # for gh copilot commands
 ```
 
-### 5.3 Repository Setup Checklist
+### 5.3 Generating the Fine-Grained PAT (Step-by-Step)
 
-Before the workflow can use Copilot CLI, a repository admin must complete these
-one-time steps:
+> **Direct link to create a new token:**
+> [`https://github.com/settings/personal-access-tokens/new`](https://github.com/settings/personal-access-tokens/new)
 
-- [ ] **Generate a fine-grained PAT** — Go to [GitHub Settings → Developer settings → Fine-grained tokens](https://github.com/settings/tokens?type=beta), create a token with the "Copilot Requests" permission
-- [ ] **Add the PAT as a repo secret** — Go to the repository's Settings → Secrets and variables → Actions, add a secret named `COPILOT_PAT` with the token value
-- [ ] **Verify Copilot subscription** — Confirm the PAT owner has an active GitHub Copilot subscription
-- [ ] **Test locally** — Run `COPILOT_GITHUB_TOKEN=<token> gh copilot suggest "hello"` to verify the token works
+Follow these steps to generate the required token:
+
+1. **Open the token creation page** — Click the link above, or navigate manually:
+   GitHub avatar (top-right) → **Settings** → **Developer settings** (bottom of
+   left sidebar) → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**
+
+2. **Fill in the token form:**
+
+   | Field | Value |
+   |---|---|
+   | **Token name** | `coodie-copilot-rebase-squash` (or any descriptive name) |
+   | **Expiration** | Pick a reasonable lifetime (e.g., 90 days); set a calendar reminder to rotate |
+   | **Description** | "Copilot CLI access for PR rebase/squash workflow" |
+   | **Resource owner** | Your personal account (the one with the Copilot subscription) |
+   | **Repository access** | "Public Repositories (read-only)" or scope to this repository only |
+
+3. **Set permissions** — Expand the **Account permissions** section and enable:
+
+   | Permission | Access level | Why |
+   |---|---|---|
+   | **GitHub Copilot** → **Copilot Requests** | **Read** | Required by the `gh copilot suggest` API |
+
+   No other permissions are needed. Do **not** grant repository write/admin
+   permissions — the workflow uses the separate `GITHUB_TOKEN` for pushes and
+   API calls.
+
+4. **Generate & copy** — Click **Generate token**. Copy the token value
+   immediately (it starts with `github_pat_` and is only shown once).
+
+### 5.4 Adding the Token as a Repository Secret
+
+> **Direct link (replace `OWNER/REPO`):**
+> `https://github.com/OWNER/REPO/settings/secrets/actions/new`
+>
+> For this repository:
+> [`https://github.com/fruch/coodie/settings/secrets/actions/new`](https://github.com/fruch/coodie/settings/secrets/actions/new)
+
+1. Open the link above, or navigate: Repository → **Settings** → **Secrets and
+   variables** → **Actions** → **New repository secret**
+2. Set **Name** to `COPILOT_PAT`
+3. Paste the fine-grained PAT value into the **Secret** field
+4. Click **Add secret**
+
+### 5.5 Repository Setup Checklist
+
+- [ ] PAT owner has an active **GitHub Copilot subscription** (Individual, Business, or Enterprise)
+- [ ] Fine-grained PAT generated with **"Copilot Requests"** permission (see [§5.3](#53-generating-the-fine-grained-pat-step-by-step))
+- [ ] PAT stored as repo secret **`COPILOT_PAT`** (see [§5.4](#54-adding-the-token-as-a-repository-secret))
+- [ ] **Local smoke test** passed: `COPILOT_GITHUB_TOKEN=github_pat_... gh copilot suggest "hello"` returns a suggestion
 
 > **Fallback behavior:** If `COPILOT_PAT` is not configured or the token is
 > invalid, the workflow gracefully degrades — conflict resolution is skipped

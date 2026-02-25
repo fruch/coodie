@@ -9,7 +9,10 @@ dependencies = [
     "jinja2>=3.1",
     "python-multipart>=0.0.22",
     "coodie",
+    "click>=8.0",
+    "faker>=18.0",
+    "rich>=13.0",
 ]
 
 [tool.uv.sources]
-coodie = { path = "..", editable = true }
+coodie = { path = "../..", editable = true }

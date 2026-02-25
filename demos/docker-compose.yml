@@ -1,0 +1,6 @@
+services:
+  scylladb:
+    image: scylladb/scylla:latest
+    ports:
+      - "9042:9042"
+    command: --smp 1 --memory 512M --developer-mode 1

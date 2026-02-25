@@ -1089,7 +1089,7 @@ For conference talks and live demos, the recommended flow is:
 
 ## 11. References
 
-- [Existing FastAPI demo](../../demo/) — current single-demo implementation
+- [FastAPI Catalog demo](../../demos/fastapi-catalog/) — Product Catalog demo (moved from `demo/` in Phase 1)
 - [scylladb/argus](https://github.com/scylladb/argus) — production Flask + cqlengine app with complex models, UDTs, batch writes, composite keys
 - [argus models: web.py](https://github.com/scylladb/argus/blob/master/argus/backend/models/web.py) — User, Release, Group, Test, Notification models
 - [argus models: testrun.py](https://github.com/scylladb/argus/blob/master/argus/backend/plugins/sct/testrun.py) — SCTTestRun with composite PK, clustering, collections

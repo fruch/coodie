@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import Any
 
 from coodie.drivers.base import AbstractDriver
@@ -48,10 +49,13 @@ class AcsyllaDriver(AbstractDriver):
 
         results = await Product.find(name="Widget").all()
 
-    **Sync bridge** — ``execute()``, ``sync_table()``, and ``close()`` run the
-    async methods on the event loop that was passed at construction (or a new
-    dedicated loop).  They **must only be called from non-async contexts**
-    (scripts, CLI tools, Django/Flask views).
+    **Sync bridge** — ``execute()``, ``sync_table()``, and ``close()`` dispatch
+    to a dedicated background event loop that is started in a daemon thread at
+    construction time.  This means they work correctly even when called from
+    within an already-running event loop (e.g. inside pytest-asyncio, ASGI
+    middleware, or ``asyncio.run()``), avoiding the
+    ``RuntimeError: This event loop is already running`` that
+    ``loop.run_until_complete()`` would raise in those contexts.
     """
 
     __slots__ = (
@@ -59,7 +63,8 @@ class AcsyllaDriver(AbstractDriver):
         "_session",
         "_default_keyspace",
         "_prepared",
-        "_loop",
+        "_bg_loop",
+        "_bg_thread",
         "_last_paging_state",
         "_known_tables",
     )
@@ -68,7 +73,6 @@ class AcsyllaDriver(AbstractDriver):
         self,
         session: Any,
         default_keyspace: str | None = None,
-        loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         try:
             import acsylla  # type: ignore[import-untyped]
@@ -78,9 +82,19 @@ class AcsyllaDriver(AbstractDriver):
         self._session = session
         self._default_keyspace = default_keyspace
         self._prepared: dict[str, Any] = {}
-        self._loop = loop or asyncio.new_event_loop()
         self._last_paging_state: bytes | None = None
         self._known_tables: dict[str, frozenset[str]] = {}
+        # Spin up a dedicated background event loop in a daemon thread.
+        # The sync bridge submits coroutines here via run_coroutine_threadsafe,
+        # which works regardless of whether the calling thread has its own
+        # running event loop.
+        self._bg_loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
+        self._bg_thread = threading.Thread(
+            target=self._bg_loop.run_forever,
+            daemon=True,
+            name="coodie-acsylla-sync",
+        )
+        self._bg_thread.start()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -250,9 +264,10 @@ class AcsyllaDriver(AbstractDriver):
 
     # ------------------------------------------------------------------
     # Synchronous interface (event-loop bridge)
-    # Uses the stored event loop so the acsylla session — which is bound
-    # to a specific loop — is always accessed from the correct one.
-    # Must only be called from non-async contexts.
+    # Submits coroutines to the dedicated background loop via
+    # run_coroutine_threadsafe, then blocks with .result().  This is safe
+    # to call from any thread — including one that already has a running
+    # event loop (e.g. pytest-asyncio, ASGI request handlers).
     # ------------------------------------------------------------------
 
     def execute(
@@ -264,7 +279,7 @@ class AcsyllaDriver(AbstractDriver):
         fetch_size: int | None = None,
         paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
-        return self._loop.run_until_complete(
+        return asyncio.run_coroutine_threadsafe(
             self.execute_async(
                 stmt,
                 params,
@@ -272,8 +287,9 @@ class AcsyllaDriver(AbstractDriver):
                 timeout=timeout,
                 fetch_size=fetch_size,
                 paging_state=paging_state,
-            )
-        )
+            ),
+            self._bg_loop,
+        ).result()
 
     def sync_table(
         self,
@@ -284,7 +300,7 @@ class AcsyllaDriver(AbstractDriver):
         dry_run: bool = False,
         drop_removed_indexes: bool = False,
     ) -> list[str]:
-        return self._loop.run_until_complete(
+        return asyncio.run_coroutine_threadsafe(
             self.sync_table_async(
                 table,
                 keyspace,
@@ -292,8 +308,11 @@ class AcsyllaDriver(AbstractDriver):
                 table_options=table_options,
                 dry_run=dry_run,
                 drop_removed_indexes=drop_removed_indexes,
-            )
-        )
+            ),
+            self._bg_loop,
+        ).result()
 
     def close(self) -> None:
-        self._loop.run_until_complete(self.close_async())
+        asyncio.run_coroutine_threadsafe(self.close_async(), self._bg_loop).result()
+        self._bg_loop.call_soon_threadsafe(self._bg_loop.stop)
+        self._bg_thread.join(timeout=10)

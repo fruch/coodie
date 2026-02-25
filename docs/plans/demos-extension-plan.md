@@ -98,7 +98,7 @@ Legend:
 |---|---|---|---|
 | Product Catalog (existing) | FastAPI + HTMX | Async | ✅ |
 | Flask Blog | Flask + Jinja2 | Sync | ❌ |
-| Django Task Board | Django + templates | Sync | ❌ |
+| Django Task Board | Django + templates | Sync | ✅ |
 
 **Gap summary — framework integrations:**
 - Flask Blog → demonstrate coodie's sync API with Flask's request lifecycle,

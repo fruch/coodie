@@ -241,6 +241,10 @@ def build_where_clause(
     return "WHERE " + " AND ".join(parts), params
 
 
+# Cache for SELECT CQL templates keyed by query shape.
+_select_cql_cache: dict[tuple, str] = {}
+
+
 def build_select(
     table: str,
     keyspace: str,
@@ -251,15 +255,41 @@ def build_select(
     allow_filtering: bool = False,
     per_partition_limit: int | None = None,
 ) -> tuple[str, list[Any]]:
+    # Build the cache key from the query *shape* (excludes actual values).
+    where_shape: tuple = ()
+    if where:
+        where_shape = tuple((col, op, len(value)) if op == "IN" else (col, op) for col, op, value in where)
+    cache_key = (
+        table,
+        keyspace,
+        tuple(columns) if columns else None,
+        where_shape,
+        limit,
+        tuple(order_by) if order_by else None,
+        allow_filtering,
+        per_partition_limit,
+    )
+
+    # Extract params (always needed regardless of cache hit).
+    params: list[Any] = []
+    if where:
+        for _col, op, value in where:
+            if op == "IN":
+                params.extend(value)
+            else:
+                params.append(value)
+
+    cached_cql = _select_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else "*"
     cql = f"SELECT {cols_str} FROM {keyspace}.{table}"
-    params: list[Any] = []
 
     if where:
-        clause, where_params = build_where_clause(where)
+        clause, _wp = build_where_clause(where)
         if clause:
             cql += " " + clause
-            params.extend(where_params)
 
     if order_by:
         order_parts = []
@@ -279,6 +309,7 @@ def build_select(
     if allow_filtering:
         cql += " ALLOW FILTERING"
 
+    _select_cql_cache[cache_key] = cql
     return cql, params
 
 
@@ -334,6 +365,38 @@ def build_insert(
         cql += " IF NOT EXISTS"
     cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
     return cql, vals
+
+
+# Cache for INSERT CQL templates keyed by (table, keyspace, columns, if_not_exists).
+_insert_cql_cache: dict[tuple, str] = {}
+
+
+def build_insert_from_columns(
+    table: str,
+    keyspace: str,
+    columns: tuple[str, ...],
+    values: list[Any],
+    ttl: int | None = None,
+    if_not_exists: bool = False,
+    timestamp: int | None = None,
+) -> tuple[str, list[Any]]:
+    """Build an INSERT statement from pre-computed column names and values.
+
+    Like :func:`build_insert` but avoids creating an intermediate ``dict``.
+    The base CQL (without ``USING`` clause) is cached per
+    ``(table, keyspace, columns, if_not_exists)`` tuple.
+    """
+    cache_key = (table, keyspace, columns, if_not_exists)
+    base_cql = _insert_cql_cache.get(cache_key)
+    if base_cql is None:
+        cols_str = ", ".join(f'"{c}"' for c in columns)
+        placeholders = ", ".join("?" * len(columns))
+        base_cql = f"INSERT INTO {keyspace}.{table} ({cols_str}) VALUES ({placeholders})"
+        if if_not_exists:
+            base_cql += " IF NOT EXISTS"
+        _insert_cql_cache[cache_key] = base_cql
+    cql = base_cql + _build_using_clause(ttl=ttl, timestamp=timestamp)
+    return cql, values
 
 
 def parse_update_kwargs(

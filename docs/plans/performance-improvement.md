@@ -764,6 +764,7 @@ Phase 2's table metadata cache, which is a separate feature (not a code optimiza
 
 ---
 
+<<<<<<< HEAD
 ## 11. Phase 2 Results
 
 > **Post-optimization run**: [#22374004611](https://github.com/fruch/coodie/actions/runs/22374004611) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22374004611/job/64760385946?pr=57#step:5:124))
@@ -881,7 +882,87 @@ Phase 2's table metadata cache, which is a separate feature (not a code optimiza
 
 ---
 
-## 12. Notes
+## 12. Phase 3 Results
+
+> **PR**: Phase 3 — Query path optimization
+
+### 12.1 Phase 3 Changes Implemented
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 3.6 | Skip `model_dump()` in `save()`/`insert()` — extract field values via `getattr()` + cached `_insert_columns()` | ✅ Done |
+| 3.7 | Optimize `_rows_to_docs()` — skip collection coercion when no collection fields, inline coercion to avoid per-row function call overhead | ✅ Done |
+| 3.8 | Cache CQL query strings — `_insert_cql_cache` for INSERT templates, `_select_cql_cache` for SELECT templates (keyed by query shape) | ✅ Done |
+
+### 12.2 Implementation Details
+
+#### Task 3.6 — Skip `model_dump()` in writes
+
+**Before** (every `save()`/`insert()` call):
+```
+model → model_dump() → dict → build_insert(dict) → CQL string
+```
+
+**After**:
+```
+model → _insert_columns(cls) [cached] → [getattr(self, c) for c in columns] → build_insert_from_columns() → CQL string
+```
+
+Changes:
+- Added `_insert_columns(cls)` to `schema.py` — `@lru_cache` returning `tuple[str, ...]` of field names per model class.
+- Added `build_insert_from_columns()` to `cql_builder.py` — takes pre-computed column names + values directly, avoids `dict.keys()`/`dict.values()` overhead.
+- Updated `save()` and `insert()` in both `sync/document.py` and `aio/document.py` to use direct `getattr()` extraction instead of `model_dump()`.
+
+**Savings**: Eliminates Pydantic's `model_dump()` serialization machinery and intermediate dict allocation on every write.
+
+#### Task 3.7 — Optimize `_rows_to_docs()` read path
+
+**Before** (every row):
+```
+coerce_row_none_collections(cls, row) → function call + _collection_fields(cls) lookup per row → model_validate(row)
+```
+
+**After**:
+```
+_collection_fields(cls) [cached, looked up once] → if empty: [validate(row) for row in rows] (skip coercion entirely)
+                                                  → if non-empty: inline coercion loop + validate
+```
+
+Changes:
+- Pre-compute `_collection_fields(doc_cls)` once per `_rows_to_docs()` call instead of per-row.
+- When model has no collection fields (common case), skip coercion entirely — direct `model_validate()`.
+- When collection fields exist, inline the coercion loop to avoid function call overhead per row.
+- Use local variable `validate = doc_cls.model_validate` for faster attribute access in the loop.
+
+**Savings**: Eliminates per-row function call overhead and `_collection_fields` lookup.
+For models without collection fields (common), zero coercion overhead.
+
+#### Task 3.8 — Cache CQL query strings
+
+**INSERT caching** (`_insert_cql_cache`):
+- Keyed by `(table, keyspace, columns, if_not_exists)`.
+- The base CQL (without `USING` clause) is cached. `USING TTL/TIMESTAMP` is appended only when needed.
+- After first `save()` for a model class, subsequent saves skip all string formatting.
+
+**SELECT caching** (`_select_cql_cache`):
+- Keyed by query *shape*: `(table, keyspace, columns, where_shape, limit, order_by, allow_filtering, per_partition_limit)`.
+- `where_shape` encodes column names + operators (not values). For `IN` clauses, the value count is included to ensure correct placeholder count.
+- On cache hit, only parameter values are extracted from the WHERE triples — CQL string construction is skipped entirely.
+
+**Savings**: Eliminates f-string CQL construction on repeated query patterns.
+Particularly impactful for hot paths like `Model.find(id=pk).all()` and `doc.save()`.
+
+### 12.3 Remaining Priorities After Phase 3
+
+| Priority | Task | Expected Impact |
+|----------|------|-----------------|
+| P2 | 3.10 Reduce `_clone()` overhead | Faster query chain construction |
+| P2 | 7.4 Lazy parsing (LazyDocument) | Near-zero cost for PK-only reads |
+| P2 | 3.11 Native async for CassandraDriver | Eliminate thread pool hop for async |
+
+---
+
+## 13. Notes
 
 - coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for
   pure Python model construction. The overhead is in the ORM ↔ driver interface.

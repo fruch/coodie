@@ -15,11 +15,14 @@ from coodie.cql_builder import (
     build_drop_keyspace,
     build_drop_table,
     build_insert,
+    build_insert_from_columns,
     build_select,
     build_update,
     build_where_clause,
     parse_filter_kwargs,
     parse_update_kwargs,
+    _insert_cql_cache,
+    _select_cql_cache,
 )
 from coodie.schema import ColumnDefinition
 
@@ -204,6 +207,87 @@ def test_build_insert():
 def test_build_insert_if_not_exists():
     cql, _ = build_insert("products", "ks", {"id": "1"}, if_not_exists=True)
     assert "IF NOT EXISTS" in cql
+
+
+# -- build_insert_from_columns (Phase 3: Task 3.6 + 3.8) ---------------------
+
+
+def test_build_insert_from_columns():
+    cols = ("id", "name")
+    vals = ["1", "X"]
+    cql, params = build_insert_from_columns("products", "ks", cols, vals)
+    assert "INSERT INTO ks.products" in cql
+    assert "VALUES (?, ?)" in cql
+    assert params == ["1", "X"]
+
+
+def test_build_insert_from_columns_if_not_exists():
+    cols = ("id",)
+    vals = ["1"]
+    cql, _ = build_insert_from_columns("products", "ks", cols, vals, if_not_exists=True)
+    assert "IF NOT EXISTS" in cql
+
+
+def test_build_insert_from_columns_with_ttl():
+    cols = ("id",)
+    vals = ["1"]
+    cql, _ = build_insert_from_columns("products", "ks", cols, vals, ttl=60)
+    assert "USING TTL 60" in cql
+
+
+def test_build_insert_from_columns_caching():
+    """Second call with same shape returns identical CQL (cache hit)."""
+    _insert_cql_cache.clear()
+    cols = ("id", "name")
+    cql1, _ = build_insert_from_columns("products", "ks", cols, ["1", "A"])
+    cql2, _ = build_insert_from_columns("products", "ks", cols, ["2", "B"])
+    # Both produce the same CQL template (values differ, CQL doesn't)
+    assert cql1 == cql2
+    assert len(_insert_cql_cache) == 1
+
+
+def test_build_insert_from_columns_cache_separate_for_if_not_exists():
+    """save() and insert() (IF NOT EXISTS) produce distinct cache entries."""
+    _insert_cql_cache.clear()
+    cols = ("id",)
+    cql_save, _ = build_insert_from_columns("t", "ks", cols, ["1"])
+    cql_ins, _ = build_insert_from_columns("t", "ks", cols, ["1"], if_not_exists=True)
+    assert cql_save != cql_ins
+    assert len(_insert_cql_cache) == 2
+
+
+# -- build_select CQL caching (Phase 3: Task 3.8) ----------------------------
+
+
+def test_build_select_cql_caching():
+    """Repeated build_select with same shape returns cached CQL."""
+    _select_cql_cache.clear()
+    cql1, p1 = build_select("t", "ks", where=[("id", "=", "a")])
+    cql2, p2 = build_select("t", "ks", where=[("id", "=", "b")])
+    assert cql1 == cql2
+    assert p1 == ["a"]
+    assert p2 == ["b"]
+    assert len(_select_cql_cache) == 1
+
+
+def test_build_select_cache_varies_by_shape():
+    """Different WHERE shapes produce distinct cache entries."""
+    _select_cql_cache.clear()
+    cql1, _ = build_select("t", "ks", where=[("id", "=", "a")])
+    cql2, _ = build_select("t", "ks", where=[("id", "=", "a"), ("name", "=", "b")])
+    assert cql1 != cql2
+    assert len(_select_cql_cache) == 2
+
+
+def test_build_select_cache_varies_by_in_length():
+    """IN clause with different value counts produces distinct CQL."""
+    _select_cql_cache.clear()
+    cql1, p1 = build_select("t", "ks", where=[("id", "IN", [1, 2])])
+    cql2, p2 = build_select("t", "ks", where=[("id", "IN", [1, 2, 3])])
+    assert "IN (?, ?)" in cql1
+    assert "IN (?, ?, ?)" in cql2
+    assert p1 == [1, 2]
+    assert p2 == [1, 2, 3]
 
 
 @pytest.mark.parametrize(

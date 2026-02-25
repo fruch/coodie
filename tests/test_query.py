@@ -473,3 +473,38 @@ async def test_token_filter_generates_correct_cql(Item, queryset_cls, registered
     stmt, params = registered_mock_driver.executed[0]
     assert 'TOKEN("id") > ?' in stmt
     assert 100 in params
+
+
+# -- _rows_to_docs optimization (Phase 3: Task 3.7) --------------------------
+
+
+async def test_rows_to_docs_no_collection_fields(Item, queryset_cls, registered_mock_driver):
+    """Non-collection model skips coercion entirely."""
+    pid = uuid4()
+    registered_mock_driver.set_return_rows([{"id": pid, "name": "A", "rating": 5}])
+    results = await _maybe_await(queryset_cls(Item).all)
+    assert len(results) == 1
+    assert results[0].name == "A"
+    assert results[0].rating == 5
+
+
+async def test_rows_to_docs_none_collection_coerced(variant, queryset_cls, registered_mock_driver):
+    """None collection fields are coerced to empty containers."""
+    if variant == "sync":
+        from coodie.sync.document import Document
+    else:
+        from coodie.aio.document import Document
+
+    class TagDoc(Document):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+        tags: list[str] = []
+
+        class Settings:
+            name = "tag_docs"
+            keyspace = "test_ks"
+
+    pid = uuid4()
+    registered_mock_driver.set_return_rows([{"id": pid, "tags": None}])
+    results = await _maybe_await(queryset_cls(TagDoc).all)
+    assert len(results) == 1
+    assert results[0].tags == []

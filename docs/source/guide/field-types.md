@@ -169,7 +169,33 @@ class Profile(Document):
 When a field is `Optional` and the stored value is `NULL` in Cassandra,
 coodie returns `None`.
 
+## User-Defined Types
+
+coodie supports Cassandra **User-Defined Types** via the `UserType` base class.
+UDT fields are automatically mapped to `frozen<type_name>` in CQL:
+
+```python
+from coodie.usertype import UserType
+
+class Address(UserType):
+    street: str
+    city: str
+    zipcode: int
+
+class Profile(Document):
+    user_id: Annotated[UUID, PrimaryKey()]
+    home: Address                              # frozen<address>
+    offices: list[Address] = []                # list<frozen<address>>
+    contacts: dict[str, Address] = {}          # map<text, frozen<address>>
+```
+
+UDTs are always frozen — the `Frozen()` marker is accepted but redundant.
+Nested UDTs (a UDT containing another UDT) are fully supported.
+
+See {doc}`user-defined-types` for the full UDT guide.
+
 ## What's Next?
 
+- {doc}`user-defined-types` — full UDT guide with nested types and sync_type()
 - {doc}`keys-and-indexes` — primary keys, clustering keys, and secondary indexes
 - {doc}`crud` — save, insert, update, delete, and query operations

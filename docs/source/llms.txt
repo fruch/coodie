@@ -20,11 +20,24 @@
 - [Sync vs Async](https://fruch.github.io/coodie/guide/sync-vs-async.html): Dual-stack API comparison
 - [Drivers](https://fruch.github.io/coodie/guide/drivers.html): CassandraDriver, AcsyllaDriver, and initialization
 - [Exceptions](https://fruch.github.io/coodie/guide/exceptions.html): Error handling reference
+- [Recipes](https://fruch.github.io/coodie/guide/recipes.html): Advanced patterns and recipes
+- [Integrations](https://fruch.github.io/coodie/guide/integrations.html): FastAPI and Flask integration examples
 
 ## Migration
 
 - [From cqlengine](https://fruch.github.io/coodie/migration/from-cqlengine.html): Side-by-side migration guide from cqlengine to coodie
 - [Argus Example](https://fruch.github.io/coodie/migration/argus-example.html): Real-world migration case study
+
+## API Reference
+
+- [Document](https://fruch.github.io/coodie/api/document.html): Document, CounterDocument, and MaterializedView classes
+- [QuerySet](https://fruch.github.io/coodie/api/queryset.html): Chainable query builder API
+- [Fields](https://fruch.github.io/coodie/api/fields.html): PrimaryKey, ClusteringKey, Indexed, Counter, and type markers
+- [Types](https://fruch.github.io/coodie/api/types.html): Python-to-CQL type mapping utilities
+- [Drivers](https://fruch.github.io/coodie/api/drivers.html): Driver registry, AbstractDriver, and CassandraDriver
+- [Exceptions](https://fruch.github.io/coodie/api/exceptions.html): CoodieError hierarchy
+- [Results](https://fruch.github.io/coodie/api/results.html): LWTResult and PagedResult
+- [Batch](https://fruch.github.io/coodie/api/batch.html): BatchQuery and AsyncBatchQuery
 
 ## Project
 

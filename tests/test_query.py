@@ -559,7 +559,6 @@ async def test_all_lazy_returns_lazy_documents(Item, queryset_cls, registered_mo
 
 async def test_all_lazy_defers_parsing(Item, queryset_cls, registered_mock_driver):
     """LazyDocument does not parse until field access."""
-    from coodie.lazy import LazyDocument
 
     pid = uuid4()
     registered_mock_driver.set_return_rows([{"id": pid, "name": "B", "rating": 3}])

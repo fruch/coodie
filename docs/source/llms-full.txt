@@ -1,0 +1,386 @@
+# coodie
+
+> coodie is a modern Pydantic-based ODM (Object-Document Mapper) for Apache Cassandra and ScyllaDB. It combines the power of Pydantic v2 models with Cassandra's distributed database, offering both sync and async APIs. Think of it as Beanie (MongoDB ODM) but for Cassandra — hence the name: Cassandra + Beanie (hoodie) = coodie.
+
+## Installation
+
+Requires Python 3.10+.
+
+```bash
+pip install coodie
+```
+
+Choose a driver extra for your cluster:
+
+```bash
+pip install "coodie[scylla]"      # ScyllaDB / Cassandra (recommended)
+pip install "coodie[cassandra]"   # Cassandra via cassandra-driver
+pip install "coodie[acsylla]"     # Async-native via acsylla
+```
+
+## Quick Start
+
+```python
+from coodie.sync import Document, init_coodie
+from coodie.fields import PrimaryKey
+from pydantic import Field
+from typing import Annotated
+from uuid import UUID, uuid4
+
+# Connect
+init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
+
+# Define a model
+class User(Document):
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    email: str
+
+    class Settings:
+        name = "users"
+
+# Sync schema & insert
+User.sync_table()
+user = User(name="Alice", email="alice@example.com")
+user.save()
+
+# Query
+print(User.find(name="Alice").allow_filtering().all())
+```
+
+For async, swap `coodie.sync` for `coodie.aio` and add `await` to terminal methods.
+
+## Defining Documents
+
+Documents are Pydantic v2 `BaseModel` subclasses. Use `Annotated[]` with field markers to define schema:
+
+```python
+from coodie.sync import Document
+from coodie.fields import PrimaryKey, ClusteringKey, Indexed
+from typing import Annotated
+from uuid import UUID
+
+class Product(Document):
+    id: Annotated[UUID, PrimaryKey()]
+    category: Annotated[str, ClusteringKey()]
+    name: str
+    brand: Annotated[str, Indexed()] = "Unknown"
+    price: float = 0.0
+
+    class Settings:
+        name = "products"         # CQL table name
+        keyspace = "my_keyspace"  # optional per-model keyspace
+```
+
+Use `CounterDocument` for counter tables and `MaterializedView` for materialized views.
+
+Call `sync_table()` to create or update the table schema idempotently.
+
+## Field Types
+
+Python types auto-map to CQL types:
+
+| Python Type | CQL Type |
+|---|---|
+| `str` | `text` |
+| `int` | `int` |
+| `float` | `float` |
+| `bool` | `boolean` |
+| `UUID` | `uuid` |
+| `datetime` | `timestamp` |
+| `date` | `date` |
+| `time` | `time` |
+| `Decimal` | `decimal` |
+| `bytes` | `blob` |
+| `ipaddress.IPv4Address` / `IPv6Address` | `inet` |
+| `list[X]` | `list<X>` |
+| `set[X]` | `set<X>` |
+| `dict[K, V]` | `map<K, V>` |
+| `tuple[X, ...]` | `tuple<X, ...>` |
+
+Use type markers in `Annotated[]` for CQL-specific types:
+
+| Annotation | CQL Type |
+|---|---|
+| `BigInt()` | `bigint` |
+| `SmallInt()` | `smallint` |
+| `TinyInt()` | `tinyint` |
+| `VarInt()` | `varint` |
+| `Double()` | `double` |
+| `Ascii()` | `ascii` |
+| `TimeUUID()` | `timeuuid` |
+| `Time()` | `time` |
+| `Frozen()` | `frozen<...>` |
+
+## Keys and Indexes
+
+**Partition Key** — determines which node stores the row:
+
+```python
+id: Annotated[UUID, PrimaryKey()]
+```
+
+Composite partition keys use `partition_key_index`:
+
+```python
+tenant_id: Annotated[str, PrimaryKey(partition_key_index=0)]
+region: Annotated[str, PrimaryKey(partition_key_index=1)]
+```
+
+**Clustering Key** — sorts rows within a partition:
+
+```python
+created_at: Annotated[datetime, ClusteringKey(order="DESC")]
+```
+
+Multiple clustering keys use `clustering_key_index`:
+
+```python
+category: Annotated[str, ClusteringKey(clustering_key_index=0)]
+priority: Annotated[int, ClusteringKey(clustering_key_index=1, order="DESC")]
+```
+
+**Secondary Index** — enables queries without `ALLOW FILTERING`:
+
+```python
+email: Annotated[str, Indexed()]
+```
+
+## CRUD Operations
+
+**Create:**
+
+```python
+user = User(name="Alice", email="alice@example.com")
+user.save()          # upsert
+user.insert()        # INSERT IF NOT EXISTS
+```
+
+**Read:**
+
+```python
+user = User.get(id=some_id)            # raises DocumentNotFound
+user = User.find_one(name="Alice")     # returns None if not found
+users = User.find(name="Alice").all()  # returns list
+```
+
+**Update:**
+
+```python
+user.update(email="new@example.com")
+user.update(email="new@example.com", ttl=3600)
+```
+
+Collection update operations:
+
+```python
+user.update(add__tags={"vip"})         # add to set
+user.update(remove__tags={"old"})      # remove from set
+user.update(append__scores=[100])      # append to list
+user.update(prepend__scores=[0])       # prepend to list
+```
+
+**Delete:**
+
+```python
+user.delete()
+User.find(status="inactive").allow_filtering().delete()  # bulk delete
+```
+
+## QuerySet API
+
+`Document.find()` returns a lazy `QuerySet`. Chain methods to build queries:
+
+```python
+products = (
+    Product.find(brand="Acme")
+    .filter(price__gt=10.0)
+    .order_by("price")
+    .limit(20)
+    .all()
+)
+```
+
+**Chain methods:** `.filter()`, `.limit()`, `.order_by()`, `.only()`, `.allow_filtering()`, `.ttl()`, `.timestamp()`, `.consistency()`, `.timeout()`, `.per_partition_limit()`
+
+**Terminal methods:** `.all()`, `.first()`, `.count()`, `.create()`, `.update()`, `.delete()`, `.paged_all()`
+
+## Filtering
+
+Django-style double-underscore lookups:
+
+| Lookup | CQL | Example |
+|---|---|---|
+| `__gt` | `>` | `price__gt=10` |
+| `__gte` | `>=` | `price__gte=10` |
+| `__lt` | `<` | `price__lt=100` |
+| `__lte` | `<=` | `price__lte=100` |
+| `__in` | `IN` | `status__in=["active", "pending"]` |
+| `__contains` | `CONTAINS` | `tags__contains="vip"` |
+| `__contains_key` | `CONTAINS KEY` | `metadata__contains_key="env"` |
+| `__like` | `LIKE` | `name__like="Al%"` |
+| `__token__gt` | `TOKEN() >` | `id__token__gt=token_value` |
+
+All filters are ANDed together.
+
+## Collections
+
+```python
+class UserProfile(Document):
+    id: Annotated[UUID, PrimaryKey()]
+    tags: set[str] = set()
+    scores: list[int] = []
+    metadata: dict[str, str] = {}
+```
+
+Update operations:
+
+- **Sets:** `add__tags={"new"}`, `remove__tags={"old"}`
+- **Lists:** `append__scores=[100]`, `prepend__scores=[0]`, `remove__scores=[50]`
+- **Maps:** `remove__metadata=["key_to_remove"]`
+
+`Frozen()` makes collections immutable (stored as a blob):
+
+```python
+data: Annotated[list[int], Frozen()]
+```
+
+## Counter Tables
+
+```python
+from coodie.sync import CounterDocument
+from coodie.fields import PrimaryKey, Counter
+
+class PageViews(CounterDocument):
+    url: Annotated[str, PrimaryKey()]
+    views: Annotated[int, Counter()]
+    unique_visitors: Annotated[int, Counter()]
+
+PageViews.sync_table()
+PageViews.increment(url="/home", views=1, unique_visitors=1)
+PageViews.decrement(url="/home", views=1)
+page = PageViews.get(url="/home")
+```
+
+Counter tables only support `increment()` and `decrement()` — not `save()` or `insert()`.
+
+## TTL (Time-To-Live)
+
+```python
+user.save(ttl=3600)           # expires in 1 hour
+user.insert(ttl=86400)        # expires in 24 hours
+user.update(email="x", ttl=7200)
+```
+
+Bulk TTL via QuerySet:
+
+```python
+User.find(status="temp").ttl(3600).update(verified=True)
+```
+
+## Lightweight Transactions (LWT)
+
+Conditional writes using Paxos consensus:
+
+```python
+result = user.insert()                         # IF NOT EXISTS by default
+result = user.delete(if_exists=True)           # IF EXISTS
+result = user.update(if_exists=True, name="Bob")
+result = user.update(if_conditions={"name": "Alice"}, name="Bob")  # IF name = 'Alice'
+```
+
+Returns `LWTResult` with `.applied` (bool) and `.existing` (dict).
+
+## Batch Operations
+
+```python
+from coodie.sync import BatchQuery
+
+with BatchQuery() as batch:
+    user1.save(batch=batch)
+    user2.save(batch=batch)
+    user3.delete(batch=batch)
+```
+
+Async version:
+
+```python
+from coodie import AsyncBatchQuery
+
+async with AsyncBatchQuery() as batch:
+    await user1.save(batch=batch)
+    await user2.save(batch=batch)
+```
+
+Batch types: `logged` (default, atomic), `unlogged` (faster), `counter` (for counter tables).
+
+## Sync vs Async API
+
+coodie offers mirror APIs:
+
+- **Sync:** `from coodie.sync import Document, init_coodie`
+- **Async:** `from coodie.aio import Document, init_coodie` (or `from coodie import ...`)
+
+Same model definitions, same field annotations, same method names. The async versions just need `await`:
+
+```python
+# Sync
+user = User.get(id=some_id)
+
+# Async
+user = await User.get(id=some_id)
+```
+
+## Drivers & Initialization
+
+```python
+from coodie.sync import init_coodie
+
+# Simple
+driver = init_coodie(hosts=["127.0.0.1"], keyspace="my_ks")
+
+# With a specific driver type
+driver = init_coodie(hosts=["127.0.0.1"], keyspace="my_ks", driver_type="acsylla")
+
+# With an existing session
+driver = init_coodie(session=existing_session, keyspace="my_ks")
+
+# Named drivers for multi-cluster
+init_coodie(hosts=["analytics-host"], keyspace="analytics", name="analytics")
+```
+
+Supported drivers:
+
+| Driver | Package | Type |
+|---|---|---|
+| `scylla` | `scylla-driver` | sync + async |
+| `cassandra` | `cassandra-driver` | sync + async |
+| `acsylla` | `acsylla` | async-native |
+
+## Exceptions
+
+| Exception | When |
+|---|---|
+| `CoodieError` | Base exception for all coodie errors |
+| `DocumentNotFound` | `get()` found no matching row |
+| `MultipleDocumentsFound` | `get()`/`find_one()` found more than one row |
+| `ConfigurationError` | No driver registered (forgot `init_coodie()`) |
+| `InvalidQueryError` | Bad query construction |
+
+```python
+from coodie.exceptions import DocumentNotFound, ConfigurationError
+
+try:
+    user = User.get(id=unknown_id)
+except DocumentNotFound:
+    print("User not found")
+```
+
+## Project Links
+
+- [GitHub Repository](https://github.com/fruch/coodie)
+- [PyPI Package](https://pypi.org/project/coodie/)
+- [Full Documentation](https://fruch.github.io/coodie/)
+- [Changelog](https://fruch.github.io/coodie/changelog.html)
+- [Contributing Guide](https://fruch.github.io/coodie/contributing.html)
+- [Migration from cqlengine](https://fruch.github.io/coodie/migration/from-cqlengine.html)

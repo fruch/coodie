@@ -40,6 +40,7 @@
 7. [Tooling & Build](#7-tooling--build)
 8. [Writing Style Guide](#8-writing-style-guide)
 9. [Milestones](#9-milestones)
+10. [LLM-Friendly Documentation (llms.txt)](#10-llm-friendly-documentation-llmstxt)
 
 ---
 
@@ -1183,6 +1184,45 @@ make clean html    # Clean build — like clearing your browser cache but useful
 - [x] Proofread for consistency and tone
 - [x] Set up Read the Docs deployment
 - [x] Announce docs release with a terrible pun
+
+### Phase 6: LLM-Friendly Documentation
+- [x] Add `llms.txt` — concise project overview with doc links for LLM consumption
+- [x] Add `llms-full.txt` — comprehensive single-file documentation for LLMs
+- [x] Configure Sphinx to serve both files at documentation root via `html_extra_path`
+
+---
+
+## 10. LLM-Friendly Documentation (llms.txt)
+
+Following the [llmstxt.org](https://llmstxt.org/) proposal, coodie provides machine-readable
+documentation files designed for consumption by large language models (LLMs).
+
+### What is llms.txt?
+
+The `/llms.txt` convention is a standard for providing LLM-friendly project documentation.
+When an LLM needs to understand a project, it can fetch `/llms.txt` to get a structured
+overview with links, or `/llms-full.txt` for comprehensive documentation in a single file.
+
+### Files
+
+| File | Purpose | Location |
+|------|---------|----------|
+| `llms.txt` | Concise project overview with organized links to documentation sections | `docs/source/llms.txt` → served at `/llms.txt` |
+| `llms-full.txt` | Comprehensive single-file documentation covering all features with code examples | `docs/source/llms-full.txt` → served at `/llms-full.txt` |
+
+### Format
+
+Both files use Markdown formatting:
+- **`llms.txt`** — H1 project title, blockquote description, H2 sections with bullet-point links
+- **`llms-full.txt`** — H1 project title, blockquote description, then full documentation
+  organized by topic with code examples, tables, and API references
+
+### Maintenance
+
+When adding or modifying documentation:
+1. Update `llms.txt` if new guide sections or pages are added (add a link)
+2. Update `llms-full.txt` if API patterns, features, or usage examples change
+3. Both files are served via Sphinx's `html_extra_path` in `docs/source/conf.py`
 
 ---
 

@@ -1,0 +1,38 @@
+# coodie
+
+> coodie is a modern Pydantic-based ODM (Object-Document Mapper) for Apache Cassandra and ScyllaDB. It combines the power of Pydantic v2 models with Cassandra's distributed database, offering both sync and async APIs. Think of it as Beanie (MongoDB ODM) but for Cassandra — hence the name: Cassandra + Beanie (hoodie) = coodie.
+
+## Docs
+
+- [Installation](https://fruch.github.io/coodie/installation.html): How to install coodie and choose a driver
+- [Quick Start](https://fruch.github.io/coodie/quickstart.html): From zero to first query in 60 seconds
+- [Defining Documents](https://fruch.github.io/coodie/guide/defining-documents.html): Document classes, fields, and Pydantic v2 integration
+- [Field Types](https://fruch.github.io/coodie/guide/field-types.html): All supported field types and type annotations
+- [Keys and Indexes](https://fruch.github.io/coodie/guide/keys-and-indexes.html): Primary keys, clustering keys, and secondary indexes
+- [CRUD Operations](https://fruch.github.io/coodie/guide/crud.html): Create, read, update, delete operations
+- [Querying](https://fruch.github.io/coodie/guide/querying.html): QuerySet API and chaining
+- [Filtering](https://fruch.github.io/coodie/guide/filtering.html): Django-style filter lookups
+- [Collections](https://fruch.github.io/coodie/guide/collections.html): List, set, map, and tuple field operations
+- [Counters](https://fruch.github.io/coodie/guide/counters.html): Counter columns with increment/decrement
+- [TTL](https://fruch.github.io/coodie/guide/ttl.html): Time-To-Live support for automatic row expiration
+- [LWT](https://fruch.github.io/coodie/guide/lwt.html): Lightweight Transactions (compare-and-set)
+- [Batch Operations](https://fruch.github.io/coodie/guide/batch-operations.html): Batch CQL statements
+- [Sync vs Async](https://fruch.github.io/coodie/guide/sync-vs-async.html): Dual-stack API comparison
+- [Drivers](https://fruch.github.io/coodie/guide/drivers.html): CassandraDriver, AcsyllaDriver, and initialization
+- [Exceptions](https://fruch.github.io/coodie/guide/exceptions.html): Error handling reference
+
+## Migration
+
+- [From cqlengine](https://fruch.github.io/coodie/migration/from-cqlengine.html): Side-by-side migration guide from cqlengine to coodie
+- [Argus Example](https://fruch.github.io/coodie/migration/argus-example.html): Real-world migration case study
+
+## Project
+
+- [GitHub Repository](https://github.com/fruch/coodie)
+- [PyPI Package](https://pypi.org/project/coodie/)
+- [Changelog](https://fruch.github.io/coodie/changelog.html)
+- [Contributing](https://fruch.github.io/coodie/contributing.html)
+
+## Optional
+
+- [llms-full.txt](https://fruch.github.io/coodie/llms-full.txt): Comprehensive single-file documentation for LLMs

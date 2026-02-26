@@ -103,7 +103,7 @@ Legend:
 | Close / shutdown | — | ❌ no explicit `close()` on Session |
 
 **Gap summary — session & connection:**
-- Keyspace selection → execute `USE keyspace` after connect, or prefix all CQL with `keyspace.table`
+- Keyspace selection → execute `USE keyspace` after connect, or prefix all CQL with `keyspace.table` (preferred — avoids issues with prepared statement metadata assuming a default keyspace)
 - Sync connection → wrap with `asyncio.run()` or event-loop bridge (same pattern as AcsyllaDriver)
 - Close → may need to rely on Python GC / destructor; investigate Rust drop behavior
 
@@ -231,7 +231,7 @@ Legend:
 
 | Task | Description |
 |---|---|
-| 1.1 | Add a `Makefile` target or script to clone and build python-rs-driver from source using `maturin develop` |
+| 1.1 | Add a `Makefile` target or script to clone and build python-rs-driver from source (`maturin develop` for local dev, `maturin build` + `pip install` for CI wheels) |
 | 1.2 | Add a CI workflow job that installs Rust toolchain, clones python-rs-driver, builds the wheel, and caches the artifact |
 | 1.3 | Add a `python-rs` optional dependency group in `pyproject.toml` (empty, documentation-only — actual install is from source) |
 | 1.4 | Document the local development setup in a `docs/guides/python-rs-driver-setup.md` or in this plan's references |
@@ -252,7 +252,7 @@ Legend:
 | 2.6 | Implement `execute()` sync wrapper via `asyncio.run()` or event-loop bridge (same pattern as AcsyllaDriver) |
 | 2.7 | Implement `sync_table_async()` and `sync_table()` — reuse CQL builder, call execute for DDL |
 | 2.8 | Implement `close_async()` and `close()` — handle graceful shutdown (or no-op if no close API) |
-| 2.9 | Register `driver_type="python-rs"` in `init_coodie()` and `init_coodie_async()` |
+| 2.9 | Register `driver_type="python-rs"` in `init_coodie()` and `init_coodie_async()` (module file: `python_rs.py`, user-facing config string: `"python-rs"`) |
 | 2.10 | Unit tests for `PythonRsDriver` with mocked `scylla.Session` |
 
 ### Phase 3: Namespace Conflict Resolution (Priority: Medium)

@@ -1,8 +1,44 @@
-# Welcome to coodie documentation!
+# coodie
+
+**The modern Pydantic-based ODM for Cassandra & ScyllaDB**
+
+```{include} ../../README.md
+:start-after: <!-- start-tagline -->
+:end-before: <!-- end-tagline -->
+```
+
+## ✨ Feature Highlights
+
+```{include} ../../README.md
+:start-after: <!-- start-features -->
+:end-before: <!-- end-features -->
+```
+
+## 📦 Installation
+
+```{include} ../../README.md
+:start-after: <!-- start-installation -->
+:end-before: <!-- end-installation -->
+```
+
+## 🚀 Quick Start
+
+```{include} ../../README.md
+:start-after: <!-- start-quickstart -->
+:end-before: <!-- end-quickstart -->
+```
+
+## 🔍 How Does coodie Compare?
+
+```{include} ../../README.md
+:start-after: <!-- start-comparison -->
+:end-before: <!-- end-comparison -->
+```
 
 ```{toctree}
 :caption: Getting Started
 :maxdepth: 2
+:hidden:
 
 installation
 quickstart
@@ -11,6 +47,7 @@ quickstart
 ```{toctree}
 :caption: User Guide
 :maxdepth: 2
+:hidden:
 
 guide/defining-documents
 guide/field-types
@@ -34,6 +71,7 @@ guide/benchmarks
 ```{toctree}
 :caption: Migration
 :maxdepth: 2
+:hidden:
 
 migration/from-cqlengine
 migration/argus-example
@@ -42,6 +80,7 @@ migration/argus-example
 ```{toctree}
 :caption: API Reference
 :maxdepth: 2
+:hidden:
 
 api/document
 api/queryset
@@ -56,6 +95,7 @@ api/batch
 ```{toctree}
 :caption: Reference
 :maxdepth: 2
+:hidden:
 
 usage
 ```
@@ -63,11 +103,8 @@ usage
 ```{toctree}
 :caption: Project Info
 :maxdepth: 2
+:hidden:
 
 changelog
 contributing
-```
-
-```{include} ../../README.md
-
 ```

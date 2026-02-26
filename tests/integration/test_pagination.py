@@ -36,9 +36,7 @@ class TestPagination:
         """Insert *n* products with the given brand and return their UUIDs."""
         ids = [uuid4() for _ in range(n)]
         for i, pid in enumerate(ids):
-            await _maybe_await(
-                Product(id=pid, name=f"PaginationItem{i}", brand=brand, price=float(i)).save
-            )
+            await _maybe_await(Product(id=pid, name=f"PaginationItem{i}", brand=brand, price=float(i)).save)
         return ids
 
     async def _cleanup(self, Product, ids: list) -> None:
@@ -50,9 +48,7 @@ class TestPagination:
     # Tests
     # ------------------------------------------------------------------
 
-    async def test_full_table_scan_spanning_multiple_pages(
-        self, coodie_driver, Product
-    ) -> None:
+    async def test_full_table_scan_spanning_multiple_pages(self, coodie_driver, Product) -> None:
         """paged_all() with fetch_size collects all rows across multiple pages.
 
         Inserts TOTAL_ROWS (>FETCH_SIZE) rows, then iterates page by page
@@ -64,23 +60,14 @@ class TestPagination:
         ids = await self._seed_products(Product, brand, TOTAL_ROWS)
 
         all_docs = []
-        result = await _maybe_await(
-            Product.find(brand=brand)
-            .fetch_size(FETCH_SIZE)
-            .allow_filtering()
-            .paged_all
-        )
+        result = await _maybe_await(Product.find(brand=brand).fetch_size(FETCH_SIZE).allow_filtering().paged_all)
         assert isinstance(result, PagedResult)
         all_docs.extend(result.data)
 
         pages = 1
         while result.paging_state is not None:
             result = await _maybe_await(
-                Product.find(brand=brand)
-                .fetch_size(FETCH_SIZE)
-                .page(result.paging_state)
-                .allow_filtering()
-                .paged_all
+                Product.find(brand=brand).fetch_size(FETCH_SIZE).page(result.paging_state).allow_filtering().paged_all
             )
             assert isinstance(result, PagedResult)
             all_docs.extend(result.data)
@@ -97,38 +84,25 @@ class TestPagination:
 
         await self._cleanup(Product, ids)
 
-    async def test_fetch_size_limits_rows_per_page(
-        self, coodie_driver, Product
-    ) -> None:
+    async def test_fetch_size_limits_rows_per_page(self, coodie_driver, Product) -> None:
         """Each page returned by paged_all() should have at most fetch_size rows."""
         await _maybe_await(Product.sync_table)
         brand = f"PaginationLimit_{uuid4().hex[:8]}"
         ids = await self._seed_products(Product, brand, TOTAL_ROWS)
 
-        result = await _maybe_await(
-            Product.find(brand=brand)
-            .fetch_size(FETCH_SIZE)
-            .allow_filtering()
-            .paged_all
-        )
+        result = await _maybe_await(Product.find(brand=brand).fetch_size(FETCH_SIZE).allow_filtering().paged_all)
         assert isinstance(result, PagedResult)
         assert len(result.data) <= FETCH_SIZE
 
         while result.paging_state is not None:
             result = await _maybe_await(
-                Product.find(brand=brand)
-                .fetch_size(FETCH_SIZE)
-                .page(result.paging_state)
-                .allow_filtering()
-                .paged_all
+                Product.find(brand=brand).fetch_size(FETCH_SIZE).page(result.paging_state).allow_filtering().paged_all
             )
             assert len(result.data) <= FETCH_SIZE
 
         await self._cleanup(Product, ids)
 
-    async def test_page_token_handoff_between_pages(
-        self, coodie_driver, Product
-    ) -> None:
+    async def test_page_token_handoff_between_pages(self, coodie_driver, Product) -> None:
         """Consecutive paging_state tokens must differ; each page yields new rows.
 
         Verifies that the paging_state returned by one page is usable as
@@ -141,12 +115,7 @@ class TestPagination:
         seen_ids: set = set()
         seen_tokens: list[bytes | None] = []
 
-        result = await _maybe_await(
-            Product.find(brand=brand)
-            .fetch_size(FETCH_SIZE)
-            .allow_filtering()
-            .paged_all
-        )
+        result = await _maybe_await(Product.find(brand=brand).fetch_size(FETCH_SIZE).allow_filtering().paged_all)
         page_ids = {d.id for d in result.data}
         # No duplicates within a page
         assert len(page_ids) == len(result.data)
@@ -155,11 +124,7 @@ class TestPagination:
 
         while result.paging_state is not None:
             result = await _maybe_await(
-                Product.find(brand=brand)
-                .fetch_size(FETCH_SIZE)
-                .page(result.paging_state)
-                .allow_filtering()
-                .paged_all
+                Product.find(brand=brand).fetch_size(FETCH_SIZE).page(result.paging_state).allow_filtering().paged_all
             )
             page_ids = {d.id for d in result.data}
             # No overlap with rows from previous pages
@@ -176,26 +141,20 @@ class TestPagination:
 
         await self._cleanup(Product, ids)
 
-    async def test_paged_all_without_fetch_size(
-        self, coodie_driver, Product
-    ) -> None:
+    async def test_paged_all_without_fetch_size(self, coodie_driver, Product) -> None:
         """paged_all() without fetch_size returns all rows in a single page."""
         await _maybe_await(Product.sync_table)
         brand = f"PaginationNoFetch_{uuid4().hex[:8]}"
         ids = await self._seed_products(Product, brand, 5)
 
-        result = await _maybe_await(
-            Product.find(brand=brand).allow_filtering().paged_all
-        )
+        result = await _maybe_await(Product.find(brand=brand).allow_filtering().paged_all)
         assert isinstance(result, PagedResult)
         assert result.paging_state is None
         assert len(result.data) == 5
 
         await self._cleanup(Product, ids)
 
-    async def test_async_paged_iteration(
-        self, coodie_driver, Product, variant
-    ) -> None:
+    async def test_async_paged_iteration(self, coodie_driver, Product, variant) -> None:
         """Async loop over paged_all() collects every row across pages.
 
         Simulates the recommended async pagination pattern: call paged_all()

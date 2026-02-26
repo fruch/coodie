@@ -197,9 +197,7 @@ class AcsyllaDriver(AbstractDriver):
 
         if current_loop is self._bg_loop:
             return await coro
-        return await asyncio.wrap_future(
-            asyncio.run_coroutine_threadsafe(coro, self._bg_loop)
-        )
+        return await asyncio.wrap_future(asyncio.run_coroutine_threadsafe(coro, self._bg_loop))
 
     # ------------------------------------------------------------------
     # Core async implementations — always run on _bg_loop
@@ -457,4 +455,3 @@ class AcsyllaDriver(AbstractDriver):
         asyncio.run_coroutine_threadsafe(self._close_async_impl(), self._bg_loop).result()
         self._bg_loop.call_soon_threadsafe(self._bg_loop.stop)
         self._bg_thread.join(timeout=10)
-

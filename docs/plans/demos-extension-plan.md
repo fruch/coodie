@@ -28,7 +28,14 @@
    - [9.2 Per-Demo Storylines](#92-per-demo-storylines)
    - [9.3 Visual Guidelines Summary Table](#93-visual-guidelines-summary-table)
 10. [Scylla-Monitoring Integration — The War Room](#10-scylla-monitoring-integration--the-war-room)
-11. [References](#11-references)
+11. [CI Testing — Demo Health Checks](#11-ci-testing--demo-health-checks)
+    - [11.1 Goals](#111-goals)
+    - [11.2 Workflow Design](#112-workflow-design)
+    - [11.3 Makefile `test` Target Convention](#113-makefile-test-target-convention)
+    - [11.4 Smoke-Test Scripts](#114-smoke-test-scripts)
+    - [11.5 Implementation Tasks](#115-implementation-tasks)
+    - [11.6 Test Matrix Summary](#116-test-matrix-summary)
+12. [References](#12-references)
 
 ---
 
@@ -1087,7 +1094,300 @@ For conference talks and live demos, the recommended flow is:
 
 ---
 
-## 11. References
+## 11. CI Testing — Demo Health Checks
+
+> **Goal:** Ensure every demo stays operational as coodie evolves, framework
+> dependencies update, and new demos are added. A dedicated GitHub Actions
+> workflow starts ScyllaDB, installs each demo, seeds data, exercises the
+> HTTP endpoints, and tears down — catching regressions before they reach
+> the default branch.
+
+### 11.1 Goals
+
+| Goal | Rationale |
+|---|---|
+| **Prevent demo decay** | Demos are user-facing artifacts; a broken `make run` undermines trust |
+| **Catch dependency drift** | Framework updates (FastAPI, Flask, Django) or coodie API changes may silently break demos |
+| **Gate new demos** | Every demo added in Phases 2–9 is automatically covered by CI |
+| **Keep runs fast** | Each demo test should complete in under 60 s; total workflow under 5 min |
+
+### 11.2 Workflow Design
+
+A new workflow file `.github/workflows/test-demos.yml` runs on PRs that
+touch demo code or core library code and on pushes to the default branch.
+
+```yaml
+name: Demo Smoke Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "demos/**"
+      - "src/**"
+
+concurrency:
+  group: demos-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  demo-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        demo:
+          - fastapi-catalog
+          - flask-blog
+          # Add new demos here as they are implemented:
+          # - django-taskboard
+          # - ttl-sessions
+          # - realtime-counters
+          # - lwt-user-registry
+          # - batch-importer
+          # - collections-tags
+          # - materialized-views
+          # - vector-search
+          # - timeseries-iot
+          # - polymorphic-cms
+          # - argus-tracker
+          # - migration-guide
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    services:
+      scylladb:
+        image: scylladb/scylla:latest
+        ports:
+          - 9042:9042
+        options: >-
+          --health-cmd "nodetool status | grep -q '^UN'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install demo dependencies
+        working-directory: demos/${{ matrix.demo }}
+        run: uv sync
+
+      - name: Create keyspace
+        run: |
+          KEYSPACE=$(grep '^KEYSPACE' demos/${{ matrix.demo }}/Makefile \
+                     | head -1 | sed 's/.*:= *//')
+          docker exec "${{ job.services.scylladb.id }}" cqlsh -e \
+            "CREATE KEYSPACE IF NOT EXISTS ${KEYSPACE}
+             WITH replication = {'class': 'SimpleStrategy',
+                                 'replication_factor': '1'};"
+
+      - name: Run smoke test
+        working-directory: demos/${{ matrix.demo }}
+        run: make test
+        env:
+          SCYLLA_HOSTS: "127.0.0.1"
+```
+
+**Key design decisions:**
+
+- **Service container instead of `docker compose`** — GitHub Actions service
+  containers get automatic health-check gating, so the job only starts after
+  ScyllaDB reports `UN` (Up/Normal). This eliminates the `until nodetool`
+  polling loop that Makefiles use locally.
+- **Matrix per demo** — each demo runs in its own job, so a failure in one
+  demo does not block or mask failures in others. The matrix is easy to
+  extend: uncomment a line when a new demo is implemented.
+- **Trigger on `src/**`** — core library changes can break demos even if no
+  demo file was touched.
+- **Concurrency group** — avoids wasting minutes on superseded pushes.
+
+### 11.3 Makefile `test` Target Convention
+
+Every demo's `Makefile` gains a `test` target that can run headlessly in CI
+without a browser or interactive server:
+
+```makefile
+.PHONY: test
+
+test: db-up seed                ## Smoke-test: seed data, start app, hit endpoints, stop
+	@echo "  🧪 Running smoke tests..."
+	uv run python smoke_test.py
+	@echo "  ✓ All smoke tests passed"
+```
+
+**Rules:**
+- `test` depends on `seed` (which depends on `db-up`), so `make test` is
+  fully self-contained
+- The actual assertions live in `smoke_test.py` (see §11.4)
+- In CI the `db-up` step is a no-op because the ScyllaDB service container
+  is already running and the keyspace is pre-created; demos should detect the
+  existing keyspace gracefully
+- `test` must exit `0` on success, non-zero on failure
+
+### 11.4 Smoke-Test Scripts
+
+Each demo includes a `smoke_test.py` that starts the app in a background
+process, exercises its HTTP endpoints, and asserts on status codes and
+response content. The script is framework-agnostic — it uses only the
+standard library `urllib` or the lightweight `httpx` test client:
+
+#### FastAPI / Uvicorn pattern
+
+```python
+"""Smoke test for the FastAPI catalog demo."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+import time
+
+import httpx
+
+APP_URL = "http://127.0.0.1:8000"
+
+
+def wait_for_app(url: str, timeout: int = 15) -> None:
+    """Poll until the app responds or timeout."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            httpx.get(url, timeout=2)
+            return
+        except httpx.ConnectError:
+            time.sleep(0.5)
+    raise RuntimeError(f"App did not start within {timeout}s")
+
+
+def main() -> None:
+    # Start the app in the background
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "main:app", "--port", "8000"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        wait_for_app(APP_URL)
+
+        # GET / — homepage should return 200
+        r = httpx.get(APP_URL)
+        assert r.status_code == 200, f"GET / returned {r.status_code}"
+
+        # GET /health or known page — verify content
+        assert b"Product" in r.content or b"Catalog" in r.content
+
+        print("  ✓ All endpoint checks passed")
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+#### Flask pattern
+
+```python
+"""Smoke test for the Flask blog demo."""
+
+from app import create_app
+
+
+def main() -> None:
+    app = create_app()
+    client = app.test_client()
+
+    # GET / — homepage
+    r = client.get("/")
+    assert r.status_code == 200, f"GET / returned {r.status_code}"
+
+    print("  ✓ All endpoint checks passed")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+#### Django pattern
+
+```python
+"""Smoke test for the Django taskboard demo."""
+
+import os
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "taskboard.settings")
+
+import django
+django.setup()
+
+from django.test import Client
+
+
+def main() -> None:
+    client = Client()
+
+    r = client.get("/")
+    assert r.status_code == 200, f"GET / returned {r.status_code}"
+
+    print("  ✓ All endpoint checks passed")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+**Guidelines for smoke-test scripts:**
+
+| Guideline | Detail |
+|---|---|
+| **Test happy paths only** | The goal is "does the demo start and serve pages?", not exhaustive testing |
+| **Assert on status codes** | Every GET/POST endpoint returns the expected 2xx/3xx status |
+| **Assert on key content** | At least one content check per page (e.g., page title, a seeded record) |
+| **Cleanup** | Always terminate the app process, even on failure |
+| **No external deps** | Use the framework's own test client where possible; fall back to `httpx` for async apps |
+| **Timeout** | Fail fast if the app does not start within 15 s |
+
+### 11.5 Implementation Tasks
+
+| Task | Description | Phase |
+|---|---|---|
+| 11.5.1 | Create `.github/workflows/test-demos.yml` with the workflow above | Phase 1 |
+| 11.5.2 | Add `test` target to `demos/fastapi-catalog/Makefile` | Phase 1 |
+| 11.5.3 | Add `smoke_test.py` to `demos/fastapi-catalog/` | Phase 1 |
+| 11.5.4 | Add `test` target to `demos/flask-blog/Makefile` | Phase 2 |
+| 11.5.5 | Add `smoke_test.py` to `demos/flask-blog/` | Phase 2 |
+| 11.5.6 | Verify both demos pass in CI on a test PR | Phase 2 |
+| 11.5.7 | For each new demo (Phases 3–9): add `smoke_test.py`, add `test` Makefile target, uncomment matrix entry | Ongoing |
+| 11.5.8 | Optionally: add a nightly `schedule` trigger to catch upstream dependency breakage | Phase 9 |
+
+### 11.6 Test Matrix Summary
+
+| Demo | Framework | Smoke-Test Strategy | App Start Method |
+|---|---|---|---|
+| fastapi-catalog | FastAPI | `httpx` against `uvicorn` subprocess | `uvicorn main:app` |
+| flask-blog | Flask | Flask test client (`app.test_client()`) | In-process |
+| django-taskboard | Django | Django test client (`django.test.Client`) | In-process |
+| ttl-sessions | FastAPI | `httpx` — verify record exists, wait for TTL, verify gone | `uvicorn` subprocess |
+| realtime-counters | FastAPI | `httpx` — increment counter, verify updated value | `uvicorn` subprocess |
+| lwt-user-registry | FastAPI | `httpx` — register user, attempt duplicate, verify LWT rejection | `uvicorn` subprocess |
+| batch-importer | CLI | Run `seed.py --count 10`, verify exit code and stdout count | Direct subprocess |
+| collections-tags | FastAPI | `httpx` — add/remove tags, verify collection mutations | `uvicorn` subprocess |
+| materialized-views | FastAPI | `httpx` — insert base row, query MV, verify consistency | `uvicorn` subprocess |
+| vector-search | FastAPI | `httpx` — insert embedding, ANN query, verify ranked results | `uvicorn` subprocess |
+| timeseries-iot | FastAPI | `httpx` — insert readings, query time range | `uvicorn` subprocess |
+| polymorphic-cms | FastAPI | `httpx` — create different content types, list all | `uvicorn` subprocess |
+| argus-tracker | Flask | Flask test client — batch ingest, query by composite key | In-process |
+| migration-guide | CLI | Run `migrate.py` then `verify.py`, assert exit code 0 | Direct subprocess |
+
+---
+
+## 12. References
 
 - [FastAPI Catalog demo](../../demos/fastapi-catalog/) — Product Catalog demo (moved from `demo/` in Phase 1)
 - [scylladb/argus](https://github.com/scylladb/argus) — production Flask + cqlengine app with complex models, UDTs, batch writes, composite keys
@@ -1102,3 +1402,5 @@ For conference talks and live demos, the recommended flow is:
 - [ScyllaDB vector search docs](https://cloud.docs.scylladb.com/stable/vector-search/work-with-vector-search.html) — CQL syntax for `vector<T, N>` type, vector indexes, and ANN queries
 - [argus vector models: argus_ai.py](https://github.com/scylladb/argus/blob/master/argus/backend/models/argus_ai.py) — production `Vector` column type, `SCTErrorEventEmbedding` with 384-dim cosine-similarity index
 - [scylla-monitoring](https://github.com/scylladb/scylla-monitoring) — Prometheus + Grafana monitoring stack for ScyllaDB, used as the "War Room" dashboard in live demos
+- [GitHub Actions workflow testing plan](github-actions-testing-plan.md) — layered testing strategy for CI workflows (actionlint, Bats, pytest conventions)
+- [GitHub Actions service containers](https://docs.github.com/en/actions/use-cases-and-examples/using-containerized-services/about-service-containers) — running ScyllaDB as a service container in CI

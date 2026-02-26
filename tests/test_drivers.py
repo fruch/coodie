@@ -636,9 +636,7 @@ def test_acsylla_driver_sync_execute_from_running_loop(acsylla_driver, mock_acsy
         # current loop is still running — this would have raised RuntimeError
         # with the old run_until_complete approach.
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None, acsylla_driver.execute, "SELECT * FROM test_ks.t", ["p1"]
-        )
+        return await loop.run_in_executor(None, acsylla_driver.execute, "SELECT * FROM test_ks.t", ["p1"])
 
     rows = asyncio.run(call_sync_from_loop())
     assert rows == [{"id": "1", "name": "Alice"}]

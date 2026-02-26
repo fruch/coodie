@@ -7,6 +7,7 @@ Use ``--driver-type`` to choose the driver backend:
 - ``scylla`` (default) — uses scylla-driver
 - ``cassandra`` — uses cassandra-driver
 - ``acsylla`` — uses acsylla
+- ``python-rs`` — uses python-rs-driver (Rust-based, async-only)
 """
 
 from __future__ import annotations
@@ -41,7 +42,7 @@ from coodie.fields import (
 from coodie.sync.document import Document as SyncDocument
 from coodie.sync.document import MaterializedView as SyncMaterializedView
 from tests.conftest import _maybe_await
-from tests.conftest_scylla import create_acsylla_session, create_cql_session  # noqa: F401
+from tests.conftest_scylla import create_acsylla_session, create_cql_session, create_python_rs_session  # noqa: F401
 from tests.conftest_scylla import scylla_container  # noqa: F401
 
 
@@ -54,9 +55,10 @@ from tests.conftest_scylla import scylla_container  # noqa: F401
 def scylla_session(scylla_container: object, driver_type: str) -> object:  # noqa: F811
     """Return a connected cassandra-driver Session with the test keyspace.
 
-    Skipped when ``--driver-type=acsylla`` (cassandra-driver may not be installed).
+    Skipped when ``--driver-type=acsylla`` or ``--driver-type=python-rs``
+    (cassandra-driver may not be installed).
     """
-    if driver_type == "acsylla":
+    if driver_type in ("acsylla", "python-rs"):
         yield None
         return
 
@@ -78,6 +80,8 @@ async def coodie_driver(
     same ``cassandra`` Python package).
     When ``--driver-type=acsylla`` creates an acsylla session connecting to the
     same container and registers an AcsyllaDriver instead.
+    When ``--driver-type=python-rs`` creates a python-rs-driver session and
+    registers a PythonRsDriver.
     """
     _registry.clear()
     if driver_type == "acsylla":
@@ -96,6 +100,21 @@ async def coodie_driver(
 
         register_driver("default", acsylla_driver, default=True)
         driver = acsylla_driver
+    elif driver_type == "python-rs":
+        try:
+            import scylla  # type: ignore[import-untyped] # noqa: F401
+        except ImportError:
+            pytest.skip("python-rs-driver is not installed")
+
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        python_rs_session = await create_python_rs_session(scylla_container, "test_ks")
+        loop = asyncio.get_running_loop()
+        python_rs_driver = PythonRsDriver(session=python_rs_session, default_keyspace="test_ks", loop=loop)
+        from coodie.drivers import register_driver
+
+        register_driver("default", python_rs_driver, default=True)
+        driver = python_rs_driver
     else:
         driver = init_coodie(session=scylla_session, keyspace="test_ks", driver_type=driver_type)
     yield driver

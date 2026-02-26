@@ -26,7 +26,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--driver-type",
         default="scylla",
-        choices=["scylla", "cassandra", "acsylla"],
+        choices=["scylla", "cassandra", "acsylla", "python-rs"],
         help="Driver backend for integration tests (default: scylla)",
     )
 

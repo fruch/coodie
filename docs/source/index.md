@@ -62,6 +62,7 @@ guide/lwt
 guide/batch-operations
 guide/sync-vs-async
 guide/drivers
+guide/encryption
 guide/exceptions
 guide/recipes
 guide/integrations

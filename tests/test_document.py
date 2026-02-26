@@ -173,6 +173,34 @@ def test_snake_case_default_table_name(document_cls):
 
 
 # ------------------------------------------------------------------
+# Model equality tests
+# ------------------------------------------------------------------
+
+
+def test_model_equality(Product):
+    """Two instances with the same field values are equal (Pydantic __eq__)."""
+    pid = uuid4()
+    a = Product(id=pid, name="Widget", price=9.99)
+    b = Product(id=pid, name="Widget", price=9.99)
+    assert a == b
+
+
+def test_model_inequality_different_fields(Product):
+    """Instances with different field values are not equal."""
+    a = Product(name="Widget", price=9.99)
+    b = Product(name="Gadget", price=19.99)
+    assert a != b
+
+
+def test_model_inequality_non_model(Product):
+    """A Document instance is not equal to a non-model object."""
+    p = Product(name="Widget", price=9.99)
+    assert p != "not a model"
+    assert p != 42
+    assert p is not None
+
+
+# ------------------------------------------------------------------
 # CounterDocument tests
 # ------------------------------------------------------------------
 

@@ -12,6 +12,7 @@ from coodie.drivers import (
     register_driver,
     _registry,
 )
+import coodie.drivers as _drivers_mod
 from coodie.drivers.base import AbstractDriver
 from coodie.exceptions import ConfigurationError
 
@@ -34,6 +35,18 @@ def test_get_driver_no_registration_raises():
     with pytest.raises(ConfigurationError):
         get_driver()
     _registry.clear()
+
+
+def test_register_driver_on_empty_registry(mock_driver):
+    """register_driver succeeds on a completely empty registry."""
+    _registry.clear()
+    _drivers_mod._default_driver_name = None
+    register_driver("fresh", mock_driver)
+    assert get_driver("fresh") is mock_driver
+    # Also becomes the default since no default existed
+    assert get_driver() is mock_driver
+    _registry.clear()
+    _drivers_mod._default_driver_name = None
 
 
 def test_mock_driver_execute(mock_driver):

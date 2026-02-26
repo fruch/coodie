@@ -64,7 +64,16 @@ dev = [
     "pytest-timeout>=2.0",
     "testcontainers>=4.0",
     "pre-commit>=4.5.1,<5",
-    "scylla-driver>=3.25.4",
+]
+
+[tool.uv]
+# scylla-driver and cassandra-driver both provide the `cassandra` Python
+# namespace and cannot coexist in the same environment.
+conflicts = [
+    [
+        { extra = "scylla" },
+        { extra = "cassandra" },
+    ],
 ]
 
 [tool.ruff]

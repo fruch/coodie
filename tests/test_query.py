@@ -567,3 +567,99 @@ async def test_all_lazy_defers_parsing(Item, queryset_cls, registered_mock_drive
     assert lazy._parsed is None
     _ = lazy.name
     assert lazy._parsed is not None
+
+
+# ------------------------------------------------------------------
+# DML chaining: filter/find chains into delete/update/create
+# ------------------------------------------------------------------
+
+
+def test_multiple_filter_chains_accumulate_for_delete(Item, queryset_cls, registered_mock_driver):
+    """Multiple filter() calls accumulate all conditions for DELETE."""
+    qs = queryset_cls(Item).filter(name="old").filter(rating__gte=3)
+    assert len(qs._where) == 2
+
+
+def test_multiple_filter_chains_accumulate_for_update(Item, queryset_cls, registered_mock_driver):
+    """Multiple filter() calls accumulate all conditions for UPDATE."""
+    qs = queryset_cls(Item).filter(name="old").filter(rating__gte=3)
+    assert len(qs._where) == 2
+
+
+async def test_chained_filters_included_in_delete_cql(Item, queryset_cls, registered_mock_driver):
+    """All chained filter() conditions appear in DELETE WHERE clause."""
+    await _maybe_await(queryset_cls(Item).filter(name="old").filter(rating__gte=3).delete)
+    stmt, params = registered_mock_driver.executed[0]
+    assert "DELETE FROM" in stmt
+    assert '"name" = ?' in stmt
+    assert '"rating" >= ?' in stmt
+    assert "old" in params
+    assert 3 in params
+
+
+async def test_chained_filters_included_in_update_cql(Item, queryset_cls, registered_mock_driver):
+    """All chained filter() conditions appear in UPDATE WHERE clause."""
+    await _maybe_await(queryset_cls(Item).filter(name="old").filter(rating__gte=3).update, name="new")
+    stmt, params = registered_mock_driver.executed[0]
+    assert "UPDATE" in stmt
+    assert '"name" = ?' in stmt
+    assert '"rating" >= ?' in stmt
+    assert "new" in params
+    assert 3 in params
+
+
+async def test_consistency_and_timeout_chained_before_delete(Item, queryset_cls, registered_mock_driver):
+    """consistency() and timeout() chain modifiers are honored by delete()."""
+    await _maybe_await(queryset_cls(Item).filter(name="old").consistency("LOCAL_QUORUM").timeout(3.0).delete)
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+    assert registered_mock_driver.last_timeout == 3.0
+
+
+async def test_ttl_chain_applied_to_update(Item, queryset_cls, registered_mock_driver):
+    """ttl() chain modifier is used by update() when no ttl parameter is passed."""
+    await _maybe_await(queryset_cls(Item).filter(name="old").ttl(600).update, name="new")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TTL 600" in stmt
+
+
+async def test_ttl_parameter_overrides_chain_in_update(Item, queryset_cls, registered_mock_driver):
+    """Explicit ttl= parameter to update() takes precedence over chained ttl()."""
+    await _maybe_await(queryset_cls(Item).filter(name="old").ttl(600).update, ttl=120, name="new")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TTL 120" in stmt
+
+
+async def test_ttl_chain_applied_to_create(Item, queryset_cls, registered_mock_driver):
+    """ttl() chain modifier is forwarded to INSERT via create()."""
+    await _maybe_await(queryset_cls(Item).ttl(3600).create, id=uuid4(), name="Widget", rating=5)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "INSERT INTO" in stmt
+    assert "USING TTL 3600" in stmt
+
+
+async def test_timestamp_chain_applied_to_create(Item, queryset_cls, registered_mock_driver):
+    """timestamp() chain modifier is forwarded to INSERT via create()."""
+    await _maybe_await(queryset_cls(Item).timestamp(1234567890).create, id=uuid4(), name="Widget", rating=5)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "INSERT INTO" in stmt
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+async def test_full_dml_chain_delete(Item, queryset_cls, registered_mock_driver):
+    """Complex chain: filter().filter().consistency().timeout().delete() — all modifiers respected."""
+    await _maybe_await(
+        queryset_cls(Item)
+        .filter(name="old")
+        .filter(rating__gte=3)
+        .consistency("QUORUM")
+        .timeout(2.5)
+        .timestamp(9999)
+        .delete
+    )
+    stmt, params = registered_mock_driver.executed[0]
+    assert "DELETE FROM" in stmt
+    assert '"name" = ?' in stmt
+    assert '"rating" >= ?' in stmt
+    assert "USING TIMESTAMP 9999" in stmt
+    assert registered_mock_driver.last_consistency == "QUORUM"
+    assert registered_mock_driver.last_timeout == 2.5

@@ -216,8 +216,13 @@ init_coodie(
 )
 ```
 
+This includes SSL/TLS options such as `ssl_context` for
+cassandra-driver/scylla-driver and `ssl_enabled` for acsylla.
+See {doc}`encryption` for full examples.
+
 ## What's Next?
 
+- {doc}`encryption` — SSL/TLS encryption for client-to-server connections
 - {doc}`sync-vs-async` — choosing between sync and async APIs
 - {doc}`lwt` — conditional writes with IF NOT EXISTS / IF EXISTS
 - {doc}`batch-operations` — batch multiple statements into one round-trip

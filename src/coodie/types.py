@@ -1,4 +1,5 @@
 import functools
+import re
 import typing
 from datetime import date, datetime, time as dt_time
 from decimal import Decimal
@@ -104,13 +105,41 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
     if annotation in _SCALAR_CQL_TYPES:
         return _SCALAR_CQL_TYPES[annotation]
 
-    # UserType subclass → frozen<type_name>
-    from coodie.usertype import _is_usertype
-
-    if _is_usertype(annotation):
-        return f"frozen<{annotation.type_name()}>"
+    # UserType (BaseModel subclass) → frozen<type_name>
+    if isinstance(annotation, type) and _is_user_type(annotation):
+        return f"frozen<{_udt_type_name(annotation)}>"
 
     raise InvalidQueryError(f"Cannot map Python type {annotation!r} to a CQL type")
+
+
+# ------------------------------------------------------------------
+# UDT (UserType / BaseModel subclass) helpers
+# ------------------------------------------------------------------
+
+_CAMEL_TO_SNAKE_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def _is_user_type(cls: type) -> bool:
+    """Return ``True`` if *cls* looks like a UDT (a BaseModel subclass)."""
+    try:
+        from pydantic import BaseModel
+    except ImportError:  # pragma: no cover
+        return False
+    return isinstance(cls, type) and issubclass(cls, BaseModel) and cls is not BaseModel
+
+
+def _udt_type_name(cls: type) -> str:
+    """Derive the CQL type name for a UserType / BaseModel subclass.
+
+    Uses ``Settings.__type_name__`` if defined, otherwise converts the
+    class name to ``lower_snake_case``.
+    """
+    settings = getattr(cls, "Settings", None)
+    if settings is not None:
+        custom = getattr(settings, "__type_name__", None)
+        if custom:
+            return custom
+    return _CAMEL_TO_SNAKE_RE.sub("_", cls.__name__).lower()
 
 
 # Mapping from collection origin types to their empty factory

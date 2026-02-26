@@ -313,13 +313,15 @@ class QuerySet:
         return None
 
     def create(self, **kwargs: Any) -> LWTResult | None:
-        """Insert a new document. Respects ``if_not_exists()`` chain modifier."""
+        """Insert a new document. Respects ``if_not_exists()``, ``ttl()``, and ``timestamp()`` chain modifiers."""
         data = kwargs
         cql, params = build_insert(
             self._table(),
             self._keyspace(),
             data,
             if_not_exists=self._if_not_exists_val,
+            ttl=self._ttl_val,
+            timestamp=self._timestamp_val,
         )
         rows = self._get_driver().execute(cql, params)
         if self._if_not_exists_val:
@@ -332,7 +334,7 @@ class QuerySet:
         if_conditions: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        """Bulk UPDATE matching rows."""
+        """Bulk UPDATE matching rows. TTL may be provided as a parameter or via the ``ttl()`` chain modifier."""
         set_data, collection_ops = parse_update_kwargs(kwargs)
         if not set_data and not collection_ops:
             return
@@ -341,7 +343,7 @@ class QuerySet:
             self._keyspace(),
             set_data,
             self._where,
-            ttl=ttl,
+            ttl=ttl if ttl is not None else self._ttl_val,
             if_conditions=if_conditions,
             collection_ops=collection_ops or None,
         )

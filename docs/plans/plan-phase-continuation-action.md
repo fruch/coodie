@@ -2,9 +2,9 @@
 
 > **Goal:** Create a GitHub Actions workflow that detects when a merged PR
 > completes a phase of a multi-phase plan in `docs/plans/`, identifies the
-> next incomplete phase, and uses the GitHub Copilot coding agent to
-> automatically open a new issue containing the next phase's tasks — so that
-> multi-phase plans advance continuously without manual handoff.
+> next incomplete phase, and uses the Copilot CLI to directly delegate
+> execution of that phase — so that multi-phase plans advance continuously
+> without manual handoff or intermediate issues.
 
 ---
 
@@ -17,7 +17,7 @@
    - [Phase 1: Plan Parsing Library](#phase-1-plan-parsing-library-priority-high)
    - [Phase 2: PR-to-Plan Linking Convention](#phase-2-pr-to-plan-linking-convention-priority-high)
    - [Phase 3: Core Workflow — Detect & Trigger](#phase-3-core-workflow--detect--trigger-priority-high)
-   - [Phase 4: Copilot Agent Integration](#phase-4-copilot-agent-integration-priority-high)
+   - [Phase 4: Copilot CLI Delegation](#phase-4-copilot-cli-delegation-priority-high)
    - [Phase 5: Safety Gates & Edge Cases](#phase-5-safety-gates--edge-cases-priority-medium)
    - [Phase 6: Documentation & Rollout](#phase-6-documentation--rollout-priority-medium)
 5. [Plan File Format Assumptions](#5-plan-file-format-assumptions)
@@ -72,16 +72,13 @@ When a PR is merged to the default branch:
    or branch name convention)
 2. If a plan is referenced, the workflow reads and parses the plan file
 3. It identifies which phase was just completed and whether a next phase exists
-4. If a next incomplete phase is found, the workflow opens a **new GitHub issue**
-   containing:
-   - The plan name and link
-   - The next phase title, goal, and task table
-   - A mention of `@copilot` to allow the Copilot coding agent to pick up the
-     work (if Copilot is configured for the repo)
+4. If a next incomplete phase is found, the workflow invokes the **Copilot CLI**
+   to directly delegate execution of that phase, with a prompt like:
+   *"Continue to phase N of plan docs/plans/\<name\>.md"*
 
 | Scenario | Result |
 |---|---|
-| PR merged, references plan, next phase exists | New issue opened with next phase tasks |
+| PR merged, references plan, next phase exists | Copilot CLI delegates the next phase for implementation |
 | PR merged, references plan, all phases complete | Comment on PR: "🎉 All phases of \<plan\> are complete!" |
 | PR merged, no plan reference | No action taken |
 | PR merged, plan file not found | Warning comment on PR |
@@ -103,10 +100,8 @@ Legend:
 | Read plan file from repo | 🔧 | `actions/checkout` already used in other workflows |
 | Parse plan markdown for phases | ❌ | Need to extract phase headers and status markers |
 | Identify next incomplete phase | ❌ | Need logic to scan phases for first non-✅ phase |
-| Extract phase tasks into issue body | ❌ | Need to extract task table from plan markdown |
-| Open GitHub issue via API | 🔧 | `gh` CLI available in all workflows; pattern used in `self-healing-ci.yml` |
-| Mention `@copilot` in issue | ❌ | Simple text inclusion in issue body |
-| Label the created issue | ❌ | Need a `plan-continuation` label |
+| Extract phase tasks for prompt | ❌ | Need to extract phase goal and task table for the Copilot CLI prompt |
+| Invoke Copilot CLI to delegate task | 🔧 | Copilot CLI already used in `pr-rebase-squash.yml`; need `gh copilot` with task prompt |
 | Handle "all phases complete" | ❌ | Post a congratulatory comment on the merged PR |
 | Conventional plan-reference format | ❌ | Need a convention: `Plan: docs/plans/<name>.md` in PR body |
 
@@ -116,9 +111,9 @@ Legend:
 - Plan parsing → shell script or Python script that reads markdown, extracts
   `### Phase N:` headers and their ✅/❌ status
 - Next-phase detection → find first phase header without ✅ in the header text
-- Issue creation → `gh issue create` with formatted body including task table
-- Copilot trigger → include `@copilot` mention in the issue body so the
-  Copilot coding agent can pick up the issue automatically
+- Copilot CLI delegation → use `gh copilot` to delegate the next phase with
+  a prompt like *"Continue to phase N of plan docs/plans/\<name\>.md — the
+  phase goal is: \<goal\>. Tasks: \<task list\>"*
 
 ---
 
@@ -134,7 +129,7 @@ phase structure, status, and task tables.
 | 1.1 | Create `.github/scripts/parse-plan.py` — Python script that reads a plan `.md` file and outputs JSON with phase titles, status (complete/incomplete), and task content | ❌ |
 | 1.2 | Support phase header formats: `### Phase N: Title ✅`, `### Phase N: Title (Priority: X)`, and `### Phase N: Title` | ❌ |
 | 1.3 | Detect phase completion via ✅ in phase header **or** all tasks in the phase table having ✅ status | ❌ |
-| 1.4 | Extract the task table (markdown) for each phase so it can be included in the issue body | ❌ |
+| 1.4 | Extract the task table (markdown) for each phase so it can be included in the delegation prompt | ❌ |
 | 1.5 | Add unit tests for the parser in `.github/scripts/test_parse_plan.py` using `pytest` | ❌ |
 | 1.6 | Test against real plan files: `udt-support.md`, `documentation-plan.md`, `pr-comment-rebase-squash-action.md` | ❌ |
 
@@ -166,20 +161,20 @@ plan references, parses the plan, and identifies the next phase.
 | 3.6 | Identify next incomplete phase from parser output | ❌ |
 | 3.7 | If no plan reference found, exit silently (success, no-op) | ❌ |
 
-### Phase 4: Copilot Agent Integration (Priority: High)
+### Phase 4: Copilot CLI Delegation (Priority: High)
 
-**Goal:** When a next phase is identified, open a GitHub issue with the phase
-details and mention `@copilot` to trigger automated implementation.
+**Goal:** When a next phase is identified, use the Copilot CLI to directly
+delegate execution of that phase — no intermediate GitHub issue needed.
 
 | Task | Description | Status |
 |---|---|---|
-| 4.1 | Format the issue title: `[Plan Continuation] <plan-name> — Phase N: <title>` | ❌ |
-| 4.2 | Format the issue body with: plan link, phase goal, full task table (markdown), and link to the merged PR that completed the previous phase | ❌ |
-| 4.3 | Include `@copilot` mention in the issue body to trigger Copilot coding agent | ❌ |
-| 4.4 | Add labels to the issue: `plan-continuation`, `automated`, and optionally the plan name | ❌ |
+| 4.1 | Install Copilot CLI in the workflow (`npm install -g @github/copilot` or use `gh copilot`) | ❌ |
+| 4.2 | Construct the delegation prompt: "Continue to phase N of plan `<path>`. Goal: `<goal>`. Tasks: `<task list>`" | ❌ |
+| 4.3 | Invoke `gh copilot` (or `copilot -p`) with the constructed prompt to delegate the task | ❌ |
+| 4.4 | Authenticate with Copilot using the `COPILOT_PAT` secret (same pattern as `pr-rebase-squash.yml`) | ❌ |
 | 4.5 | If all phases are complete, post a comment on the merged PR: "🎉 All phases of \<plan\> are now complete!" | ❌ |
-| 4.6 | Create the `plan-continuation` and `automated` labels in `.github/labels.toml` | ❌ |
-| 4.7 | Check for existing open issues with the same plan+phase to avoid duplicates | ❌ |
+| 4.6 | If Copilot CLI is unavailable (no `COPILOT_PAT`), degrade gracefully: post a PR comment with the next phase details and a manual prompt suggestion instead | ❌ |
+| 4.7 | Log the delegation prompt and Copilot CLI response to `$GITHUB_STEP_SUMMARY` | ❌ |
 
 ### Phase 5: Safety Gates & Edge Cases (Priority: Medium)
 
@@ -191,9 +186,8 @@ details and mention `@copilot` to trigger automated implementation.
 | 5.2 | Skip if the plan has no recognizable phase structure | ❌ |
 | 5.3 | Handle plans where phase status is tracked only in task tables (not in headers) | ❌ |
 | 5.4 | Add a `skip-continuation` label that, when present on the PR, prevents the workflow from running | ❌ |
-| 5.5 | Add concurrency group per plan file to prevent parallel issue creation | ❌ |
-| 5.6 | Rate-limit: do not create more than one continuation issue per plan per day | ❌ |
-| 5.7 | Log all decisions to `$GITHUB_STEP_SUMMARY` for auditability | ❌ |
+| 5.5 | Add concurrency group per plan file to prevent parallel delegation runs | ❌ |
+| 5.6 | Log all decisions to `$GITHUB_STEP_SUMMARY` for auditability | ❌ |
 
 ### Phase 6: Documentation & Rollout (Priority: Medium)
 
@@ -266,7 +260,6 @@ has no plan reference.
 | Permission | Scope | Reason |
 |---|---|---|
 | `contents: read` | Repository | Read plan files from the repo |
-| `issues: write` | Repository | Create continuation issues |
 | `pull-requests: write` | Repository | Post comments on the merged PR |
 
 ### 6.2 Step-by-Step Pseudocode
@@ -287,12 +280,11 @@ has no plan reference.
       b. Otherwise: latest phase marked complete in the plan
 12. Find next incomplete phase (first phase after completed that is not ✅)
 13. If no next phase → post "all phases complete" comment, exit
-14. Check for existing open issue with same plan+phase → skip if exists
-15. Create GitHub issue:
-      - Title: [Plan Continuation] <plan-name> — Phase N: <title>
-      - Body: plan link + phase goal + task table + @copilot mention
-      - Labels: plan-continuation, automated
-16. Post comment on merged PR linking to the new issue
+14. Construct delegation prompt:
+      "Continue to phase N of plan docs/plans/<name>.md.
+       Phase goal: <goal>. Tasks: <task table>"
+15. Invoke Copilot CLI with the delegation prompt
+16. Post comment on merged PR with delegation summary
 17. Log summary to $GITHUB_STEP_SUMMARY
 ```
 
@@ -318,7 +310,6 @@ jobs:
     if: github.event.pull_request.merged == true
     permissions:
       contents: read
-      issues: write
       pull-requests: write
 
     steps:
@@ -389,7 +380,7 @@ jobs:
           echo "next_phase_title=$(echo "$RESULT" | jq -r '.next_phase.title // empty')" >> "$GITHUB_OUTPUT"
           echo "all_complete=$(echo "$RESULT" | jq -r '.all_complete')" >> "$GITHUB_OUTPUT"
 
-          # Store full phase content for issue body
+          # Store full phase content for the delegation prompt
           echo "$RESULT" | jq -r '.next_phase.content // empty' > /tmp/next-phase-content.md
 
       # ── 6. Handle missing plan file ──────────────────────────
@@ -418,110 +409,69 @@ jobs:
             --repo "${{ github.repository }}" \
             --body "🎉 **All phases complete!** Every phase in [\`${PLAN_FILE}\`](${PLAN_FILE}) is now marked as done. Great work!"
 
-      # ── 8. Check for duplicate issue ─────────────────────────
-      - name: Check for existing continuation issue
+      # ── 8. Delegate next phase via Copilot CLI ───────────────
+      - name: Delegate next phase to Copilot
         if: >-
           steps.parse.outputs.plan_exists == 'true' &&
           steps.parse.outputs.all_complete != 'true' &&
           steps.parse.outputs.next_phase_number != ''
-        id: dedup
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PLAN_FILE="${{ steps.plan-ref.outputs.plan_file }}"
-          PHASE="${{ steps.parse.outputs.next_phase_number }}"
-          PLAN_NAME=$(basename "$PLAN_FILE" .md)
-
-          EXISTING=$(gh issue list \
-            --repo "${{ github.repository }}" \
-            --label "plan-continuation" \
-            --search "[Plan Continuation] ${PLAN_NAME} — Phase ${PHASE}" \
-            --state open \
-            --json number \
-            --jq '.[0].number // empty')
-
-          if [ -n "$EXISTING" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "issue_number=${EXISTING}" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # ── 9. Create continuation issue ─────────────────────────
-      - name: Create next-phase issue
-        if: >-
-          steps.parse.outputs.plan_exists == 'true' &&
-          steps.parse.outputs.all_complete != 'true' &&
-          steps.parse.outputs.next_phase_number != '' &&
-          steps.dedup.outputs.exists != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           PLAN_FILE="${{ steps.plan-ref.outputs.plan_file }}"
           PHASE="${{ steps.parse.outputs.next_phase_number }}"
           TITLE="${{ steps.parse.outputs.next_phase_title }}"
           PLAN_NAME=$(basename "$PLAN_FILE" .md)
           PR_NUMBER="${{ github.event.pull_request.number }}"
-          PR_TITLE="${{ github.event.pull_request.title }}"
           PHASE_CONTENT=$(cat /tmp/next-phase-content.md)
 
-          ISSUE_TITLE="[Plan Continuation] ${PLAN_NAME} — Phase ${PHASE}: ${TITLE}"
+          # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
+          npm install -g @github/copilot 2>/dev/null || true
 
-          cat > /tmp/issue-body.md <<EOF
-          ## Plan Phase Continuation
+          # Construct the delegation prompt
+          PROMPT="Continue to phase ${PHASE} of plan ${PLAN_FILE}.
+          Phase title: ${TITLE}.
 
-          **Plan:** [\`${PLAN_FILE}\`](https://github.com/${{ github.repository }}/blob/master/${PLAN_FILE})
-          **Phase:** ${PHASE} — ${TITLE}
-          **Previous PR:** #${PR_NUMBER} (${PR_TITLE})
-
-          ---
-
-          ### Phase Details
+          ## Tasks
 
           ${PHASE_CONTENT}
 
           ---
+          Read the full plan at ${PLAN_FILE} for context.
+          Implement all tasks listed above for Phase ${PHASE}."
 
-          > This issue was automatically created by the
-          > [Plan Phase Continuation](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          > workflow after PR #${PR_NUMBER} was merged.
+          # Delegate via Copilot CLI — check exit code explicitly
+          EXIT_CODE=0
+          RESPONSE=$(copilot -p "$PROMPT" 2>&1) || EXIT_CODE=$?
 
-          @copilot Please implement Phase ${PHASE} of this plan. Read the full plan
-          at \`${PLAN_FILE}\` for context. The tasks above describe what needs to be done.
-          EOF
+          # Fallback: if Copilot CLI failed or is unavailable, post a comment
+          # with the prompt so a developer can pick it up manually.
+          if [ "$EXIT_CODE" -ne 0 ] || [ -z "$RESPONSE" ]; then
+            gh pr comment "${PR_NUMBER}" \
+              --repo "${{ github.repository }}" \
+              --body "🔄 **Next phase ready:** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}).
 
-          ISSUE_URL=$(gh issue create \
-            --repo "${{ github.repository }}" \
-            --title "$ISSUE_TITLE" \
-            --body-file /tmp/issue-body.md \
-            --label "plan-continuation,automated")
+          Copilot CLI was not available (exit code: ${EXIT_CODE}). Run manually:
+          \`\`\`
+          copilot -p \"Continue to phase ${PHASE} of plan ${PLAN_FILE}\"
+          \`\`\`"
+          else
+            gh pr comment "${PR_NUMBER}" \
+              --repo "${{ github.repository }}" \
+              --body "🔄 **Next phase delegated!** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}) has been sent to Copilot CLI."
+          fi
 
-          echo "Created continuation issue: $ISSUE_URL"
-
-          # Comment on the merged PR linking to the new issue
-          gh pr comment "${PR_NUMBER}" \
-            --repo "${{ github.repository }}" \
-            --body "🔄 **Next phase started!** Created ${ISSUE_URL} for Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE})."
-
-          # Step summary
+          # Step summary (truncate response to avoid verbose/sensitive output)
+          RESPONSE_SUMMARY=$(echo "${RESPONSE:-'(not available)'}" | head -20)
           {
             echo "### Plan Phase Continuation"
             echo ""
             echo "- **Plan:** \`${PLAN_FILE}\`"
             echo "- **Next phase:** ${PHASE} — ${TITLE}"
-            echo "- **Issue:** ${ISSUE_URL}"
+            echo "- **Copilot CLI exit code:** ${EXIT_CODE}"
+            echo "- **Status:** $( [ "$EXIT_CODE" -eq 0 ] && echo '✅ Delegated' || echo '⚠️ Fallback (manual prompt posted)')"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      # ── 10. Report duplicate ─────────────────────────────────
-      - name: Report existing issue
-        if: steps.dedup.outputs.exists == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          EXISTING="${{ steps.dedup.outputs.issue_number }}"
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body "ℹ️ **Continuation issue already exists:** #${EXISTING} — skipping duplicate creation."
 ```
 
 ---
@@ -531,11 +481,11 @@ jobs:
 | Risk | Mitigation |
 |---|---|
 | Arbitrary file read via plan reference | Plan path is validated against `docs/plans/*.md` pattern; no path traversal possible |
-| Issue spam from rapid merges | Concurrency group per PR + duplicate issue check prevents spam |
-| Injection via PR body/title into issue | PR title and body are passed through GitHub API (not shell-interpolated); `--body-file` avoids injection |
+| Copilot CLI prompt injection via plan content | Plan files are committed to the repo and reviewed via PRs; prompt content is repo-controlled, not user-supplied |
 | Unauthorized plan continuation | Only merged PRs trigger the workflow; merge permissions are governed by branch protection rules |
-| Copilot acting on malicious issue content | The `@copilot` mention is informational; Copilot's own guardrails apply to any actions it takes |
-| `GITHUB_TOKEN` scope | Token is limited to `contents: read`, `issues: write`, `pull-requests: write` — minimum required permissions |
+| `COPILOT_PAT` secret exposure | The PAT is only exposed via `COPILOT_GITHUB_TOKEN` env var in the delegation step; it is never logged or passed to other steps. If the secret is missing, the workflow degrades gracefully (posts manual prompt instead) |
+| `GITHUB_TOKEN` scope | Token is limited to `contents: read`, `pull-requests: write` — minimum required permissions |
+| Concurrent delegation for same plan | Concurrency group per PR prevents parallel runs |
 
 > **Note:** The `pull_request: closed` trigger runs the workflow from the
 > **PR's head branch** for the workflow file, but the `actions/checkout` step
@@ -567,14 +517,14 @@ Because this is a workflow, integration testing is primarily manual:
 
 | Test Case | Setup | Expected Result | Phase |
 |---|---|---|---|
-| PR with plan reference, next phase exists | PR body contains `Plan: docs/plans/udt-support.md` | Issue created for next incomplete phase | 3, 4 |
+| PR with plan reference, next phase exists | PR body contains `Plan: docs/plans/udt-support.md` | Copilot CLI invoked with next phase prompt | 3, 4 |
 | PR with plan reference, all phases done | PR body contains `Plan: docs/plans/pr-comment-rebase-squash-action.md` | "All phases complete" comment | 3, 4 |
 | PR with no plan reference | Normal PR body | Workflow exits silently | 3 |
 | PR with invalid plan path | `Plan: docs/plans/nonexistent.md` | Warning comment posted | 5 |
 | PR closed without merge | PR closed via "Close" button | Workflow does not run | 3 |
-| Duplicate issue prevention | Two PRs merged for same plan | Only one issue created | 4, 5 |
+| Copilot CLI unavailable | No `COPILOT_PAT` secret | Fallback: PR comment with manual prompt | 4 |
 | Branch name convention | Branch `plan/udt-support/phase-3` | Plan detected from branch name | 3 |
-| `skip-continuation` label | PR has the label | Workflow does not create issue | 5 |
+| `skip-continuation` label | PR has the label | Workflow does not delegate | 5 |
 
 ### 8.3 Static Analysis
 
@@ -589,9 +539,9 @@ Because this is a workflow, integration testing is primarily manual:
 ## 9. References
 
 - [GitHub Actions: `pull_request` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request)
+- [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
 - [GitHub Copilot coding agent](https://docs.github.com/en/copilot/using-github-copilot/using-copilot-coding-agent)
-- [GitHub CLI: `gh issue create`](https://cli.github.com/manual/gh_issue_create)
-- [Existing `self-healing-ci.yml`](../../.github/workflows/self-healing-ci.yml) — pattern for PR commenting
 - [Existing `pr-rebase-squash.yml`](../../.github/workflows/pr-rebase-squash.yml) — Copilot CLI integration pattern
+- [Existing `self-healing-ci.yml`](../../.github/workflows/self-healing-ci.yml) — pattern for PR commenting
 - [Plan writing conventions](../../.github/skills/writing-plans/SKILL.md)
 - [Conventional Commits specification](https://www.conventionalcommits.org/)

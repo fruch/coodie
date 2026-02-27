@@ -164,11 +164,90 @@ jobs:
             echo "status=conflict" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Abort on rebase conflicts
+      # ── 5b. Resolve conflicts with Copilot CLI ──────────────
+      - name: Resolve conflicts with Copilot CLI
+        id: resolve
         if: steps.rebase.outputs.status == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          npm install -g @github/copilot 2>/dev/null || true
+
+          MAX_ROUNDS=10
+          ROUND=0
+          RESOLVED_FILES=""
+
+          while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
+            ROUND=$((ROUND + 1))
+            CONFLICTS=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+
+            if [ -z "$CONFLICTS" ]; then
+              # No more conflict markers — rebase has landed cleanly
+              echo "status=clean" >> "$GITHUB_OUTPUT"
+              {
+                echo "### 🤖 Copilot resolved rebase conflicts"
+                echo ""
+                echo "Files resolved automatically:"
+                for F in $RESOLVED_FILES; do echo "- \`$F\`"; done
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            echo "Conflict resolution round $ROUND for: $CONFLICTS"
+            ALL_RESOLVED=true
+
+            while IFS= read -r FILE; do
+              [ -z "$FILE" ] && continue
+              CONFLICT_CONTENT=$(cat "$FILE")
+              RESOLVED=$(copilot -p \
+                "Resolve ALL git conflict markers (<<<<<<<, =======, >>>>>>>) in the file \
+                 below. Output ONLY the complete resolved file content — no markdown fences, \
+                 no explanations, no preamble. File: $FILE --- Content: $CONFLICT_CONTENT" \
+                2>/dev/null) || true
+
+              # Strip fenced code blocks if present
+              if [ -n "$RESOLVED" ] && echo "$RESOLVED" | grep -q '^```'; then
+                RESOLVED=$(echo "$RESOLVED" | awk '/^```/{if(f){exit}else{f=1;next}} f{print}')
+              fi
+
+              # Accept only if non-empty and conflict markers are gone
+              if [ -n "$RESOLVED" ] && ! echo "$RESOLVED" | grep -qF '<<<<<<<'; then
+                printf '%s\n' "$RESOLVED" > "$FILE"
+                git add "$FILE"
+                RESOLVED_FILES="$RESOLVED_FILES $FILE"
+              else
+                ALL_RESOLVED=false
+                echo "Copilot could not resolve conflicts in: $FILE"
+              fi
+            done <<< "$CONFLICTS"
+
+            if [ "$ALL_RESOLVED" = "false" ]; then
+              echo "status=unresolved" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            # All conflicts in this round resolved — continue the rebase
+            if GIT_EDITOR=true git rebase --continue; then
+              echo "status=clean" >> "$GITHUB_OUTPUT"
+              {
+                echo "### 🤖 Copilot resolved rebase conflicts"
+                echo ""
+                echo "Files resolved automatically:"
+                for F in $RESOLVED_FILES; do echo "- \`$F\`"; done
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            # git rebase --continue hit the next commit's conflicts — loop again
+          done
+
+          echo "status=unresolved" >> "$GITHUB_OUTPUT"
+
+      - name: Abort on rebase conflicts
+        if: steps.rebase.outputs.status == 'conflict' && steps.resolve.outputs.status != 'clean'
         run: |
           git rebase --abort
-          echo "Rebase failed due to merge conflicts. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
+          echo "Rebase failed: Copilot could not resolve all conflicts automatically. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
       - name: Push rebased branch

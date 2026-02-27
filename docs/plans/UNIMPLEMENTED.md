@@ -4,7 +4,8 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-02-27
+> **Last reviewed:** 2026-02-27 (post-merge: workflow testing plan completed,
+> client-encryption Phases 1–2 done, new plan-phase-continuation-action plan)
 
 ---
 
@@ -16,7 +17,7 @@
 4. [Performance Improvements](#4-performance-improvements)
 5. [Client Encryption (SSL/TLS)](#5-client-encryption-ssltls)
 6. [python-rs Driver Support](#6-python-rs-driver-support)
-7. [GitHub Actions Workflow Testing](#7-github-actions-workflow-testing)
+7. [Plan Phase Continuation Action](#7-plan-phase-continuation-action)
 8. [Demo Suite Extension](#8-demo-suite-extension)
 9. [cqlengine Test Coverage Gaps](#9-cqlengine-test-coverage-gaps)
 10. [Integration Test Coverage Gaps](#10-integration-test-coverage-gaps)
@@ -117,19 +118,11 @@
 
 *Source: `client-encryption.md`*
 
-> *SSL/TLS works today via `**kwargs` passthrough to driver constructors (✅). Missing: documentation, integration tests, and explicit `ssl_context` parameter.*
+> *SSL/TLS works via `**kwargs` passthrough (✅). Documentation (✅ `docs/source/guide/encryption.md`) and integration tests (✅ `tests/integration/test_encryption.py`) are done. Phase 3 remains: explicit SSL parameters on `init_coodie()`.*
 
-### 5.1 SSL/TLS Documentation
+### 5.1 Explicit `ssl_context` Parameter (Low Priority)
 
-> **Prompt:** Write user-facing documentation for coodie's SSL/TLS support. Create or complete `docs/source/guide/encryption.md` with: (1) CassandraDriver recipes — `ssl_context`, `ssl_options`, mutual TLS with `load_cert_chain()`. (2) AcsyllaDriver recipes — `ssl_enabled=True`, `ssl_trusted_cert` PEM string, `ssl_verify_flags`. (3) Bring-your-own session (pre-configured SSL session passed to `init_coodie(session=...)`). (4) Troubleshooting common SSL errors. See `docs/plans/client-encryption.md` Phase 1.
-
-### 5.2 SSL/TLS Integration Tests
-
-> **Prompt:** Add integration tests for SSL/TLS connections against a real ScyllaDB instance with server certificates enabled. Test: (1) CassandraDriver with `ssl_context` connecting to SSL-enabled ScyllaDB. (2) AcsyllaDriver with `ssl_enabled=True` and `ssl_trusted_cert`. (3) Connection failure with wrong/expired certs. (4) Mutual TLS with client certificates. Use a Docker Compose setup with self-signed certs. See `docs/plans/client-encryption.md` Phase 2.
-
-### 5.3 Explicit `ssl_context` Parameter (Low Priority)
-
-> **Prompt:** Add an explicit `ssl_context` parameter to `init_coodie()` and `init_coodie_async()` signatures (instead of relying solely on `**kwargs` passthrough). Add validation: if `ssl_context` is provided along with conflicting `**kwargs`, raise `ConfigurationError` with a helpful message. See `docs/plans/client-encryption.md` Phase 3.
+> **Prompt:** Add explicit SSL parameters to `init_coodie()` and `init_coodie_async()` signatures instead of relying solely on `**kwargs` passthrough. For `init_coodie()`: add `ssl_context: ssl.SSLContext | None = None` and forward it to `Cluster()`. For `init_coodie_async()`: add `ssl_enabled`, `ssl_trusted_cert`, `ssl_cert`, `ssl_private_key`, `ssl_verify_flags` parameters for acsylla, plus `ssl_context` for the cassandra driver path. Add type stubs / overloads so mypy doesn't complain. Add unit tests verifying the new parameters reach the driver. Update `docs/source/guide/encryption.md` to use the new explicit API. See `docs/plans/client-encryption.md` Phase 3 (tasks 3.1–3.5).
 
 ---
 
@@ -161,27 +154,35 @@
 
 ---
 
-## 7. GitHub Actions Workflow Testing
+## 7. Plan Phase Continuation Action
 
-*Source: `github-actions-testing-plan.md`*
+*Source: `plan-phase-continuation-action.md`*
 
-> *Phase 2 (Bats tests) is partially done — `tests/workflows/conftest.py` and `test_smoke.bats` exist. Phases 1, 3, and 4 are not implemented.*
+> *A new plan to automate multi-phase plan execution via GitHub Actions + Copilot CLI. All 6 phases are pending — no implementation exists yet.*
 
-### 7.1 Phase 1 — actionlint Static Analysis
+### 7.1 Phase 1 — Plan Parsing Library
 
-> **Prompt:** Add actionlint static analysis for GitHub Actions workflows. (1) Add the `actionlint` hook to `.pre-commit-config.yaml` using the `rhysd/actionlint` pre-commit hook. (2) Run `actionlint` against all workflow files and fix any reported errors. (3) Add an `actionlint` step to `ci.yml` (or a new workflow) that runs on PRs touching `.github/workflows/`. (4) Document actionlint usage in `CONTRIBUTING.md`. See `docs/plans/github-actions-testing-plan.md` Phase 1 (tasks 1.1–1.5).
+> **Prompt:** Create `.github/scripts/parse-plan.py` — a Python script that reads a plan `.md` file and outputs JSON with phase titles, status (complete/incomplete), and task content. Support phase header formats: `### Phase N: Title ✅`, `### Phase N: Title (Priority: X)`, and `### Phase N: Title`. Detect phase completion via ✅ in phase header **or** all tasks in the phase table having ✅ status. Extract the task table (markdown) for each phase. Add unit tests in `.github/scripts/test_parse_plan.py` and test against real plan files (`udt-support.md`, `documentation-plan.md`, `pr-comment-rebase-squash-action.md`). See `docs/plans/plan-phase-continuation-action.md` Phase 1 (tasks 1.1–1.6).
 
-### 7.2 Phase 2 — Shell Script Extraction & Bats Tests (Complete Remaining Tasks)
+### 7.2 Phase 2 — PR-to-Plan Linking Convention
 
-> **Prompt:** Complete the shell script extraction and Bats testing for GitHub Actions workflows. The pytest-bats plugin (`tests/workflows/conftest.py`) and a smoke test (`test_smoke.bats`) already exist. Remaining work: (1) Create `.github/scripts/` directory. (2) Extract the "Parse slash command" step from `pr-rebase-squash.yml` into `.github/scripts/parse-command.sh`. (3) Extract the "Squash commits" commit-message logic into `.github/scripts/build-squash-message.sh`. (4) Extract the "Collect failed job logs" step from `self-healing-ci.yml` into `.github/scripts/collect-failed-logs.sh`. (5) Update workflow YAML files to source the extracted scripts. (6) Write comprehensive Bats tests for each script (command parsing, edge cases, fallback paths). (7) Add a CI job that installs `bats-core` and runs `pytest tests/workflows/`. See `docs/plans/github-actions-testing-plan.md` Phase 2 (tasks 2.1–2.12).
+> **Prompt:** Define and implement a convention for linking PRs to plan files. (1) PR body must contain `Plan: docs/plans/<name>.md` (case-insensitive). (2) Optionally support `Phase: N` to indicate which phase the PR completes. (3) Support branch-name convention as fallback: `plan/<plan-name>/phase-N`. (4) Add a PR template snippet documenting the convention. (5) Update `CONTRIBUTING.md` with the plan-linking convention. See `docs/plans/plan-phase-continuation-action.md` Phase 2 (tasks 2.1–2.5).
 
-### 7.3 Phase 3 — Python Workflow Convention Checks
+### 7.3 Phase 3 — Core Workflow (Detect & Trigger)
 
-> **Prompt:** Create `tests/test_workflow_conventions.py` with pytest-based checks that enforce repository-specific workflow conventions: (1) all workflows use `actions/checkout@v4` or later (not unpinned), (2) all multi-job workflows define a `concurrency` group, (3) all workflows using `gh` CLI set `GH_TOKEN` env var, (4) no workflow uses `actions/checkout` with `fetch-depth: 1` when `git rebase` or `git log` is used later, (5) all `schedule` triggers have valid cron expressions. Parse workflow YAML files with `pyyaml` and assert on structure. See `docs/plans/github-actions-testing-plan.md` Phase 3 (tasks 3.1–3.8).
+> **Prompt:** Create `.github/workflows/plan-continuation.yml` with `pull_request: types: [closed]` and `workflow_dispatch` triggers. Implement: (1) Merge guard — only run if PR was actually merged or manually dispatched. (2) Bootstrap detection — use GitHub API to find `docs/plans/*.md` additions/modifications in PR changed files. (3) Extract plan reference from PR body and/or branch name. (4) Handle `workflow_dispatch` inputs for manual re-runs. (5) Run `parse-plan.py` on detected plan files. (6) Determine completed phase and identify next incomplete phase. (7) Exit silently (no-op) if no plan reference found. See `docs/plans/plan-phase-continuation-action.md` Phase 3 (tasks 3.1–3.10).
 
-### 7.4 Phase 4 — workflow_dispatch Smoke Tests
+### 7.4 Phase 4 — Copilot CLI Delegation
 
-> **Prompt:** Document and optionally automate live smoke tests for the PR workflows. (1) Document the manual smoke-test procedure in `CONTRIBUTING.md` for `pr-rebase-squash.yml`: how to trigger via Actions tab, expected results, cleanup steps. (2) Create a test PR template branch (`test/workflow-smoke`) with known state for reproducible testing. (3) Add `workflow_dispatch` triggers to `self-healing-ci.yml` for manual testing. (4) Optionally create `.github/workflows/test-workflows.yml` that runs nightly, creates a test PR, triggers `/rebase squash`, and validates the result. See `docs/plans/github-actions-testing-plan.md` Phase 4 (tasks 4.1–4.5).
+> **Prompt:** Add Copilot CLI delegation to the plan continuation workflow. (1) Install Copilot CLI (`gh copilot`). (2) Construct a delegation prompt: "Continue to phase N of plan `<path>`. Goal: `<goal>`. Tasks: `<task list>`". (3) Invoke Copilot CLI with the prompt to create a branch, implement the next phase, and open a PR. (4) Include the `Plan: docs/plans/<name>.md` and `Phase: N` references in the auto-created PR body. See `docs/plans/plan-phase-continuation-action.md` Phase 4 (tasks 4.1–4.3).
+
+### 7.5 Phase 5 — Safety Gates & Edge Cases
+
+> **Prompt:** Add safety gates to the plan continuation workflow. (1) Skip if plan has no remaining incomplete phases ("all done" comment). (2) Rate-limit: maximum one auto-delegation per plan per day. (3) Fail-safe: if Copilot CLI errors, post a comment with the prompt so a human can act. (4) Handle plans with non-sequential phases. (5) Handle concurrent PRs modifying the same plan. See `docs/plans/plan-phase-continuation-action.md` Phase 5.
+
+### 7.6 Phase 6 — Documentation & Rollout
+
+> **Prompt:** Document the plan phase continuation workflow. (1) Add a "Plan Automation" section to `CONTRIBUTING.md`. (2) Add inline comments to the workflow YAML. (3) Create a test plan file (`docs/plans/_test-plan-continuation.md`) for end-to-end testing. (4) Gradually enable for real plans after successful dry-run. See `docs/plans/plan-phase-continuation-action.md` Phase 6.
 
 ---
 

@@ -1310,6 +1310,111 @@ limitations.
 
 ---
 
+## 13C. Phase 6 — Custom `dict_factory` for CassandraDriver
+
+> **PR**: [#113](https://github.com/fruch/coodie/pull/113) — `perf(drivers): set dict_factory on CassandraDriver session for zero-copy rows`
+> **Pre-change baseline run**: [#22488403820](https://github.com/fruch/coodie/actions/runs/22488403820) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22488403820/job/65143784056)) — commit `8db913f` on master, 2026-02-27
+
+### 13C.1 Change Implemented
+
+| Change | Description | Status |
+|--------|-------------|--------|
+| `session.row_factory = dict_factory` | Set on `CassandraDriver.__init__()` via `cassandra.query.dict_factory` | ✅ Done |
+| `_rows_to_dicts()` zero-copy | Already had `isinstance(sample, dict)` passthrough — no change needed | ✅ Used |
+
+**Before**:
+```
+CassandraDriver.execute()
+  → session.execute()           # returns ResultSet of NamedTuples (default factory)
+  → _rows_to_dicts(result)
+      → list(result_set)        # materialise all rows
+      → hasattr(sample, '_asdict')  # type-check per group
+      → [dict(r._asdict()) for r in rows]  # per-row: OrderedDict + dict() wrapping
+```
+
+**After**:
+```
+CassandraDriver.execute()
+  → session.execute()           # returns ResultSet of dicts (dict_factory)
+  → _rows_to_dicts(result)
+      → list(result_set)        # materialise all rows
+      → isinstance(sample, dict)  # fast type-check once
+      → return rows             # zero-copy passthrough — no per-row conversion
+```
+
+**Savings per query**: Eliminates `_asdict()` (returns OrderedDict) + `dict()` wrapping for each row.
+For a 1-row query (GET by PK): ~30–50 µs. For a 10-row query: ~300–500 µs.
+
+### 13C.2 Pre-Change Baseline (run [#22488403820](https://github.com/fruch/coodie/actions/runs/22488403820))
+
+The most recent master run before this change confirms Phase 5 numbers are stable:
+
+#### 13C.2.1 Argus Real-World Patterns — Phase 5 vs Pre-Phase 6 Master
+
+| Pattern | Phase 5 (coodie) | Pre-Phase 6 master (coodie) | cqlengine | coodie ratio | Δ vs Phase 5 |
+|---------|-----------------|---------------------------|-----------|-------------|--------------|
+| Batch events (10) | 1,082 µs | **1,137 µs** | 3,044 µs | 0.37× (2.7× faster) | stable |
+| Notification feed | 591 µs | **589 µs** | 1,369 µs | 0.43× (2.3× faster) | stable |
+| Status update | 943 µs | **932 µs** | 852 µs | 1.09× slower | stable |
+| Comment with collections | 507 µs | **510 µs** | 766 µs | 0.67× (1.5× faster) | stable |
+| Multi-model lookup | 905 µs | **948 µs** | 1,339 µs | 0.71× (1.4× faster) | stable |
+| Argus model instantiation | 21.3 µs | **21.5 µs** | 37.0 µs | 0.58× (1.7× faster) | stable |
+
+All values are within normal benchmark variance (< 5%). The Phase 5 baseline is confirmed as the
+valid "before dict_factory" reference.
+
+#### 13C.2.2 Core Operations — Phase 5 Baseline (before dict_factory)
+
+| Operation | Phase 5 (coodie) | cqlengine | ratio |
+|-----------|-----------------|-----------|-------|
+| GET by PK | 485 µs | 651 µs | 0.75× (1.3× faster) |
+| Filter + LIMIT | 608 µs | 1,120 µs | 0.54× (1.9× faster) |
+| Filter (secondary index) | 1,509 µs | 4,500 µs | 0.34× (3.0× faster) |
+| COUNT | 916 µs | 1,020 µs | 0.90× (1.1× faster) |
+| Collection read | 483 µs | 654 µs | 0.74× (1.4× faster) |
+| Single INSERT | 449 µs | 589 µs | 0.76× (1.3× faster) |
+| Partial UPDATE | 906 µs | 508 µs | 1.78× slower |
+
+### 13C.3 Expected Post-Change Improvement
+
+> ⚠️ **Note**: As of PR #113, no post-merge benchmark exists yet — the benchmark workflow
+> requires the PR to be merged to master (or a `benchmark` label added to the PR) before
+> running. The estimates below are based on the §14.5.1 analysis and local profiling.
+
+| Operation | Before (Phase 5) | Expected after dict_factory | Estimated Δ | Rationale |
+|-----------|-----------------|----------------------------|-------------|-----------|
+| GET by PK | 485 µs | ~440–460 µs | −5–10% | 1 row: saves `_asdict()` + `dict()` per row |
+| Filter + LIMIT | 608 µs | ~570–590 µs | −3–7% | few rows: partial overhead removal |
+| Filter (secondary index) | 1,509 µs | ~1,280–1,360 µs | −10–15% | many rows: full savings scale linearly |
+| COUNT | 916 µs | ~870–895 µs | −2–5% | 1-row result: smaller saving |
+| Collection read | 483 µs | ~450–465 µs | −4–7% | 1 row: same as GET |
+
+Write operations (INSERT, UPDATE, DELETE) are **not affected** — `_rows_to_dicts()` is not called
+on write results (the driver returns `None` or an empty list).
+
+### 13C.4 How `dict_factory` Removes the Overhead
+
+The cassandra-driver's default `row_factory` is `named_tuple_factory`, which produces NamedTuples.
+`cassandra.query.dict_factory` is a C-level factory in the driver that constructs rows as plain
+`dict` objects directly at the protocol decode stage — the same cost as NamedTuples, but already
+in the format coodie needs.
+
+`_rows_to_dicts()` has three code paths:
+1. `hasattr(sample, '_asdict')` → NamedTuple path: **O(N) `dict(r._asdict())` allocations** — eliminated
+2. `isinstance(sample, dict)` → Dict path: **`return rows` (zero-copy)** — now the active path
+3. `r.__dict__` fallback → Not relevant for cassandra-driver
+
+The change makes path 2 the default for all CassandraDriver queries.
+
+### 13C.5 Benchmark Results Post-Merge
+
+> 🔲 **Pending**: Will be filled in once PR #113 is merged and the benchmark workflow runs on master.
+>
+> The benchmark workflow auto-pushes to `gh-pages` on every `master` push, so results will
+> be visible at `https://fruch.github.io/coodie/benchmarks/scylla/` after merge.
+
+---
+
 ## 14. Notes
 
 - coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for

@@ -115,7 +115,7 @@ jobs:
           echo "PR #${{ steps.ctx.outputs.pr_number }} is ${{ steps.pr.outputs.state }}, not open."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.pr.outputs.head_ref }}
           fetch-depth: 0

@@ -26,6 +26,7 @@ seeds sample data, and launches the app.
 | Demo | Framework | Features Shown | Directory |
 |---|---|---|---|
 | 🛒 Product Catalog | FastAPI + HTMX | Async CRUD, secondary indexes, clustering order, Jinja2 templates, seed data | [`fastapi-catalog/`](fastapi-catalog/) |
+| 📝 Blog | Flask + Jinja2 | Sync CRUD, clustering keys (newest-first), secondary indexes, tags (list field), seed data | [`flask-blog/`](flask-blog/) |
 
 ## Shared Infrastructure
 

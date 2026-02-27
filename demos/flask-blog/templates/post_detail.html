@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>🧠 Post Details</h2>
+  <div class="post-full-title">{{ post.title }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Author <span>🧠 {{ post.author }}</span></div>
+    <div class="detail-meta-item">Category <span class="post-category">{{ post.category }}</span></div>
+    <div class="detail-meta-item">Published <span>{{ post.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</span></div>
+    <div class="detail-meta-item">Tags
+      <span>{% for tag in post.tags %}<span class="tag">{{ tag }}</span>{% endfor %}{% if not post.tags %}<span style="color:var(--dim)">none</span>{% endif %}</span>
+    </div>
+  </div>
+  {% if post.content %}
+  <div class="post-full-content">{{ post.content }}</div>
+  {% endif %}
+  <div class="post-id">POST-ID: {{ post.id }}</div>
+  <div style="margin-top:1rem;">
+    <form method="post" action="/posts/{{ post.id }}/delete" style="display:inline;">
+      <button class="btn btn-danger" onclick="return confirm('Erase this propaganda? This cannot be undone.')">✕ Delete Post</button>
+    </form>
+    <a href="/" class="btn btn-primary" style="margin-left:0.5rem;">← Back to Feed</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>📡 Comments ({{ comments|length }})</h2>
+  {% if comments %}
+    {% for c in comments %}
+    <div class="comment-item">
+      <div class="comment-header">
+        <span>
+          <span class="comment-author">{{ c.author }}</span>
+        </span>
+        <span>
+          <span class="comment-date">{{ c.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</span>
+          <form method="post" action="/posts/{{ c.post_id }}/comments/{{ c.created_at.isoformat() }}/delete" style="display:inline;">
+            <button class="btn btn-danger" onclick="return confirm('Redact this comment?')">✕</button>
+          </form>
+        </span>
+      </div>
+      {% if c.content %}<div class="comment-content">{{ c.content }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">No reader responses intercepted — post a comment below</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>✍️ Post a Comment</h2>
+  <form method="post" action="/posts/{{ post.id }}/comments">
+    <div class="form-row">
+      <div>
+        <label for="author">Callsign</label>
+        <input id="author" name="author" required placeholder="Captain Jinja">
+      </div>
+      <div></div>
+    </div>
+    <label for="content">Message</label>
+    <textarea id="content" name="content" required placeholder="Deploy your counter-propaganda here…"></textarea>
+    <button class="btn btn-primary" type="submit">📡 Transmit Comment</button>
+  </form>
+</div>
+
+{% endblock %}

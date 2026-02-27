@@ -424,19 +424,92 @@ async def test_cassandra_driver_execute_async(cassandra_driver, mock_cassandra_s
 
 
 async def test_cassandra_driver_sync_table_async(cassandra_driver, mock_cassandra_session):
-    """sync_table_async delegates to sync_table via run_in_executor."""
+    """sync_table_async uses native async callbacks — no run_in_executor."""
+    import asyncio
     from coodie.schema import ColumnDefinition
 
     cols = [
         ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
     ]
     SysRow = namedtuple("SysRow", ["column_name"])
-    mock_cassandra_session.execute.side_effect = [
-        None,  # CREATE TABLE
-        [SysRow(column_name="id")],  # system_schema
-    ]
+
+    # The CREATE TABLE call uses raw CQL via execute_async (not prepared)
+    # The introspection call also uses execute_async with params
+    call_count = 0
+
+    def fake_execute_async(stmt, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        future = MagicMock()
+
+        if call_count == 1:
+            # CREATE TABLE — returns None
+            result = None
+        else:
+            # system_schema introspection — returns rows
+            result = [SysRow(column_name="id")]
+
+        def add_callbacks(on_success, on_error):
+            loop = asyncio.get_event_loop()
+            loop.call_soon(on_success, result)
+
+        future.add_callbacks = add_callbacks
+        return future
+
+    mock_cassandra_session.execute_async.side_effect = fake_execute_async
     await cassandra_driver.sync_table_async("t", "test_ks", cols)
-    assert mock_cassandra_session.execute.call_count >= 1
+    assert mock_cassandra_session.execute_async.call_count >= 1
+
+
+async def test_cassandra_driver_execute_async_with_paging(cassandra_driver, mock_cassandra_session):
+    """execute_async delegates paginated queries to sync execute via run_in_executor."""
+    SysRow = namedtuple("SysRow", ["id", "name"])
+    result = MagicMock()
+    result.current_rows = [SysRow(id="1", name="Alice")]
+    result.paging_state = b"page-token"
+    result.__iter__ = MagicMock(return_value=iter([]))  # not used for paginated
+
+    mock_cassandra_session.execute.return_value = result
+    rows = await cassandra_driver.execute_async("SELECT * FROM test_ks.t", [], fetch_size=10)
+    assert rows == [{"id": "1", "name": "Alice"}]
+    assert cassandra_driver._last_paging_state == b"page-token"
+    # Verify fetch_size was set on the bound statement
+    prepared = mock_cassandra_session.prepare.return_value
+    assert prepared.bind.return_value.fetch_size == 10
+
+
+async def test_cassandra_driver_execute_async_with_paging_state(cassandra_driver, mock_cassandra_session):
+    """execute_async passes paging_state through to sync execute for paginated queries."""
+    SysRow = namedtuple("SysRow", ["id", "name"])
+    result = MagicMock()
+    result.current_rows = [SysRow(id="2", name="Bob")]
+    result.paging_state = None
+    result.__iter__ = MagicMock(return_value=iter([]))  # not used for paginated
+
+    mock_cassandra_session.execute.return_value = result
+    rows = await cassandra_driver.execute_async(
+        "SELECT * FROM test_ks.t", [], fetch_size=10, paging_state=b"prev-token"
+    )
+    assert rows == [{"id": "2", "name": "Bob"}]
+    assert cassandra_driver._last_paging_state is None
+    # Verify paging_state was passed to sync execute
+    call_kwargs = mock_cassandra_session.execute.call_args
+    assert call_kwargs.kwargs.get("paging_state") == b"prev-token"
+
+
+async def test_cassandra_driver_sync_table_async_cache_hit(cassandra_driver, mock_cassandra_session):
+    """sync_table_async returns [] on cache hit without any DB calls."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    # Pre-populate the cache
+    cassandra_driver._known_tables["test_ks.t"] = frozenset(["id"])
+    result = await cassandra_driver.sync_table_async("t", "test_ks", cols)
+    assert result == []
+    # No DB calls should have been made
+    mock_cassandra_session.execute_async.assert_not_called()
 
 
 async def test_cassandra_driver_close_async(cassandra_driver, mock_cassandra_session):
@@ -472,7 +545,13 @@ def acsylla_driver(mock_acsylla_session):
     with patch.dict("sys.modules", {"acsylla": MagicMock()}):
         from coodie.drivers.acsylla import AcsyllaDriver
 
-        return AcsyllaDriver(session=mock_acsylla_session, default_keyspace="test_ks")
+        driver = AcsyllaDriver(session=mock_acsylla_session, default_keyspace="test_ks")
+        try:
+            yield driver
+        finally:
+            # Stop the background event loop thread started by the driver
+            driver._bg_loop.call_soon_threadsafe(driver._bg_loop.stop)
+            driver._bg_thread.join(timeout=10)
 
 
 async def test_acsylla_driver_execute_async(acsylla_driver, mock_acsylla_session):
@@ -605,6 +684,87 @@ async def test_acsylla_driver_execute_async_with_paging_state(acsylla_driver, mo
     assert acsylla_driver._last_paging_state is None
 
     # Verify set_page_state was called on the statement
+    prepared = mock_acsylla_session.create_prepared.return_value
+    statement = prepared.bind.return_value
+    statement.set_page_state.assert_called_once_with(b"page-token")
+
+
+# ------------------------------------------------------------------
+# Sync bridge: execute(), sync_table(), close() via background loop
+# ------------------------------------------------------------------
+
+
+def test_acsylla_driver_sync_execute(acsylla_driver, mock_acsylla_session):
+    """execute() works from a non-async context via the background loop."""
+    rows = acsylla_driver.execute("SELECT * FROM test_ks.t", ["p1"])
+    assert rows == [{"id": "1", "name": "Alice"}]
+
+
+def test_acsylla_driver_sync_execute_from_running_loop(acsylla_driver, mock_acsylla_session):
+    """execute() works even when called from within a running event loop."""
+    import asyncio
+
+    async def call_sync_from_loop():
+        # run_in_executor ensures execute() is called from a thread while the
+        # current loop is still running — this would have raised RuntimeError
+        # with the old run_until_complete approach.
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, acsylla_driver.execute, "SELECT * FROM test_ks.t", ["p1"])
+
+    rows = asyncio.run(call_sync_from_loop())
+    assert rows == [{"id": "1", "name": "Alice"}]
+
+
+def test_acsylla_driver_sync_close(acsylla_driver, mock_acsylla_session):
+    """close() runs close_async() on the background loop and stops it."""
+    acsylla_driver.close()
+    mock_acsylla_session.close.assert_called_once()
+    # Background loop should be stopped and thread should have exited after close()
+    assert not acsylla_driver._bg_loop.is_running()
+    assert not acsylla_driver._bg_thread.is_alive()
+
+
+def test_acsylla_driver_sync_execute_with_fetch_size(acsylla_driver, mock_acsylla_session):
+    """Sync execute() with fetch_size correctly propagates _last_paging_state."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "1"}, {"id": "2"}]))
+    mock_result.has_more_pages.return_value = True
+    mock_result.page_state.return_value = b"next-page-token"
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
+
+    rows = acsylla_driver.execute("SELECT * FROM test_ks.t", [], fetch_size=2)
+
+    assert rows == [{"id": "1"}, {"id": "2"}]
+    # _last_paging_state must be readable from the calling thread after execute() returns
+    assert acsylla_driver._last_paging_state == b"next-page-token"
+
+    prepared = mock_acsylla_session.create_prepared.return_value
+    prepared.bind.assert_called_with([], page_size=2)
+
+
+def test_acsylla_driver_sync_execute_no_more_pages(acsylla_driver, mock_acsylla_session):
+    """Sync execute() clears _last_paging_state when there are no more pages."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "3"}]))
+    mock_result.has_more_pages.return_value = False
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
+
+    acsylla_driver.execute("SELECT * FROM test_ks.t", [], fetch_size=2)
+
+    assert acsylla_driver._last_paging_state is None
+
+
+def test_acsylla_driver_sync_execute_with_paging_state(acsylla_driver, mock_acsylla_session):
+    """Sync execute() passes paging_state to the statement (cursor-based pagination)."""
+    mock_result = MagicMock()
+    mock_result.__iter__ = MagicMock(return_value=iter([{"id": "4"}]))
+    mock_result.has_more_pages.return_value = False
+    mock_acsylla_session.execute = AsyncMock(return_value=mock_result)
+
+    rows = acsylla_driver.execute("SELECT * FROM test_ks.t", [], fetch_size=2, paging_state=b"page-token")
+
+    assert rows == [{"id": "4"}]
+    assert acsylla_driver._last_paging_state is None
     prepared = mock_acsylla_session.create_prepared.return_value
     statement = prepared.bind.return_value
     statement.set_page_state.assert_called_once_with(b"page-token")

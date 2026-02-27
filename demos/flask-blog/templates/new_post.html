@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>🧠 Publish New Post</h2>
+  <form method="post" action="/posts">
+    <label for="title">Title</label>
+    <input id="title" name="title" required placeholder="Why You Should Trust SCYLLA-9 With Your Memories">
+
+    <div class="form-row">
+      <div>
+        <label for="author">Author</label>
+        <input id="author" name="author" required placeholder="Captain Jinja">
+      </div>
+      <div>
+        <label for="category">Category</label>
+        <input id="category" name="category" required placeholder="counter-intel">
+      </div>
+    </div>
+
+    <label for="tags">Tags <span style="color:var(--dim)">(comma-separated)</span></label>
+    <input id="tags" name="tags" placeholder="truth, resistance, counter-propaganda">
+
+    <label for="content">Content</label>
+    <textarea id="content" name="content" rows="8" placeholder="Write your counter-propaganda here. Remember: every word fights Editor-X's influence…"></textarea>
+
+    <button class="btn btn-primary" type="submit">📝 Publish Post</button>
+    <a href="/" class="btn" style="margin-left:0.5rem;color:var(--muted);">Cancel</a>
+  </form>
+</div>
+
+{% endblock %}

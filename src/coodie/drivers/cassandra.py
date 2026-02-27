@@ -205,6 +205,20 @@ class CassandraDriver(AbstractDriver):
     # Asynchronous interface (asyncio bridge)
     # ------------------------------------------------------------------
 
+    def _wrap_future(self, driver_future: Any) -> asyncio.Future[Any]:
+        """Bridge a cassandra-driver ``ResponseFuture`` to an :mod:`asyncio` Future."""
+        loop = asyncio.get_running_loop()
+        result_future: asyncio.Future[Any] = loop.create_future()
+
+        def on_success(result: Any) -> None:
+            loop.call_soon_threadsafe(result_future.set_result, result)
+
+        def on_error(exc: Exception) -> None:
+            loop.call_soon_threadsafe(result_future.set_exception, exc)
+
+        driver_future.add_callbacks(on_success, on_error)
+        return result_future
+
     async def execute_async(
         self,
         stmt: str,
@@ -214,14 +228,13 @@ class CassandraDriver(AbstractDriver):
         fetch_size: int | None = None,
         paging_state: bytes | None = None,
     ) -> list[dict[str, Any]]:
-        loop = asyncio.get_event_loop()
         if fetch_size is not None:
             # Paginated queries: delegate to the sync execute() via
             # run_in_executor.  The cassandra-driver's async callback
-            # mechanism does not reliably expose paging_state on the
-            # ResultSet delivered to add_callbacks.  The sync path
-            # (session.execute) handles paging correctly and sets
-            # self._last_paging_state.
+            # mechanism delivers a plain list to add_callbacks, not a
+            # ResultSet, so current_rows / paging_state are unavailable.
+            # The sync path (session.execute) returns a proper ResultSet.
+            loop = asyncio.get_running_loop()
             return await loop.run_in_executor(
                 None,
                 lambda: self.execute(
@@ -243,19 +256,19 @@ class CassandraDriver(AbstractDriver):
         if timeout is not None:
             execute_kwargs["timeout"] = timeout
         future = self._session.execute_async(bound, **execute_kwargs)
-
-        result_future: asyncio.Future[Any] = loop.create_future()
-
-        def on_success(result: Any) -> None:
-            loop.call_soon_threadsafe(result_future.set_result, result)
-
-        def on_error(exc: Exception) -> None:
-            loop.call_soon_threadsafe(result_future.set_exception, exc)
-
-        future.add_callbacks(on_success, on_error)
-        result = await result_future
+        result = await self._wrap_future(future)
         self._last_paging_state = None
         return self._rows_to_dicts(result)
+
+    async def _execute_cql_async(self, cql: str) -> Any:
+        """Execute a raw CQL string asynchronously via the callback bridge."""
+        future = self._session.execute_async(cql)
+        return await self._wrap_future(future)
+
+    async def _execute_bound_async(self, cql: str, params: tuple[Any, ...]) -> Any:
+        """Execute a parameterised CQL string asynchronously via the callback bridge."""
+        future = self._session.execute_async(cql, params)
+        return await self._wrap_future(future)
 
     async def sync_table_async(
         self,
@@ -266,10 +279,116 @@ class CassandraDriver(AbstractDriver):
         dry_run: bool = False,
         drop_removed_indexes: bool = False,
     ) -> list[str]:
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, self.sync_table, table, keyspace, cols, table_options, dry_run, drop_removed_indexes
+        cache_key = f"{keyspace}.{table}"
+        col_names = frozenset(col.name for col in cols)
+        if not dry_run and not drop_removed_indexes and self._known_tables.get(cache_key) == col_names:
+            return []  # table already synced this session with same columns
+
+        from coodie.cql_builder import (
+            build_create_table,
+            build_create_index,
+            build_drop_index,
+            build_alter_table_options,
         )
+
+        planned: list[str] = []
+
+        # 1. CREATE TABLE IF NOT EXISTS
+        create_cql = build_create_table(table, keyspace, cols, table_options=table_options)
+        planned.append(create_cql)
+        if not dry_run:
+            await self._execute_cql_async(create_cql)
+
+        # 2. Introspect existing columns and add missing ones
+        existing = await self._get_existing_columns_async(table, keyspace)
+        model_col_names = {col.name for col in cols}
+        is_new_table = existing == model_col_names
+
+        if not is_new_table:
+            for col in cols:
+                if col.name not in existing:
+                    alter = f'ALTER TABLE {keyspace}.{table} ADD "{col.name}" {col.cql_type}'
+                    planned.append(alter)
+                    if not dry_run:
+                        await self._execute_cql_async(alter)
+
+        # 3. Schema drift detection — warn on DB columns not in model
+        drift_cols = existing - model_col_names
+        if drift_cols:
+            import logging
+
+            logger = logging.getLogger("coodie")
+            logger.warning(
+                "Schema drift detected: columns %s exist in %s.%s but are not defined in the model",
+                drift_cols,
+                keyspace,
+                table,
+            )
+
+        # 4. Table option changes
+        if table_options:
+            current_options = await self._get_current_table_options_async(table, keyspace)
+            changed = {}
+            for k, v in table_options.items():
+                if str(current_options.get(k)) != str(v):
+                    changed[k] = v
+            if changed:
+                alter_cql = build_alter_table_options(table, keyspace, changed)
+                planned.append(alter_cql)
+                if not dry_run:
+                    await self._execute_cql_async(alter_cql)
+
+        # 5. Create secondary indexes
+        model_indexes: dict[str, Any] = {}
+        for col in cols:
+            if col.index:
+                idx_name = col.index_name or f"{table}_{col.name}_idx"
+                model_indexes[idx_name] = col
+                index_cql = build_create_index(table, keyspace, col)
+                planned.append(index_cql)
+                if not dry_run:
+                    await self._execute_cql_async(index_cql)
+
+        # 6. Drop removed indexes
+        if drop_removed_indexes:
+            existing_indexes = await self._get_existing_indexes_async(table, keyspace)
+            for idx_name in existing_indexes:
+                if idx_name not in model_indexes:
+                    drop_cql = build_drop_index(idx_name, keyspace)
+                    planned.append(drop_cql)
+                    if not dry_run:
+                        await self._execute_cql_async(drop_cql)
+
+        if not dry_run:
+            self._known_tables[cache_key] = col_names
+
+        return planned
+
+    async def _get_existing_columns_async(self, table: str, keyspace: str) -> set[str]:
+        rows = await self._execute_bound_async(
+            "SELECT column_name FROM system_schema.columns WHERE keyspace_name = %s AND table_name = %s",
+            (keyspace, table),
+        )
+        return {r["column_name"] for r in self._rows_to_dicts(rows)}
+
+    async def _get_current_table_options_async(self, table: str, keyspace: str) -> dict[str, Any]:
+        """Introspect current table options from ``system_schema.tables``."""
+        rows = await self._execute_bound_async(
+            "SELECT * FROM system_schema.tables WHERE keyspace_name = %s AND table_name = %s",
+            (keyspace, table),
+        )
+        dicts = self._rows_to_dicts(rows)
+        if dicts:
+            return dicts[0]
+        return {}
+
+    async def _get_existing_indexes_async(self, table: str, keyspace: str) -> set[str]:
+        """Introspect existing index names from ``system_schema.indexes``."""
+        rows = await self._execute_bound_async(
+            "SELECT index_name FROM system_schema.indexes WHERE keyspace_name = %s AND table_name = %s",
+            (keyspace, table),
+        )
+        return {r["index_name"] for r in self._rows_to_dicts(rows)}
 
     async def close_async(self) -> None:
         self.close()

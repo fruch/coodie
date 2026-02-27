@@ -26,11 +26,14 @@
 
 ---
 
+<!-- start-tagline -->
 Define your data models as Python classes, and coodie handles schema synchronization,
 serialization, and query building — with both **sync** and **async** APIs.
+<!-- end-tagline -->
 
 ## ✨ Feature Highlights
 
+<!-- start-features -->
 <table>
 <tr>
 <td width="50%">
@@ -49,9 +52,11 @@ serialization, and query building — with both **sync** and **async** APIs.
 </td>
 </tr>
 </table>
+<!-- end-features -->
 
 ## 🔍 How Does coodie Compare?
 
+<!-- start-comparison -->
 | Feature | **coodie** | **beanie** | **cqlengine** |
 |---|:---:|:---:|:---:|
 | **Database** | Cassandra / ScyllaDB | MongoDB | Cassandra |
@@ -69,9 +74,11 @@ serialization, and query building — with both **sync** and **async** APIs.
 | **Multiple Drivers** | ✅ 3 drivers | motor only | cassandra-driver only |
 | **Polymorphic Models** | ✅ `Discriminator` | ❌ | ❌ |
 | **Python Version** | 3.10+ | 3.8+ | 3.6+ |
+<!-- end-comparison -->
 
 ## 📦 Installation
 
+<!-- start-installation -->
 ```bash
 pip install coodie
 ```
@@ -83,9 +90,11 @@ pip install "coodie[scylla]"      # ScyllaDB / Cassandra (recommended)
 pip install "coodie[cassandra]"   # Cassandra via cassandra-driver
 pip install "coodie[acsylla]"     # Async-native via acsylla
 ```
+<!-- end-installation -->
 
 ## 🚀 Quick Start
 
+<!-- start-quickstart -->
 **1. Start a local ScyllaDB** (or use an existing cluster):
 
 ```bash
@@ -134,6 +143,7 @@ print(User.find(name="Alice").allow_filtering().all())
 ```
 
 > 💡 **Async?** Just swap `coodie.sync` for `coodie.aio` and add `await` — that's it!
+<!-- end-quickstart -->
 
 ## 📖 Usage
 

@@ -30,6 +30,7 @@ from coodie.schema import (
     _find_discriminator_column,
     _get_discriminator_value,
     _insert_columns,
+    _pk_columns,
     _resolve_polymorphic_base,
 )
 from coodie.sync.query import QuerySet, _snake_case
@@ -228,9 +229,8 @@ class Document(BaseModel):
         When *if_exists* is ``True`` the generated CQL includes ``IF EXISTS``
         and a :class:`~coodie.results.LWTResult` is returned.
         """
-        schema = self.__class__._schema()
-        pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
-        where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
+        pk_names = _pk_columns(self.__class__)
+        where = [(c, "=", getattr(self, c)) for c in pk_names]
         cql, params = build_delete(
             self.__class__._get_table(),
             self.__class__._get_keyspace(),
@@ -270,9 +270,8 @@ class Document(BaseModel):
         if not set_data and not collection_ops:
             return None
 
-        schema = self.__class__._schema()
-        pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
-        where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
+        pk_names = _pk_columns(self.__class__)
+        where = [(c, "=", getattr(self, c)) for c in pk_names]
 
         cql, params = build_update(
             self.__class__._get_table(),
@@ -362,9 +361,8 @@ class CounterDocument(Document):
 
     def _counter_update(self, deltas: dict[str, int]) -> None:
         """Execute a counter UPDATE with the given deltas."""
-        schema = self.__class__._schema()
-        pk_cols = [c for c in schema if c.primary_key or c.clustering_key]
-        where = [(c.name, "=", getattr(self, c.name)) for c in pk_cols]
+        pk_names = _pk_columns(self.__class__)
+        where = [(c, "=", getattr(self, c)) for c in pk_names]
         cql, params = build_counter_update(
             self.__class__._get_table(),
             self.__class__._get_keyspace(),

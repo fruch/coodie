@@ -309,6 +309,35 @@ docs = ["sphinx", "myst-parser"]
 
 Install with: `uv sync --group dev --group test`
 
+## Pre-commit Workflow
+
+> **Always** set up and run pre-commit hooks before touching code. Forgetting
+> this is the most common cause of "lint failed on CI but passed locally".
+
+### Setup (once per clone)
+
+```bash
+# Install the git hooks so they run automatically on every commit
+uv run pre-commit install
+# — or, if the project uses prek instead —
+prek install
+```
+
+### Before every commit
+
+```bash
+# Run all hooks against every tracked file and fix auto-fixable issues
+uv run pre-commit run --all-files
+# Re-stage any files that were auto-fixed, then commit
+```
+
+### Agent checklist
+
+When making code changes in this repository:
+
+- [ ] `pre-commit install` has been run in this clone (git hooks are active)
+- [ ] `pre-commit run --all-files` passes with no failures before using **report_progress**
+
 ## Best Practices Checklist
 
 - [ ] Use `src/` layout for packages

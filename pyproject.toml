@@ -91,6 +91,7 @@ asyncio_default_fixture_loop_scope = "session"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m not integration')",
     "benchmark: marks tests as benchmark tests (enable with --benchmark-enable)",
+    "ssl: marks tests that require an SSL-enabled ScyllaDB container",
 ]
 python_files = ["test_*.py", "bench_*.py"]
 pythonpath = ["src"]

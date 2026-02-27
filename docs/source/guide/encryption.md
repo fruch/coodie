@@ -1,16 +1,17 @@
 # Client Encryption (SSL/TLS)
 
 coodie supports SSL/TLS encryption for connections to Cassandra and ScyllaDB
-through the underlying driver.  No special coodie configuration is needed —
-pass SSL options as keyword arguments to `init_coodie()` and they flow directly
-to the driver.
+through the underlying driver.  `init_coodie()` and `init_coodie_async()` expose
+first-class keyword arguments for SSL configuration so that IDEs and type
+checkers surface them.  Any extra keyword arguments are still forwarded to the
+underlying driver for full flexibility.
 
 ---
 
 ## CassandraDriver (scylla-driver / cassandra-driver)
 
-SSL is configured via Python's standard `ssl.SSLContext`, which is passed to the
-underlying `cassandra.cluster.Cluster` constructor.
+SSL is configured via Python's standard `ssl.SSLContext`, passed as the
+`ssl_context` keyword argument to `init_coodie()`.
 
 ### Disable server certificate verification (development only)
 
@@ -120,13 +121,20 @@ init_coodie(session=session, keyspace="my_ks")
 
 ## AcsyllaDriver
 
-`acsylla` takes SSL configuration as keyword arguments to
-`acsylla.create_cluster()`.  Pass them through `init_coodie_async()`:
+`acsylla` takes SSL configuration as keyword arguments.  `init_coodie_async()`
+(aliased as `coodie.aio.init_coodie()`) exposes these as first-class parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ssl_enabled` | `bool` | Enable TLS for the connection |
+| `ssl_trusted_cert` | `str` | PEM-encoded CA certificate |
+| `ssl_cert` | `str` | PEM-encoded client certificate (mutual TLS) |
+| `ssl_private_key` | `str` | PEM-encoded client private key (mutual TLS) |
+| `ssl_verify_flags` | `int` | Verification flags (e.g. `CASS_SSL_VERIFY_NONE`) |
 
 ### Disable certificate verification (development only)
 
 ```python
-import acsylla
 from coodie.aio import init_coodie
 
 await init_coodie(
@@ -134,7 +142,7 @@ await init_coodie(
     keyspace="my_ks",
     driver_type="acsylla",
     ssl_enabled=True,
-    ssl_verify_flags=acsylla.CassSSLVerifyFlags.CASS_SSL_VERIFY_NONE,
+    ssl_verify_flags=0,  # CASS_SSL_VERIFY_NONE
 )
 ```
 

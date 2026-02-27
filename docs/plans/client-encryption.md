@@ -34,31 +34,27 @@ Legend:
 
 | Feature | coodie Equivalent | Status |
 |---|---|---|
-| Pass `ssl_context` to `Cluster()` | `init_coodie(ssl_context=...)` via `**kwargs` | ✅ |
+| Pass `ssl_context` to `Cluster()` | `init_coodie(ssl_context=...)` — first-class parameter | ✅ |
 | Pass `ssl_options` to `Cluster()` | `init_coodie(ssl_options=...)` via `**kwargs` | ✅ |
 | Bring-your-own SSL session (BYOS) | `init_coodie(session=pre_ssl_session)` | ✅ |
-| Mutual TLS (client cert authentication) | SSL context with `load_cert_chain()` passed via `**kwargs` | ✅ |
-| Documentation for SSL configuration | — | ❌ |
-| Integration tests for SSL connections | — | ❌ |
+| Mutual TLS (client cert authentication) | SSL context with `load_cert_chain()` | ✅ |
+| Documentation for SSL configuration | `docs/source/guide/encryption.md` | ✅ |
+| Integration tests for SSL connections | `tests/integration/test_encryption.py` | ✅ |
 
-**Gap summary — CassandraDriver:**
-- Documentation → add `docs/source/guide/encryption.md` with SSL examples
-- Integration tests → add `tests/integration/test_encryption.py`
+**Gap summary — CassandraDriver:** All gaps closed ✅
 
 ### 1.2 AcsyllaDriver
 
 | Feature | coodie Equivalent | Status |
 |---|---|---|
-| Pass `ssl_enabled=True` to `acsylla.create_cluster()` | `init_coodie_async(ssl_enabled=True)` via `**kwargs` | ✅ |
-| Pass PEM cert strings to `create_cluster()` | `init_coodie_async(ssl_trusted_cert=pem_str)` via `**kwargs` | ✅ |
-| Configure SSL verify flags | `init_coodie_async(ssl_verify_flags=...)` via `**kwargs` | ✅ |
+| Pass `ssl_enabled=True` to `acsylla.create_cluster()` | `init_coodie_async(ssl_enabled=True)` — first-class parameter | ✅ |
+| Pass PEM cert strings to `create_cluster()` | `init_coodie_async(ssl_trusted_cert=pem_str)` — first-class parameter | ✅ |
+| Configure SSL verify flags | `init_coodie_async(ssl_verify_flags=...)` — first-class parameter | ✅ |
 | Bring-your-own SSL session (BYOS) | `init_coodie_async(session=pre_ssl_session)` | ✅ |
-| Documentation for SSL configuration | — | ❌ |
-| Integration tests for SSL connections | — | ❌ |
+| Documentation for SSL configuration | `docs/source/guide/encryption.md` | ✅ |
+| Integration tests for SSL connections | `tests/integration/test_encryption.py` | ✅ |
 
-**Gap summary — AcsyllaDriver:**
-- Documentation → add acsylla SSL section to `docs/source/guide/encryption.md`
-- Integration tests → add async SSL tests to `tests/integration/test_encryption.py`
+**Gap summary — AcsyllaDriver:** All gaps closed ✅
 
 ### 1.3 init_coodie() / init_coodie_async()
 
@@ -66,12 +62,13 @@ Legend:
 |---|---|---|
 | `**kwargs` forwarded to `Cluster()` | ✅ | `ssl_context`, `ssl_options`, etc. work today |
 | `**kwargs` forwarded to `acsylla.create_cluster()` | ✅ | `ssl_enabled`, `ssl_trusted_cert`, etc. work today |
-| Explicit `ssl_context` parameter | ❌ | Discoverable via `**kwargs` but not in signature |
+| Explicit `ssl_context` parameter | ✅ | First-class kwarg on `init_coodie()` |
+| Explicit acsylla SSL parameters | ✅ | `ssl_enabled`, `ssl_trusted_cert`, `ssl_cert`, `ssl_private_key`, `ssl_verify_flags` on `init_coodie_async()` |
 | SSL validation / helpful error messages | ❌ | Bad SSL config surfaces as a raw driver exception |
 
 **Gap summary — init_coodie():**
-- Explicit parameter → keep as `**kwargs` for now (avoids driver-specific API leaking into coodie's surface); document the kwargs instead
-- Error messages → out of scope for this phase
+- Explicit parameter → ✅ `ssl_context` is now a first-class kwarg on `init_coodie()`; acsylla SSL params on `init_coodie_async()`
+- Error messages → out of scope for this plan
 
 ---
 
@@ -88,29 +85,29 @@ Legend:
 | 1.3 | Add `guide/encryption` to the toctree in `docs/source/index.md` | ✅ |
 | 1.4 | Link the encryption guide from `docs/source/guide/drivers.md` | ✅ |
 
-### Phase 2: Integration Tests (Priority: High)
+### Phase 2: Integration Tests (Priority: High) ✅
 
 **Goal:** Verify that SSL connections actually work against a real ScyllaDB instance.
 
-| Task | Description |
-|---|---|
-| 2.1 | Add `ssl_certs` session fixture that generates a self-signed CA + server cert using `cryptography`; skip if `cryptography` is not installed |
-| 2.2 | Add `scylla_ssl_container` fixture that mounts certs and a custom `scylla.yaml` with `client_encryption_options.enabled: true` |
-| 2.3 | Write `TestSSLCassandraDriver` — sync + async tests verifying `init_coodie(ssl_context=...)` works |
-| 2.4 | Write `TestSSLAcsyllaDriver` — async test verifying `init_coodie_async(ssl_enabled=True, ssl_trusted_cert=...)` works |
-| 2.5 | Mark all SSL tests with `@pytest.mark.integration` and add a `ssl` sub-mark |
+| Task | Description | Status |
+|---|---|---|
+| 2.1 | Add `ssl_certs` session fixture that generates a self-signed CA + server cert using `cryptography`; skip if `cryptography` is not installed | ✅ |
+| 2.2 | Add `scylla_ssl_container` fixture that mounts certs and a custom `scylla.yaml` with `client_encryption_options.enabled: true` | ✅ |
+| 2.3 | Write `TestSSLCassandraDriver` — sync + async tests verifying `init_coodie(ssl_context=...)` works | ✅ |
+| 2.4 | Write `TestSSLAcsyllaDriver` — async test verifying `init_coodie_async(ssl_enabled=True, ssl_trusted_cert=...)` works | ✅ |
+| 2.5 | Mark all SSL tests with `@pytest.mark.integration` and add a `ssl` sub-mark | ✅ |
 
-### Phase 3: Explicit ssl_context Parameter (Priority: Low)
+### Phase 3: Explicit ssl_context Parameter (Priority: Low) ✅
 
 **Goal:** Make `ssl_context` a first-class keyword argument on `init_coodie()` so IDEs and type checkers surface it.
 
-| Task | Description |
-|---|---|
-| 3.1 | Add `ssl_context: ssl.SSLContext \| None = None` to `init_coodie()` signature; pass it into `Cluster()` |
-| 3.2 | Add `ssl_enabled`, `ssl_trusted_cert`, `ssl_cert`, `ssl_private_key`, `ssl_verify_flags` to `init_coodie_async()` for acsylla |
-| 3.3 | Add type stubs / overloads so mypy doesn't complain |
-| 3.4 | Unit tests verifying the new parameters reach the driver |
-| 3.5 | Update `docs/source/guide/encryption.md` to use the new explicit API |
+| Task | Description | Status |
+|---|---|---|
+| 3.1 | Add `ssl_context: ssl.SSLContext \| None = None` to `init_coodie()` signature; pass it into `Cluster()` | ✅ |
+| 3.2 | Add `ssl_enabled`, `ssl_trusted_cert`, `ssl_cert`, `ssl_private_key`, `ssl_verify_flags` to `init_coodie_async()` for acsylla | ✅ |
+| 3.3 | Add type stubs / overloads so mypy doesn't complain | ✅ |
+| 3.4 | Unit tests verifying the new parameters reach the driver | ✅ |
+| 3.5 | Update `docs/source/guide/encryption.md` to use the new explicit API | ✅ |
 
 ---
 

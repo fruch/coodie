@@ -26,6 +26,7 @@
    - [6.1 Trigger & Permissions](#61-trigger--permissions)
    - [6.2 Step-by-Step Pseudocode](#62-step-by-step-pseudocode)
    - [6.3 Draft Workflow YAML](#63-draft-workflow-yaml)
+   - [6.4 Manual Dispatch & Testing](#64-manual-dispatch--testing)
 7. [Security Considerations](#7-security-considerations)
 8. [Test Plan](#8-test-plan)
 9. [References](#9-references)
@@ -165,15 +166,16 @@ identifies the next phase.
 
 | Task | Description | Status |
 |---|---|---|
-| 3.1 | Create `.github/workflows/plan-continuation.yml` with `pull_request: types: [closed]` trigger | ❌ |
-| 3.2 | Add merge guard: `if: github.event.pull_request.merged == true` | ❌ |
+| 3.1 | Create `.github/workflows/plan-continuation.yml` with `pull_request: types: [closed]` and `workflow_dispatch` triggers | ❌ |
+| 3.2 | Add merge guard: run if manually dispatched OR if the PR was actually merged | ❌ |
 | 3.3 | **Bootstrap detection:** Use GitHub API to list PR changed files and find any `docs/plans/*.md` additions/modifications — this starts Phase 1 when a plan is first merged | ❌ |
 | 3.4 | Extract plan reference from PR body (`Plan: docs/plans/<name>.md`) and optionally from branch name (for subsequent phase PRs) | ❌ |
 | 3.5 | Merge detected plan files: combine plans found via changed files (3.3) and PR body/branch (3.4), deduplicate | ❌ |
-| 3.6 | Checkout the repo and run `parse-plan.py` on each detected plan file | ❌ |
-| 3.7 | Determine which phase was completed (from `Phase: N` in PR body, or infer from latest ✅ phase; for bootstrap PRs, no completed phase — start at Phase 1) | ❌ |
-| 3.8 | Identify next incomplete phase from parser output | ❌ |
-| 3.9 | If no plan reference found and no plan files in changed files, exit silently (success, no-op) | ❌ |
+| 3.6 | Handle `workflow_dispatch` inputs: use `inputs.plan_file` and `inputs.phase` directly, bypassing PR detection | ❌ |
+| 3.7 | Checkout the repo and run `parse-plan.py` on each detected plan file | ❌ |
+| 3.8 | Determine which phase was completed (from `Phase: N` in PR body, `inputs.phase`, or infer from latest ✅ phase; for bootstrap PRs, no completed phase — start at Phase 1) | ❌ |
+| 3.9 | Identify next incomplete phase from parser output | ❌ |
+| 3.10 | If no plan reference found and no plan files in changed files, exit silently (success, no-op) | ❌ |
 
 ### Phase 4: Copilot CLI Delegation (Priority: High)
 
@@ -263,11 +265,25 @@ on:
   pull_request:
     types: [closed]
     branches: [master]
+
+  workflow_dispatch:
+    inputs:
+      plan_file:
+        description: "Path to plan file (e.g. docs/plans/udt-support.md)"
+        required: true
+        type: string
+      phase:
+        description: "Completed phase number (or 'auto' to detect from plan)"
+        required: false
+        default: "auto"
+        type: string
 ```
 
 The workflow runs on every PR close targeting master, but immediately exits
 if the PR was not merged (`github.event.pull_request.merged != true`) or
-has no plan reference.
+has no plan reference. It can also be dispatched manually via `workflow_dispatch`
+for testing — in that mode, the plan file and optional phase number are provided
+as inputs, bypassing PR detection entirely (see [§6.4](#64-manual-dispatch--testing)).
 
 **Required permissions:**
 
@@ -279,23 +295,25 @@ has no plan reference.
 ### 6.2 Step-by-Step Pseudocode
 
 ```
-1.  Trigger: pull_request closed (targeting master)
-2.  Guard: was the PR actually merged? (github.event.pull_request.merged)
-3.  Guard: does the PR have `skip-continuation` label? → exit
-4.  **Bootstrap detection:** List PR changed files via GitHub API; collect any
+1.  Trigger: pull_request closed (targeting master) OR workflow_dispatch
+2.  If workflow_dispatch → use inputs.plan_file and inputs.phase directly (skip steps 2-7)
+3.  Guard: was the PR actually merged? (github.event.pull_request.merged)
+4.  Guard: does the PR have `skip-continuation` label? → exit
+5.  **Bootstrap detection:** List PR changed files via GitHub API; collect any
     docs/plans/*.md files that were added or modified
-5.  Extract plan reference from PR body (regex: Plan: docs/plans/<name>.md)
-6.  Fallback: extract from branch name (plan/<name>/phase-N)
-7.  Merge results: combine plans from steps 4-6, deduplicate
-8.  If no plan files found → exit silently (success)
-9.  Checkout repository at merge commit
-10. For each detected plan file:
+6.  Extract plan reference from PR body (regex: Plan: docs/plans/<name>.md)
+7.  Fallback: extract from branch name (plan/<name>/phase-N)
+8.  Merge results: combine plans from steps 5-7, deduplicate
+9.  If no plan files found → exit silently (success)
+10. Checkout repository at merge commit
+11. For each detected plan file:
       a. Run parse-plan.py on the plan file
       b. If plan file not found → post warning comment, continue
       c. Parse JSON output: list of phases with status
       d. Determine completed phase:
            - From PR body "Phase: N" if present
            - For bootstrap PRs (plan file in changed files): none completed yet
+           - For workflow_dispatch: inputs.phase (or "auto")
            - Otherwise: latest phase marked complete in the plan
       e. Find next incomplete phase (first phase that is not ✅)
       f. If no next phase → post "all phases complete" comment, continue
@@ -303,8 +321,8 @@ has no plan reference.
            "Continue to phase N of plan docs/plans/<name>.md.
             Phase goal: <goal>. Tasks: <task table>"
       h. Invoke Copilot CLI with the delegation prompt
-11. Post comment on merged PR with delegation summary
-12. Log summary to $GITHUB_STEP_SUMMARY
+12. Post comment on merged PR with delegation summary (skip if workflow_dispatch)
+13. Log summary to $GITHUB_STEP_SUMMARY
 ```
 
 ### 6.3 Draft Workflow YAML
@@ -318,22 +336,49 @@ on:
     types: [closed]
     branches: [master]
 
+  # Manual dispatch for testing — provide plan file path and optional phase.
+  workflow_dispatch:
+    inputs:
+      plan_file:
+        description: "Path to plan file (e.g. docs/plans/udt-support.md)"
+        required: true
+        type: string
+      phase:
+        description: "Completed phase number (or 'auto' to detect from plan)"
+        required: false
+        default: "auto"
+        type: string
+
 concurrency:
-  group: plan-continuation-${{ github.event.pull_request.number }}
+  group: plan-continuation-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   continue-plan:
     name: Continue Plan Phase
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    # Run if: manually dispatched, OR PR was merged
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.merged == true
     permissions:
       contents: read
       pull-requests: write
 
     steps:
+      # ── 0. Handle manual dispatch (workflow_dispatch) ─────────
+      - name: Use workflow_dispatch inputs
+        if: github.event_name == 'workflow_dispatch'
+        id: dispatch
+        run: |
+          echo "plan_file=${{ inputs.plan_file }}" >> "$GITHUB_OUTPUT"
+          echo "phase=${{ inputs.phase }}" >> "$GITHUB_OUTPUT"
+          echo "has_plan=true" >> "$GITHUB_OUTPUT"
+          echo "📋 Manual dispatch: plan=${{ inputs.plan_file }}, phase=${{ inputs.phase }}"
+
       # ── 1. Detect plan files from PR changed files (bootstrap) ──
       - name: Detect plan files in PR changed files
+        if: github.event_name != 'workflow_dispatch'
         id: changed-plans
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -356,6 +401,7 @@ jobs:
 
       # ── 2. Extract plan reference from PR body/branch ─────────
       - name: Extract plan reference from PR
+        if: github.event_name != 'workflow_dispatch'
         id: plan-ref
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -392,26 +438,34 @@ jobs:
 
       # ── 3. Exit if no plan reference ─────────────────────────
       - name: Skip if no plan reference
-        if: steps.plan-ref.outputs.has_plan != 'true'
+        if: >-
+          steps.dispatch.outputs.has_plan != 'true' &&
+          steps.plan-ref.outputs.has_plan != 'true'
         run: echo "No plan reference found in PR — skipping."
 
       # ── 3. Checkout repo ─────────────────────────────────────
       - uses: actions/checkout@v4
-        if: steps.plan-ref.outputs.has_plan == 'true'
+        if: >-
+          steps.dispatch.outputs.has_plan == 'true' ||
+          steps.plan-ref.outputs.has_plan == 'true'
 
       # ── 4. Set up Python ─────────────────────────────────────
       - uses: actions/setup-python@v5
-        if: steps.plan-ref.outputs.has_plan == 'true'
+        if: >-
+          steps.dispatch.outputs.has_plan == 'true' ||
+          steps.plan-ref.outputs.has_plan == 'true'
         with:
           python-version: "3.12"
 
       # ── 5. Parse plan file ───────────────────────────────────
       - name: Parse plan and find next phase
-        if: steps.plan-ref.outputs.has_plan == 'true'
+        if: >-
+          steps.dispatch.outputs.has_plan == 'true' ||
+          steps.plan-ref.outputs.has_plan == 'true'
         id: parse
         run: |
-          PLAN_FILE="${{ steps.plan-ref.outputs.plan_file }}"
-          COMPLETED_PHASE="${{ steps.plan-ref.outputs.phase }}"
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
+          COMPLETED_PHASE="${{ steps.dispatch.outputs.phase || steps.plan-ref.outputs.phase }}"
 
           if [ ! -f "$PLAN_FILE" ]; then
             echo "plan_exists=false" >> "$GITHUB_OUTPUT"
@@ -435,15 +489,21 @@ jobs:
       # ── 6. Handle missing plan file ──────────────────────────
       - name: Warn if plan file not found
         if: >-
-          steps.plan-ref.outputs.has_plan == 'true' &&
+          (steps.dispatch.outputs.has_plan == 'true' || steps.plan-ref.outputs.has_plan == 'true') &&
           steps.parse.outputs.plan_exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PLAN_FILE="${{ steps.plan-ref.outputs.plan_file }}"
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body "⚠️ **Plan file not found:** \`${PLAN_FILE}\` referenced in this PR does not exist."
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
+          echo "⚠️ Plan file not found: ${PLAN_FILE}"
+          echo "### ⚠️ Plan File Not Found" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${PLAN_FILE}\` does not exist in the repository." >> "$GITHUB_STEP_SUMMARY"
+          # Post PR comment only when triggered by a PR (not manual dispatch)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" \
+              --repo "${{ github.repository }}" \
+              --body "⚠️ **Plan file not found:** \`${PLAN_FILE}\` referenced in this PR does not exist."
+          fi
 
       # ── 7. All phases complete ───────────────────────────────
       - name: Celebrate completion
@@ -453,10 +513,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PLAN_FILE="${{ steps.plan-ref.outputs.plan_file }}"
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body "🎉 **All phases complete!** Every phase in [\`${PLAN_FILE}\`](${PLAN_FILE}) is now marked as done. Great work!"
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
+          echo "🎉 All phases of ${PLAN_FILE} are complete!"
+          echo "### 🎉 All Phases Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "Every phase in \`${PLAN_FILE}\` is now marked as done." >> "$GITHUB_STEP_SUMMARY"
+          # Post PR comment only when triggered by a PR (not manual dispatch)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" \
+              --repo "${{ github.repository }}" \
+              --body "🎉 **All phases complete!** Every phase in [\`${PLAN_FILE}\`](${PLAN_FILE}) is now marked as done. Great work!"
+          fi
 
       # ── 8. Delegate next phase via Copilot CLI ───────────────
       - name: Delegate next phase to Copilot
@@ -468,7 +534,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
-          PLAN_FILE="${{ steps.plan-ref.outputs.plan_file }}"
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
           PHASE="${{ steps.parse.outputs.next_phase_number }}"
           TITLE="${{ steps.parse.outputs.next_phase_title }}"
           PLAN_NAME=$(basename "$PLAN_FILE" .md)
@@ -497,18 +563,24 @@ jobs:
           # Fallback: if Copilot CLI failed or is unavailable, post a comment
           # with the prompt so a developer can pick it up manually.
           if [ "$EXIT_CODE" -ne 0 ] || [ -z "$RESPONSE" ]; then
-            gh pr comment "${PR_NUMBER}" \
-              --repo "${{ github.repository }}" \
-              --body "🔄 **Next phase ready:** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}).
+            echo "⚠️ Copilot CLI not available (exit code: ${EXIT_CODE})"
+            # Post PR comment only when triggered by a PR (not manual dispatch)
+            if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${PR_NUMBER}" ]; then
+              gh pr comment "${PR_NUMBER}" \
+                --repo "${{ github.repository }}" \
+                --body "🔄 **Next phase ready:** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}).
 
           Copilot CLI was not available (exit code: ${EXIT_CODE}). Run manually:
           \`\`\`
           copilot -p \"Continue to phase ${PHASE} of plan ${PLAN_FILE}\"
           \`\`\`"
+            fi
           else
-            gh pr comment "${PR_NUMBER}" \
-              --repo "${{ github.repository }}" \
-              --body "🔄 **Next phase delegated!** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}) has been sent to Copilot CLI."
+            if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${PR_NUMBER}" ]; then
+              gh pr comment "${PR_NUMBER}" \
+                --repo "${{ github.repository }}" \
+                --body "🔄 **Next phase delegated!** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}) has been sent to Copilot CLI."
+            fi
           fi
 
           # Step summary (truncate response to avoid verbose/sensitive output)
@@ -521,6 +593,64 @@ jobs:
             echo "- **Copilot CLI exit code:** ${EXIT_CODE}"
             echo "- **Status:** $( [ "$EXIT_CODE" -eq 0 ] && echo '✅ Delegated' || echo '⚠️ Fallback (manual prompt posted)')"
           } >> "$GITHUB_STEP_SUMMARY"
+```
+
+---
+
+### 6.4 Manual Dispatch & Testing
+
+The workflow includes a `workflow_dispatch` trigger so it can be run manually
+for testing without needing to merge a PR. This is useful for:
+
+- Verifying the parser works on a specific plan file
+- Testing the Copilot CLI delegation end-to-end
+- Re-running delegation for a plan that stalled
+- Debugging workflow behavior in a branch before merging
+
+#### Triggering via `gh` CLI
+
+```bash
+# Basic: run against a plan file (auto-detect next phase)
+gh workflow run plan-continuation.yml \
+  -f plan_file="docs/plans/udt-support.md"
+
+# Specify which phase was just completed (delegate phase 4 next)
+gh workflow run plan-continuation.yml \
+  -f plan_file="docs/plans/udt-support.md" \
+  -f phase="3"
+
+# Run on a specific branch (useful for testing before merge)
+gh workflow run plan-continuation.yml \
+  --ref my-feature-branch \
+  -f plan_file="docs/plans/performance-improvement.md"
+
+# Dry-run: check which phase would be next without delegation
+# (use phase=auto which is the default)
+gh workflow run plan-continuation.yml \
+  -f plan_file="docs/plans/documentation-plan.md" \
+  -f phase="auto"
+```
+
+#### Triggering via GitHub UI
+
+1. Go to **Actions** → **Plan Phase Continuation**
+2. Click **Run workflow**
+3. Fill in:
+   - **Plan file path:** e.g. `docs/plans/udt-support.md`
+   - **Completed phase:** a number or `auto` (default)
+4. Click **Run workflow**
+
+#### Monitoring the run
+
+```bash
+# Watch the latest run
+gh run watch
+
+# List recent runs of this workflow
+gh run list --workflow=plan-continuation.yml
+
+# View logs for a specific run
+gh run view <run-id> --log
 ```
 
 ---
@@ -576,6 +706,9 @@ Because this is a workflow, integration testing is primarily manual:
 | Copilot CLI unavailable | No `COPILOT_PAT` secret | Fallback: PR comment with manual prompt | 4 |
 | Branch name convention | Branch `plan/udt-support/phase-3` | Plan detected from branch name | 3 |
 | `skip-continuation` label | PR has the label | Workflow does not delegate | 5 |
+| **Manual dispatch:** `gh workflow run` with plan file | `gh workflow run -f plan_file=docs/plans/udt-support.md` | Workflow runs, parses plan, delegates next phase | 3, 4 |
+| **Manual dispatch:** with explicit phase | `gh workflow run -f plan_file=... -f phase=2` | Next phase after 2 is delegated | 3, 4 |
+| **Manual dispatch:** nonexistent plan file | `gh workflow run -f plan_file=docs/plans/nope.md` | Step summary shows warning | 5 |
 
 ### 8.3 Static Analysis
 

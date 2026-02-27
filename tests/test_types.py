@@ -105,10 +105,7 @@ def test_frozen_collection_with_index():
 
     assert python_type_to_cql_type_str(Annotated[list[str], Frozen(), Indexed()]) == "frozen<list<text>>"
     assert python_type_to_cql_type_str(Annotated[set[int], Frozen(), Indexed()]) == "frozen<set<int>>"
-    assert (
-        python_type_to_cql_type_str(Annotated[dict[str, int], Frozen(), Indexed()])
-        == "frozen<map<text, int>>"
-    )
+    assert python_type_to_cql_type_str(Annotated[dict[str, int], Frozen(), Indexed()]) == "frozen<map<text, int>>"
 
 
 def test_unsupported_type_raises():

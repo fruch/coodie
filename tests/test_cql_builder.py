@@ -465,6 +465,48 @@ def test_parse_update_kwargs_append_prepend():
     assert ("items", "prepend", ["a"]) in ops
 
 
+def test_parse_update_kwargs_map_update():
+    set_data, ops = parse_update_kwargs({"meta__update": {"k": "v"}})
+    assert set_data == {}
+    assert ("meta", "update", {"k": "v"}) in ops
+
+
+def test_build_update_map_update():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("meta", "update", {"k": "v"})],
+    )
+    assert '"meta" = "meta" + ?' in cql
+    assert params == [{"k": "v"}, "1"]
+
+
+def test_build_update_map_remove():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("meta", "remove", {"k"})],
+    )
+    assert '"meta" = "meta" - ?' in cql
+    assert params == [{"k"}, "1"]
+
+
+def test_build_update_list_remove():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("items", "remove", ["old"])],
+    )
+    assert '"items" = "items" - ?' in cql
+    assert params == [["old"], "1"]
+
+
 def test_build_update_with_if_conditions():
     cql, params = build_update(
         "products",

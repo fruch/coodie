@@ -17,6 +17,7 @@ from coodie.fields import (
     Discriminator,
     Indexed,
     PrimaryKey,
+    Static,
 )
 
 
@@ -42,6 +43,7 @@ def make_tagged_product(base_cls):
         price: float = 0.0
         tags: set[str] = set()
         items: list[str] = []
+        meta: dict[str, str] = {}
 
         class Settings:
             name = "tagged_products"
@@ -134,3 +136,17 @@ def make_vehicle_hierarchy(base_cls):
             __discriminator_value__ = "truck"
 
     return Vehicle, Truck
+
+
+def make_sensor_reading(base_cls):
+    class SensorReading(base_cls):
+        sensor_id: Annotated[str, PrimaryKey()]
+        reading_time: Annotated[str, ClusteringKey()]
+        sensor_name: Annotated[str, Static()] = ""
+        value: float = 0.0
+
+        class Settings:
+            name = "sensor_readings"
+            keyspace = "test_ks"
+
+    return SensorReading

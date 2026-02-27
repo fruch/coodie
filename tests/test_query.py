@@ -206,6 +206,36 @@ async def test_update_noop_when_empty(Item, queryset_cls, registered_mock_driver
     assert len(registered_mock_driver.executed) == 0
 
 
+async def test_update_map_update(document_cls, queryset_cls, registered_mock_driver):
+    class MapItem(document_cls):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+        meta: dict[str, str] = {}
+
+        class Settings:
+            name = "map_items"
+            keyspace = "test_ks"
+
+    await _maybe_await(queryset_cls(MapItem).filter(id=uuid4()).update, meta__update={"k": "v"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"meta" = "meta" + ?' in stmt
+    assert {"k": "v"} in params
+
+
+async def test_update_map_remove(document_cls, queryset_cls, registered_mock_driver):
+    class MapItem(document_cls):
+        id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+        meta: dict[str, str] = {}
+
+        class Settings:
+            name = "map_items2"
+            keyspace = "test_ks"
+
+    await _maybe_await(queryset_cls(MapItem).filter(id=uuid4()).update, meta__remove={"k"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"meta" = "meta" - ?' in stmt
+    assert {"k"} in params
+
+
 # ------------------------------------------------------------------
 # LWT chain methods
 # ------------------------------------------------------------------

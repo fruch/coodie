@@ -1,9 +1,10 @@
 # Plan Phase Continuation GitHub Action
 
 > **Goal:** Create a GitHub Actions workflow that detects when a merged PR
-> completes a phase of a multi-phase plan in `docs/plans/`, identifies the
-> next incomplete phase, and uses the Copilot CLI to directly delegate
-> execution of that phase — so that multi-phase plans advance continuously
+> introduces a new plan or completes a phase of an existing multi-phase plan
+> in `docs/plans/`, identifies the first incomplete phase, and uses the
+> Copilot CLI to directly delegate execution of that phase — so that
+> multi-phase plans start automatically on merge and advance continuously
 > without manual handoff or intermediate issues.
 
 ---
@@ -68,19 +69,26 @@ The repository already has patterns for post-merge automation:
 
 When a PR is merged to the default branch:
 
-1. The workflow checks if the PR references a plan file (via PR body, title,
-   or branch name convention)
-2. If a plan is referenced, the workflow reads and parses the plan file
-3. It identifies which phase was just completed and whether a next phase exists
-4. If a next incomplete phase is found, the workflow invokes the **Copilot CLI**
+1. The workflow checks if the PR **introduces or modifies a plan file** in
+   `docs/plans/` (by inspecting changed files), or **references** a plan file
+   (via PR body or branch name convention)
+2. If a plan is found, the workflow reads and parses the plan file
+3. It identifies the first incomplete phase — this could be Phase 1 if the PR
+   introduced the plan itself, or the next phase after the one just completed
+4. If an incomplete phase is found, the workflow invokes the **Copilot CLI**
    to directly delegate execution of that phase, with a prompt like:
    *"Continue to phase N of plan docs/plans/\<name\>.md"*
 
+**Key insight:** Merging a PR that introduces a new plan document is itself the
+trigger to start Phase 1. No separate "kick-off" step is needed — the workflow
+treats the plan PR merge the same as any phase-completing merge.
+
 | Scenario | Result |
 |---|---|
+| PR merged, introduces a new plan file | Copilot CLI delegates Phase 1 (bootstrap) |
 | PR merged, references plan, next phase exists | Copilot CLI delegates the next phase for implementation |
 | PR merged, references plan, all phases complete | Comment on PR: "🎉 All phases of \<plan\> are complete!" |
-| PR merged, no plan reference | No action taken |
+| PR merged, no plan reference and no plan files changed | No action taken |
 | PR merged, plan file not found | Warning comment on PR |
 | PR closed without merge | No action taken |
 
@@ -96,6 +104,7 @@ Legend:
 | Feature | Status | Notes |
 |---|---|---|
 | Detect PR merge event | 🔧 | `push` to master triggers exist; need `pull_request: closed` with merge check |
+| Detect plan files in PR changed files | ❌ | Need to inspect PR's changed files for `docs/plans/*.md` additions/modifications (bootstrap trigger) |
 | Parse plan reference from PR | ❌ | No convention for linking PRs to plans |
 | Read plan file from repo | 🔧 | `actions/checkout` already used in other workflows |
 | Parse plan markdown for phases | ❌ | Need to extract phase headers and status markers |
@@ -106,8 +115,10 @@ Legend:
 | Conventional plan-reference format | ❌ | Need a convention: `Plan: docs/plans/<name>.md` in PR body |
 
 **Gap summary — automation pipeline:**
+- Plan detection → inspect PR changed files for new/modified `docs/plans/*.md`
+  files (bootstrap: starts Phase 1 when a plan is first merged)
 - PR-to-plan linking → define a convention (`Plan: <path>` in PR body or
-  branch name `plan/<plan-name>/phase-N`)
+  branch name `plan/<plan-name>/phase-N`) for subsequent phase PRs
 - Plan parsing → shell script or Python script that reads markdown, extracts
   `### Phase N:` headers and their ✅/❌ status
 - Next-phase detection → find first phase header without ✅ in the header text
@@ -149,17 +160,20 @@ and phase.
 ### Phase 3: Core Workflow — Detect & Trigger (Priority: High)
 
 **Goal:** Create the GitHub Actions workflow that triggers on PR merge, detects
-plan references, parses the plan, and identifies the next phase.
+plan references (or new plan files in changed files), parses the plan, and
+identifies the next phase.
 
 | Task | Description | Status |
 |---|---|---|
 | 3.1 | Create `.github/workflows/plan-continuation.yml` with `pull_request: types: [closed]` trigger | ❌ |
 | 3.2 | Add merge guard: `if: github.event.pull_request.merged == true` | ❌ |
-| 3.3 | Extract plan reference from PR body (`Plan: docs/plans/<name>.md`) and optionally from branch name | ❌ |
-| 3.4 | Checkout the repo and run `parse-plan.py` on the referenced plan file | ❌ |
-| 3.5 | Determine which phase was completed (from `Phase: N` in PR body, or infer from latest ✅ phase) | ❌ |
-| 3.6 | Identify next incomplete phase from parser output | ❌ |
-| 3.7 | If no plan reference found, exit silently (success, no-op) | ❌ |
+| 3.3 | **Bootstrap detection:** Use GitHub API to list PR changed files and find any `docs/plans/*.md` additions/modifications — this starts Phase 1 when a plan is first merged | ❌ |
+| 3.4 | Extract plan reference from PR body (`Plan: docs/plans/<name>.md`) and optionally from branch name (for subsequent phase PRs) | ❌ |
+| 3.5 | Merge detected plan files: combine plans found via changed files (3.3) and PR body/branch (3.4), deduplicate | ❌ |
+| 3.6 | Checkout the repo and run `parse-plan.py` on each detected plan file | ❌ |
+| 3.7 | Determine which phase was completed (from `Phase: N` in PR body, or infer from latest ✅ phase; for bootstrap PRs, no completed phase — start at Phase 1) | ❌ |
+| 3.8 | Identify next incomplete phase from parser output | ❌ |
+| 3.9 | If no plan reference found and no plan files in changed files, exit silently (success, no-op) | ❌ |
 
 ### Phase 4: Copilot CLI Delegation (Priority: High)
 
@@ -268,24 +282,29 @@ has no plan reference.
 1.  Trigger: pull_request closed (targeting master)
 2.  Guard: was the PR actually merged? (github.event.pull_request.merged)
 3.  Guard: does the PR have `skip-continuation` label? → exit
-4.  Extract plan reference from PR body (regex: Plan: docs/plans/<name>.md)
-5.  Fallback: extract from branch name (plan/<name>/phase-N)
-6.  If no plan reference found → exit silently (success)
-7.  Checkout repository at merge commit
-8.  Run parse-plan.py on the referenced plan file
-9.  If plan file not found → post warning comment, exit
-10. Parse JSON output: list of phases with status
-11. Determine completed phase:
-      a. From PR body "Phase: N" if present
-      b. Otherwise: latest phase marked complete in the plan
-12. Find next incomplete phase (first phase after completed that is not ✅)
-13. If no next phase → post "all phases complete" comment, exit
-14. Construct delegation prompt:
-      "Continue to phase N of plan docs/plans/<name>.md.
-       Phase goal: <goal>. Tasks: <task table>"
-15. Invoke Copilot CLI with the delegation prompt
-16. Post comment on merged PR with delegation summary
-17. Log summary to $GITHUB_STEP_SUMMARY
+4.  **Bootstrap detection:** List PR changed files via GitHub API; collect any
+    docs/plans/*.md files that were added or modified
+5.  Extract plan reference from PR body (regex: Plan: docs/plans/<name>.md)
+6.  Fallback: extract from branch name (plan/<name>/phase-N)
+7.  Merge results: combine plans from steps 4-6, deduplicate
+8.  If no plan files found → exit silently (success)
+9.  Checkout repository at merge commit
+10. For each detected plan file:
+      a. Run parse-plan.py on the plan file
+      b. If plan file not found → post warning comment, continue
+      c. Parse JSON output: list of phases with status
+      d. Determine completed phase:
+           - From PR body "Phase: N" if present
+           - For bootstrap PRs (plan file in changed files): none completed yet
+           - Otherwise: latest phase marked complete in the plan
+      e. Find next incomplete phase (first phase that is not ✅)
+      f. If no next phase → post "all phases complete" comment, continue
+      g. Construct delegation prompt:
+           "Continue to phase N of plan docs/plans/<name>.md.
+            Phase goal: <goal>. Tasks: <task table>"
+      h. Invoke Copilot CLI with the delegation prompt
+11. Post comment on merged PR with delegation summary
+12. Log summary to $GITHUB_STEP_SUMMARY
 ```
 
 ### 6.3 Draft Workflow YAML
@@ -313,7 +332,29 @@ jobs:
       pull-requests: write
 
     steps:
-      # ── 1. Extract plan reference ────────────────────────────
+      # ── 1. Detect plan files from PR changed files (bootstrap) ──
+      - name: Detect plan files in PR changed files
+        id: changed-plans
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # List files changed in this PR and filter for docs/plans/*.md
+          CHANGED_PLANS=$(gh api \
+            "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --paginate --jq '.[].filename' \
+            | grep -E '^docs/plans/.*\.md$' || true)
+
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED_PLANS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "has_changed_plans=$( [ -n \"$CHANGED_PLANS\" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$CHANGED_PLANS" ]; then
+            echo "📄 Plan files found in PR changed files:"
+            echo "$CHANGED_PLANS"
+          fi
+
+      # ── 2. Extract plan reference from PR body/branch ─────────
       - name: Extract plan reference from PR
         id: plan-ref
         env:
@@ -337,11 +378,19 @@ jobs:
             PHASE=$(echo "$PR_BRANCH" | grep -oP '(?<=phase-)\d+' || true)
           fi
 
+          # Merge: combine PR body/branch plan with changed-files plans
+          CHANGED_PLANS="${{ steps.changed-plans.outputs.files }}"
+          ALL_PLANS=$(echo -e "${PLAN_FILE}\n${CHANGED_PLANS}" | grep -v '^$' | sort -u)
+
           echo "plan_file=${PLAN_FILE}" >> "$GITHUB_OUTPUT"
           echo "phase=${PHASE}" >> "$GITHUB_OUTPUT"
-          echo "has_plan=$( [ -n \"$PLAN_FILE\" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "all_plans<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$ALL_PLANS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          HAS_PLAN=$( [ -n "$ALL_PLANS" ] && echo true || echo false )
+          echo "has_plan=${HAS_PLAN}" >> "$GITHUB_OUTPUT"
 
-      # ── 2. Exit if no plan reference ─────────────────────────
+      # ── 3. Exit if no plan reference ─────────────────────────
       - name: Skip if no plan reference
         if: steps.plan-ref.outputs.has_plan != 'true'
         run: echo "No plan reference found in PR — skipping."
@@ -517,9 +566,11 @@ Because this is a workflow, integration testing is primarily manual:
 
 | Test Case | Setup | Expected Result | Phase |
 |---|---|---|---|
+| **Bootstrap:** PR introduces a new plan file | PR adds `docs/plans/new-feature.md` with 3 phases | Copilot CLI delegates Phase 1 | 3, 4 |
+| **Bootstrap:** PR introduces plan, all phases already ✅ | PR adds fully-completed plan file | "All phases complete" comment | 3, 4 |
 | PR with plan reference, next phase exists | PR body contains `Plan: docs/plans/udt-support.md` | Copilot CLI invoked with next phase prompt | 3, 4 |
 | PR with plan reference, all phases done | PR body contains `Plan: docs/plans/pr-comment-rebase-squash-action.md` | "All phases complete" comment | 3, 4 |
-| PR with no plan reference | Normal PR body | Workflow exits silently | 3 |
+| PR with no plan reference and no plan files changed | Normal PR body, no `docs/plans/` files touched | Workflow exits silently | 3 |
 | PR with invalid plan path | `Plan: docs/plans/nonexistent.md` | Warning comment posted | 5 |
 | PR closed without merge | PR closed via "Close" button | Workflow does not run | 3 |
 | Copilot CLI unavailable | No `COPILOT_PAT` secret | Fallback: PR comment with manual prompt | 4 |

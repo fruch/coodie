@@ -160,6 +160,95 @@ available.
 > work-in-progress commits and you want a clean single-commit history before
 > merging. Use `/rebase squash` to do both at once.
 
+### Testing the Rebase & Squash Workflow Locally
+
+#### Unit tests for the conflict-resolution script (fast, no Docker)
+
+The conflict-resolution logic lives in `.github/scripts/resolve-conflicts.sh`
+and is covered by Bats tests in `tests/workflows/test_resolve_conflicts.bats`.
+Run them directly with `bats` or via `pytest`:
+
+```bash
+# Install bats-core once (macOS or Debian/Ubuntu)
+brew install bats-core        # macOS
+# apt install bats            # Ubuntu
+
+# Run the Bats tests directly
+bats tests/workflows/test_resolve_conflicts.bats
+
+# Or run all workflow tests through pytest (unified reporting)
+uv run pytest tests/workflows/ -v
+```
+
+#### End-to-end smoke test via `workflow_dispatch` (recommended, no Docker)
+
+The workflow has a `workflow_dispatch` trigger so you can run it manually
+against a real PR without posting a comment:
+
+```bash
+# Trigger rebase on PR #<N>
+gh workflow run pr-rebase-squash.yml \
+  --field pr_number=<N> \
+  --field command=rebase
+
+# Trigger squash
+gh workflow run pr-rebase-squash.yml \
+  --field pr_number=<N> \
+  --field command=squash
+
+# Rebase then squash in one run
+gh workflow run pr-rebase-squash.yml \
+  --field pr_number=<N> \
+  --field "command=rebase squash"
+
+# Watch the run live
+gh run watch
+```
+
+#### Running with `act` (requires Docker)
+
+[`act`](https://github.com/nektos/act) can simulate the `issue_comment`
+trigger locally. Note that steps calling `gh api` require a real
+`GITHUB_TOKEN` pointing at a live PR — `act` cannot mock GitHub API state.
+
+```bash
+# Install act (macOS or Linux)
+brew install act     # macOS
+# or: curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+
+# Create a mock event payload (replace PR_NUMBER and COMMENT_ID)
+cat > /tmp/rebase-event.json << 'EOF'
+{
+  "action": "created",
+  "issue": {
+    "number": PR_NUMBER,
+    "pull_request": {"url": "https://api.github.com/repos/fruch/coodie/pulls/PR_NUMBER"}
+  },
+  "comment": {
+    "id": COMMENT_ID,
+    "body": "/rebase",
+    "user": {"login": "fruch", "id": 340979}
+  },
+  "repository": {"full_name": "fruch/coodie", "name": "coodie",
+                  "owner": {"login": "fruch"}}
+}
+EOF
+
+# Run the workflow (the -P flag maps ubuntu-latest to a smaller act image)
+act issue_comment \
+  -e /tmp/rebase-event.json \
+  --secret GITHUB_TOKEN="$(gh auth token)" \
+  --secret COPILOT_PAT="$(gh auth token)" \
+  -W .github/workflows/pr-rebase-squash.yml \
+  --job rebase-squash \
+  -P ubuntu-latest=catthehacker/ubuntu:act-22.04
+```
+
+> **Tip:** The `workflow_dispatch` approach is preferred for end-to-end
+> testing because it uses the real GitHub API and avoids the Docker overhead.
+> Use `act` when you need to iterate on workflow logic without consuming
+> GitHub Actions minutes.
+
 ## Tips
 
 To run a subset of tests:

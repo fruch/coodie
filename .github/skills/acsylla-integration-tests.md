@@ -6,12 +6,14 @@ a first-class driver backend through `AcsyllaDriver`.
 
 ## Prerequisites
 
+See [setup-environment.md](setup-environment.md) for the shared environment
+setup (dev dependencies, pre-commit hooks, commit/push checklist).
+
 ```bash
 # Docker must be running (ScyllaDB runs in a container via testcontainers)
 docker info
 
-# Install the project with dev dependencies + acsylla extra
-uv sync --all-groups
+# Install the acsylla extra
 uv pip install -e ".[acsylla]"
 ```
 

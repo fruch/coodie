@@ -25,11 +25,12 @@ Benchmarks live in the `benchmarks/` directory at the repository root.
 
 ### Setup
 
-```bash
-# Install all dev dependencies (includes pytest-benchmark)
-uv sync --all-groups
+See [setup-environment.md](../setup-environment.md) for the shared environment
+setup (dev dependencies, pre-commit hooks, commit/push checklist).
 
-# Install the scylla driver extra
+Then install the scylla driver extra if not already present:
+
+```bash
 uv pip install -e ".[scylla]"
 ```
 

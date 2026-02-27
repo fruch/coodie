@@ -63,16 +63,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "pr_number=${{ inputs.pr_number }}" >> "$GITHUB_OUTPUT"
-            echo "actor=${{ github.actor }}" >> "$GITHUB_OUTPUT"
             ACTOR_ID=$(gh api "users/${{ github.actor }}" --jq '.id')
-            echo "actor_id=$ACTOR_ID" >> "$GITHUB_OUTPUT"
-            echo "has_comment=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "pr_number=${{ inputs.pr_number }}"
+              echo "actor=${{ github.actor }}"
+              echo "actor_id=$ACTOR_ID"
+              echo "has_comment=false"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "pr_number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
-            echo "actor=${{ github.event.comment.user.login }}" >> "$GITHUB_OUTPUT"
-            echo "actor_id=${{ github.event.comment.user.id }}" >> "$GITHUB_OUTPUT"
-            echo "has_comment=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "pr_number=${{ github.event.issue.number }}"
+              echo "actor=${{ github.event.comment.user.login }}"
+              echo "actor_id=${{ github.event.comment.user.id }}"
+              echo "has_comment=true"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       # ── 1. Permission check ──────────────────────────────────
@@ -104,10 +108,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_JSON=$(gh api "repos/${{ github.repository }}/pulls/${{ steps.ctx.outputs.pr_number }}")
-          echo "head_ref=$(echo "$PR_JSON" | jq -r '.head.ref')" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$(echo "$PR_JSON" | jq -r '.head.sha')" >> "$GITHUB_OUTPUT"
-          echo "base_ref=$(echo "$PR_JSON" | jq -r '.base.ref')" >> "$GITHUB_OUTPUT"
-          echo "state=$(echo "$PR_JSON" | jq -r '.state')" >> "$GITHUB_OUTPUT"
+          {
+            echo "head_ref=$(echo "$PR_JSON" | jq -r '.head.ref')"
+            echo "head_sha=$(echo "$PR_JSON" | jq -r '.head.sha')"
+            echo "base_ref=$(echo "$PR_JSON" | jq -r '.base.ref')"
+            echo "state=$(echo "$PR_JSON" | jq -r '.state')"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Abort if PR is not open
         if: steps.pr.outputs.state != 'open'
@@ -115,7 +121,7 @@ jobs:
           echo "PR #${{ steps.ctx.outputs.pr_number }} is ${{ steps.pr.outputs.state }}, not open."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.pr.outputs.head_ref }}
           fetch-depth: 0
@@ -129,24 +135,22 @@ jobs:
       # ── 4. Parse command ─────────────────────────────────────
       - name: Parse slash command
         id: cmd
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_COMMAND: ${{ inputs.command }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            COMMAND="${{ inputs.command }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            COMMAND="$INPUT_COMMAND"
           else
-            COMMAND="${{ github.event.comment.body }}"
+            COMMAND="$COMMENT_BODY"
           fi
-          DO_REBASE=false
-          DO_SQUASH=false
-          if echo "$COMMAND" | grep -qiE '(^\s*/)?rebase\s+squash\s*$'; then
-            DO_REBASE=true
-            DO_SQUASH=true
-          elif echo "$COMMAND" | grep -qiE '(^\s*/)?rebase\s*$'; then
-            DO_REBASE=true
-          elif echo "$COMMAND" | grep -qiE '(^\s*/)?squash\s*$'; then
-            DO_SQUASH=true
-          fi
-          echo "do_rebase=$DO_REBASE" >> "$GITHUB_OUTPUT"
-          echo "do_squash=$DO_SQUASH" >> "$GITHUB_OUTPUT"
+          export COMMAND
+          source .github/scripts/parse-command.sh
+          {
+            echo "do_rebase=$DO_REBASE"
+            echo "do_squash=$DO_SQUASH"
+          } >> "$GITHUB_OUTPUT"
 
       # ── 5. Rebase ───────────────────────────────────────────
       - name: Rebase onto base branch
@@ -204,46 +208,23 @@ jobs:
           fi
 
           # Try Copilot CLI for a full commit body description.
-          # NOTE: stderr goes to /dev/null — never capture it into the message
-          # variable, since error text would bypass the empty-string fallback.
+          # Write to a temp file so stray CLI output cannot leak into the
+          # commit message (only the file content is used downstream).
+          COPILOT_OUTPUT_FILE=$(mktemp)
           npm install -g @github/copilot 2>/dev/null || true
-          BODY=$(copilot -p \
+          copilot -p \
             "Write ONLY a git commit body (no subject line) summarising these changes. \
              Output plain text only — no markdown fences, no code blocks, no tool \
              calls, no reasoning steps. Be concise. \
              Commits: $LOG --- Diff stat: $STAT" \
-            2>/dev/null) || true
+            > "$COPILOT_OUTPUT_FILE" 2>/dev/null || true
 
-          # Clean copilot output: if the response is wrapped in a fenced code
-          # block (```...```) with tool-call / reasoning preamble before it,
-          # extract only the content between the first pair of ``` markers.
-          if [ -n "$BODY" ] && echo "$BODY" | grep -q '^```'; then
-            BODY=$(echo "$BODY" | awk '/^```/{if(f){exit}else{f=1;next}} f{print}')
-          fi
-
-          # Strip any remaining copilot agent step-output lines
-          # (● action headers, $ shell commands, └ result summaries)
-          if [ -n "$BODY" ]; then
-            BODY=$(echo "$BODY" | grep -vE '^\s*(●|└|\$ )')
-          fi
-
-          # Reject output that looks like error messages rather than real content
-          if [ -n "$BODY" ] && echo "$BODY" | grep -qiE '(error:|unknown option|--help|installed successfully)'; then
-            BODY=""
-          fi
-
-          # Fallback: use PR body as description
-          if [ -z "$BODY" ]; then
-            BODY=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
-              --jq '.body // empty') || true
-          fi
-
-          # Build full commit message: subject + optional body
-          if [ -n "$BODY" ]; then
-            MESSAGE=$(printf '%s\n\n%s' "$TITLE" "$BODY")
-          else
-            MESSAGE="$TITLE"
-          fi
+          # Clean and validate Copilot output, with PR body fallback
+          PR_BODY=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
+            --jq '.body // empty') || true
+          export TITLE COPILOT_OUTPUT_FILE PR_BODY
+          source .github/scripts/build-squash-message.sh
+          rm -f "$COPILOT_OUTPUT_FILE"
 
           # Squash
           git reset --soft "$MERGE_BASE"

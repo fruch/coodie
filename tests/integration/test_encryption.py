@@ -196,8 +196,7 @@ def ssl_session(scylla_ssl_container: Any, ssl_certs: dict[str, Path]) -> Any:
             time.sleep(2)
 
     session.execute(
-        "CREATE KEYSPACE IF NOT EXISTS ssl_ks "
-        "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}"
+        "CREATE KEYSPACE IF NOT EXISTS ssl_ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}"
     )
     yield session
     cluster.shutdown()
@@ -313,9 +312,7 @@ class TestSSLAcsyllaDriver:
     """Verify that AcsyllaDriver works over a TLS-encrypted connection."""
 
     @pytest_asyncio.fixture(scope="class")
-    async def acsylla_ssl_session(
-        self, scylla_ssl_container: Any, ssl_certs: dict[str, Path]
-    ) -> Any:
+    async def acsylla_ssl_session(self, scylla_ssl_container: Any, ssl_certs: dict[str, Path]) -> Any:
         """Return an acsylla session connected over TLS."""
         try:
             import acsylla  # type: ignore[import-untyped]
@@ -386,9 +383,7 @@ class TestSSLAcsyllaDriver:
             _registry.clear()
 
     @pytest.mark.asyncio
-    async def test_init_coodie_async_ssl_kwargs(
-        self, scylla_ssl_container: Any, ssl_certs: dict[str, Path]
-    ) -> None:
+    async def test_init_coodie_async_ssl_kwargs(self, scylla_ssl_container: Any, ssl_certs: dict[str, Path]) -> None:
         """init_coodie_async() forwards ssl_enabled / ssl_trusted_cert to acsylla.create_cluster()."""
         try:
             import acsylla  # type: ignore[import-untyped]  # noqa: F401

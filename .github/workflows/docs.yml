@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Dependencies
-        run: uv sync --extra docs
+        run: uv sync --group docs
       - name: Build docs
         run: uv run sphinx-build -b html docs/source docs/build/html
       - name: Include benchmark history from gh-pages
@@ -46,7 +46,7 @@ jobs:
 
       - name: Upload artifact
         if: github.ref == 'refs/heads/master'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docs/build/html
 

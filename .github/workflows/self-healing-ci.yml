@@ -11,15 +11,26 @@ on:
       - Integration Tests
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to inspect'
+        required: true
+        type: number
 
 jobs:
   on-failure:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'failure'
     permissions:
+      contents: read
       pull-requests: write
       actions: read
     steps:
+      - uses: actions/checkout@v4
+
       - name: Find associated pull request
         id: pr
         env:
@@ -54,19 +65,10 @@ jobs:
           head_sha="${{ github.event.workflow_run.head_sha }}"
 
           # Collect logs from all failed jobs
-          failed_logs=""
-          for job_id in $(gh api "repos/${{ github.repository }}/actions/runs/${run_id}/jobs" \
-            --jq '.jobs[] | select(.conclusion == "failure") | .id'); do
-            job_name=$(gh api "repos/${{ github.repository }}/actions/runs/${run_id}/jobs" \
-              --jq ".jobs[] | select(.id == ${job_id}) | .name")
-            logs=$(gh api "repos/${{ github.repository }}/actions/jobs/${job_id}/logs" 2>&1 | tail -100)
-            failed_logs="${failed_logs}
-          ### Job: ${job_name}
-          \`\`\`
-          ${logs}
-          \`\`\`
-          "
-          done
+          export REPO="${{ github.repository }}"
+          export RUN_ID="${run_id}"
+          source .github/scripts/collect-failed-logs.sh
+          failed_logs="$FAILED_LOGS"
 
           # Write outputs
           {

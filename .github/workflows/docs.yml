@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Dependencies
-        run: uv sync --extra docs
+        run: uv sync --group docs
       - name: Build docs
         run: uv run sphinx-build -b html docs/source docs/build/html
       - name: Include benchmark history from gh-pages

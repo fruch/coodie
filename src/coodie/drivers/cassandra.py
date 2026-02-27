@@ -21,6 +21,12 @@ class CassandraDriver(AbstractDriver):
         self._prepared: dict[str, Any] = {}
         self._last_paging_state: bytes | None = None
         self._known_tables: dict[str, frozenset[str]] = {}
+        try:
+            from cassandra.query import dict_factory  # type: ignore[import-untyped]
+
+            session.row_factory = dict_factory
+        except ImportError:
+            pass
 
     # ------------------------------------------------------------------
     # Internal helpers

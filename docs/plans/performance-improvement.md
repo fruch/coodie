@@ -1304,7 +1304,7 @@ limitations.
 
 | Priority | Task | Expected Impact |
 |----------|------|-----------------|
-| P0 | 14.5.1 Custom `dict_factory` | Eliminate `_rows_to_dicts()` overhead (−10–15% reads) |
+| ✅ Done | 14.5.1 Custom `dict_factory` | Eliminate `_rows_to_dicts()` overhead (−10–15% reads) |
 | P2 | 14.5.4 `__slots__` on LWTResult/PagedResult/BatchQuery | −2–5% on affected operations |
 | P2 | 14.5.6 Connection-level optimizations | −5–15% on real-world workloads |
 

@@ -6,10 +6,10 @@ Docker must be running on the host.
 
 ## Prerequisites
 
-```bash
-# Install the project with dev dependencies
-uv sync --all-groups
+See [setup-environment.md](setup-environment.md) for the shared environment
+setup (dev dependencies, pre-commit hooks, commit/push checklist).
 
+```bash
 # Install the driver you want to test
 uv pip install -e ".[scylla]"    # scylla-driver (default)
 uv pip install -e ".[cassandra]" # cassandra-driver

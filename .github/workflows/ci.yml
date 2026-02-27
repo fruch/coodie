@@ -23,6 +23,9 @@ jobs:
         run: uv sync --all-groups
       - name: Run pre-commit
         run: uv run pre-commit run --all-files
+      - name: Show diff of modified files
+        if: failure()
+        run: git diff
 
   # Make sure commit messages follow the conventional commits convention:
   # https://www.conventionalcommits.org

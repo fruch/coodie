@@ -1,4 +1,4 @@
-# PR Comment-Driven Rebase & Squash GitHub Action
+# PR Comment-Driven Rebase & Squash GitHub Action — ✅ DONE
 
 > **Goal:** Create a GitHub Actions workflow that responds to `/squash` and
 > `/rebase` slash-commands in pull-request comments, rebases the PR branch onto

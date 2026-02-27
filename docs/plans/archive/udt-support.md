@@ -1,4 +1,4 @@
-# Phase A: User-Defined Types (UDT) — Implementation Plan
+# Phase A: User-Defined Types (UDT) — Implementation Plan — ✅ DONE
 
 > **Goal:** Add complete UDT support to coodie, matching every public feature
 > of cqlengine's `cassandra.cqlengine.usertype` — `UserType` base class,

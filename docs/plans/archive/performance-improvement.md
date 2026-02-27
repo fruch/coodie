@@ -1,4 +1,4 @@
-# Performance Improvement Plan for coodie
+# Performance Improvement Plan for coodie — ✅ DONE
 
 > **Based on**: Benchmark CI run [#22353872673](https://github.com/fruch/coodie/actions/runs/22353872673) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22353872673/job/64694559794?pr=31#step:5:122)) and acsylla driver ([job](https://github.com/fruch/coodie/actions/runs/22353872673/job/64694559911?pr=31#step:5:122))
 > **Date**: 2026-02-24

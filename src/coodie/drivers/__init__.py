@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ssl as _ssl
 from typing import Any
 
 from coodie.drivers.base import AbstractDriver
@@ -33,6 +34,7 @@ def init_coodie(
     keyspace: str | None = None,
     driver_type: str = "scylla",
     name: str = "default",
+    ssl_context: _ssl.SSLContext | None = None,
     **kwargs: Any,
 ) -> AbstractDriver:
     if driver_type == "acsylla":
@@ -55,6 +57,8 @@ def init_coodie(
                     "cassandra-driver (or scylla-driver) is required for CassandraDriver. "
                     "Install it with: pip install scylla-driver"
                 ) from exc
+            if ssl_context is not None:
+                kwargs["ssl_context"] = ssl_context
             cluster = Cluster(hosts or ["127.0.0.1"], **kwargs)
             session = cluster.connect(keyspace)
 
@@ -72,6 +76,12 @@ async def init_coodie_async(
     keyspace: str | None = None,
     driver_type: str = "scylla",
     name: str = "default",
+    ssl_context: _ssl.SSLContext | None = None,
+    ssl_enabled: bool | None = None,
+    ssl_trusted_cert: str | None = None,
+    ssl_cert: str | None = None,
+    ssl_private_key: str | None = None,
+    ssl_verify_flags: int | None = None,
     **kwargs: Any,
 ) -> AbstractDriver:
     if driver_type == "acsylla" and session is None and hosts is not None:
@@ -79,6 +89,16 @@ async def init_coodie_async(
             import acsylla  # type: ignore[import-untyped]
         except ImportError as exc:
             raise ImportError("acsylla is required for AcsyllaDriver. Install it with: pip install acsylla") from exc
+        if ssl_enabled is not None:
+            kwargs["ssl_enabled"] = ssl_enabled
+        if ssl_trusted_cert is not None:
+            kwargs["ssl_trusted_cert"] = ssl_trusted_cert
+        if ssl_cert is not None:
+            kwargs["ssl_cert"] = ssl_cert
+        if ssl_private_key is not None:
+            kwargs["ssl_private_key"] = ssl_private_key
+        if ssl_verify_flags is not None:
+            kwargs["ssl_verify_flags"] = ssl_verify_flags
         cluster = acsylla.create_cluster(hosts, **kwargs)
         session = await cluster.create_session(keyspace=keyspace)
 
@@ -100,6 +120,7 @@ async def init_coodie_async(
         keyspace=keyspace,
         driver_type=driver_type,
         name=name,
+        ssl_context=ssl_context,
         **kwargs,
     )
 

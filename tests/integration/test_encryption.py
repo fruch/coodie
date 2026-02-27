@@ -208,6 +208,7 @@ def ssl_session(scylla_ssl_container: Any, ssl_certs: dict[str, Path]) -> Any:
 
 
 @pytest.mark.integration
+@pytest.mark.ssl
 class TestSSLCassandraDriver:
     """Verify that CassandraDriver works over a TLS-encrypted connection."""
 
@@ -308,6 +309,7 @@ class TestSSLCassandraDriver:
 
 
 @pytest.mark.integration
+@pytest.mark.ssl
 class TestSSLAcsyllaDriver:
     """Verify that AcsyllaDriver works over a TLS-encrypted connection."""
 

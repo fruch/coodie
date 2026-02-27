@@ -258,6 +258,16 @@ def test_cassandra_driver_rows_to_dicts_empty_iterable():
     assert CassandraDriver._rows_to_dicts([]) == []
 
 
+def test_cassandra_driver_sets_dict_factory(mock_cassandra_session):
+    """CassandraDriver sets dict_factory on the session so rows arrive as dicts."""
+    from cassandra.query import dict_factory  # type: ignore[import-untyped]
+
+    from coodie.drivers.cassandra import CassandraDriver
+
+    CassandraDriver(session=mock_cassandra_session, default_keyspace="ks")
+    assert mock_cassandra_session.row_factory is dict_factory
+
+
 def test_cassandra_driver_sync_table(cassandra_driver, mock_cassandra_session):
     from coodie.schema import ColumnDefinition
 

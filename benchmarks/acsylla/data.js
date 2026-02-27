@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772116842240,
+  "lastUpdate": 1772201213637,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -6660,6 +6660,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000432367323990398",
             "extra": "mean: 1.6869683526886274 msec\nrounds: 465"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "d56cc561a3ac772f4dc31a2e1364e379789f4103",
+          "message": "feat(usertype): add full UDT support with frozen UDTs, nested types, and driver integration\n\nEnables modeling Cassandra user-defined types (UDTs) as Pydantic models via the UserType base class,\nbringing coodie's type-safe ORM to complex composite data structures.\nFrozen semantics match cqlengine's behavior while leveraging Pydantic's validation.\nIncludes CQL DDL generation with dependency ordering, serialization round-trips,\nbenchmarks comparing performance against cqlengine, and comprehensive documentation\ncovering migration patterns and frozen collection semantics.\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-02-27T16:06:20+02:00",
+          "tree_id": "dbfee4f230e1cd64b62a7234d9ed5dad3d8abb81",
+          "url": "https://github.com/fruch/coodie/commit/d56cc561a3ac772f4dc31a2e1364e379789f4103"
+        },
+        "date": 1772201213053,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 79975.43210203783,
+            "unit": "iter/sec",
+            "range": "stddev: 8.827191033216893e-7",
+            "extra": "mean: 12.503839913289063 usec\nrounds: 8764"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 529648.5484145145,
+            "unit": "iter/sec",
+            "range": "stddev: 5.64246717585607e-7",
+            "extra": "mean: 1.8880444456866108 usec\nrounds: 35594"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 666619.3343712304,
+            "unit": "iter/sec",
+            "range": "stddev: 3.024924852996252e-7",
+            "extra": "mean: 1.5001065052264366 usec\nrounds: 40552"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 937194.000405971,
+            "unit": "iter/sec",
+            "range": "stddev: 2.374159916393722e-7",
+            "extra": "mean: 1.067014939880988 usec\nrounds: 111112"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 984367.4146917526,
+            "unit": "iter/sec",
+            "range": "stddev: 2.1983695338126337e-7",
+            "extra": "mean: 1.0158808439561589 usec\nrounds: 87398"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 829416.1876878095,
+            "unit": "iter/sec",
+            "range": "stddev: 2.4419085786397753e-7",
+            "extra": "mean: 1.2056673294353375 usec\nrounds: 88520"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 189556.84605644984,
+            "unit": "iter/sec",
+            "range": "stddev: 5.566941490636374e-7",
+            "extra": "mean: 5.275462325967383 usec\nrounds: 7326"
           }
         ]
       }

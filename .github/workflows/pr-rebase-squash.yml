@@ -54,7 +54,6 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      workflows: write
 
     steps:
       # ── 0. Normalize inputs across triggers ──────────────────
@@ -126,7 +125,12 @@ jobs:
         with:
           ref: ${{ steps.pr.outputs.head_ref }}
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # WORKFLOW_PUSH_PAT has Contents (Read and write) repository
+          # permission, allowing force-push of branches that include
+          # .github/workflows/ changes.  Falls back to GITHUB_TOKEN when
+          # the PAT is unavailable (pushes that touch workflow files will
+          # fail in that case — a GitHub platform restriction).
+          token: ${{ secrets.WORKFLOW_PUSH_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Configure Git identity
         run: |

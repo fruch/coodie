@@ -662,7 +662,7 @@ gh run view <run-id> --log
 | Arbitrary file read via plan reference | Plan path is validated against `docs/plans/*.md` pattern; no path traversal possible |
 | Copilot CLI prompt injection via plan content | Plan files are committed to the repo and reviewed via PRs; prompt content is repo-controlled, not user-supplied |
 | Unauthorized plan continuation | Only merged PRs trigger the workflow; merge permissions are governed by branch protection rules |
-| `COPILOT_PAT` secret exposure | The PAT is only exposed via `COPILOT_GITHUB_TOKEN` env var in the delegation step; it is never logged or passed to other steps. If the secret is missing, the workflow degrades gracefully (posts manual prompt instead) |
+| `COPILOT_PAT` secret exposure | The PAT is only exposed via `COPILOT_GITHUB_TOKEN` env var in the delegation step; it is never logged or passed to other steps. If the secret is missing, the workflow degrades gracefully (posts manual prompt instead). This token only needs the **Copilot Requests (Read)** account permission — no repo write access. For full PAT setup instructions, see `pr-comment-rebase-squash-action.md` [§5.3](pr-comment-rebase-squash-action.md#53-creating-copilot_pat-copilot-cli-access) |
 | `GITHUB_TOKEN` scope | Token is limited to `contents: read`, `pull-requests: write` — minimum required permissions |
 | Concurrent delegation for same plan | Concurrency group per PR prevents parallel runs |
 

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772312277171,
+  "lastUpdate": 1772317089195,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -7317,6 +7317,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.692448410069282e-7",
             "extra": "mean: 5.295941939615725 usec\nrounds: 7785"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "dc534151222a30deff522a3e7435cf6fd90d2843",
+          "message": "fix(ci): replace invalid workflows permission with PAT checkout for workflow file pushes\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T00:17:33+02:00",
+          "tree_id": "cfceafe40cc2cb3d97c150f6d3ca6724157f6e02",
+          "url": "https://github.com/fruch/coodie/commit/dc534151222a30deff522a3e7435cf6fd90d2843"
+        },
+        "date": 1772317088799,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53850.64346877629,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015859902821539754",
+            "extra": "mean: 18.569880238846554 usec\nrounds: 8542"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 574879.978275533,
+            "unit": "iter/sec",
+            "range": "stddev: 4.6001301189208967e-7",
+            "extra": "mean: 1.7394935252393018 usec\nrounds: 49809"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 622189.6218503702,
+            "unit": "iter/sec",
+            "range": "stddev: 3.8345240208690123e-7",
+            "extra": "mean: 1.6072270653213965 usec\nrounds: 55451"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 826024.3654628841,
+            "unit": "iter/sec",
+            "range": "stddev: 5.065012851822409e-7",
+            "extra": "mean: 1.2106180420472514 usec\nrounds: 159439"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 975740.8923632798,
+            "unit": "iter/sec",
+            "range": "stddev: 3.0616123598367314e-7",
+            "extra": "mean: 1.0248622434773271 usec\nrounds: 101948"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 741971.6556353382,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4200312315856813e-7",
+            "extra": "mean: 1.347760379261006 usec\nrounds: 118120"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190054.4767281102,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010685496928018847",
+            "extra": "mean: 5.261649276647078 usec\nrounds: 7533"
           }
         ]
       }

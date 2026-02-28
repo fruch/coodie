@@ -1554,7 +1554,7 @@ cqlengine's approach. The benchmark simply doesn't use it.
 **Fix**: Add fair comparison benchmarks using `CoodieProduct.find(id=X).update(price=42.0)`
 alongside the existing ones. This is not a code optimization — it's a benchmark correctness fix.
 
-#### Category B: Read-Modify-Write Pattern Overhead (3 losses — addressable)
+#### Category B: Read-Modify-Write Pattern Overhead (2 losses — addressable)
 
 | Benchmark | coodie | cqlengine | Ratio | Root Cause |
 |-----------|--------|-----------|-------|------------|
@@ -1688,7 +1688,8 @@ cached per class:
 @classmethod
 @functools.lru_cache(maxsize=128)
 def _get_field_cql_types(cls) -> tuple[tuple[str, str], ...]:
-    # ... existing logic, return tuple instead of list for hashability
+    # Returns ((field_name, cql_type_str), ...) — tuple for lru_cache hashability
+    # ... existing logic, return tuple(...) instead of list
 ```
 
 **Expected impact**: Close the 0.21× gap on `udt_ddl_generation` benchmark. The benchmark
@@ -1732,7 +1733,11 @@ For read-modify-write patterns, cqlengine only sends changed fields.
 
 ```python
 class Document(BaseModel):
-    _dirty_fields: ClassVar[set[str]]  # set of field names modified since load
+    _dirty_fields: set[str] = set()  # per-instance set of modified field names
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        object.__setattr__(self, '_dirty_fields', set())
 
     def __setattr__(self, name, value):
         if name in self.model_fields:

@@ -1306,6 +1306,12 @@ limitations.
 |----------|------|-----------------|
 | ✅ Done | 14.5.1 Custom `dict_factory` | Eliminate `_rows_to_dicts()` overhead (−10–15% reads) |
 | ✅ Done | 14.5.4 `__slots__` on LWTResult/PagedResult/BatchQuery | −2–5% on affected operations |
+| P0 | §13E Task 8.1 Fair benchmark for partial UPDATE | Reveals true ratio (~1.0–1.2×) |
+| P0 | §13E Task 8.2 Cache build_count/update/delete | −3–5% on affected ops |
+| P0 | §13E Task 8.3 Pre-compile `_snake_case` regex | −1–2 µs per query |
+| P1 | §13E Task 8.4 Cache `_get_field_cql_types()` | −70–80% on UDT DDL benchmark |
+| P1 | §13E Task 8.5 Prepared statement warming | −100–200 µs first query |
+| P2 | §13E Task 8.6 Dirty-field tracking for save() | −10–30% read-modify-write |
 | P2 | 14.5.6 Connection-level optimizations | −5–15% on real-world workloads |
 
 ---
@@ -1520,6 +1526,282 @@ noise floor of CI benchmarks), consistent with the original §14.5.4 estimate.
 
 ---
 
+## 13E. Phase 8 — Benchmark Review & Next-Level Optimizations
+
+> **Date**: 2026-02-28
+> **Based on**: Phase 7 benchmark results (run [#22530373428](https://github.com/fruch/coodie/actions/runs/22530373428))
+> **Status**: Proposed
+
+### 13E.1 Current Benchmark Summary
+
+After 7 phases of optimization, coodie wins **27 of 34** paired benchmarks against cqlengine.
+The 7 remaining losses fall into three categories:
+
+#### Category A: Unfair Benchmark Comparison (2 losses — fixable without code changes)
+
+| Benchmark | coodie | cqlengine | Ratio | Root Cause |
+|-----------|--------|-----------|-------|------------|
+| `partial_update` | 1,053 iter/s | 1,829 iter/s | **0.58×** | coodie does GET + UPDATE (2 round-trips); cqlengine does UPDATE only (1 round-trip) |
+| `update_if_condition` | 623 iter/s | 775 iter/s | **0.80×** | Same: GET + conditional UPDATE vs direct conditional UPDATE |
+
+**Analysis**: The coodie benchmarks use `CoodieProduct.get(id=X)` then `doc.update(...)` — a
+read-modify-write pattern requiring **2 DB round-trips**. The cqlengine benchmarks use
+`CqlProduct.objects(id=X).update(price=42.0)` — a **single UPDATE statement**.
+
+coodie already has `QuerySet.update()` which generates a single UPDATE query, identical to
+cqlengine's approach. The benchmark simply doesn't use it.
+
+**Fix**: Add fair comparison benchmarks using `CoodieProduct.find(id=X).update(price=42.0)`
+alongside the existing ones. This is not a code optimization — it's a benchmark correctness fix.
+
+#### Category B: Read-Modify-Write Pattern Overhead (3 losses — addressable)
+
+| Benchmark | coodie | cqlengine | Ratio | Root Cause |
+|-----------|--------|-----------|-------|------------|
+| `status_update` | 1,033 iter/s | 1,155 iter/s | **0.89×** | `find().all()[0]` + modify + `save()` — full re-serialization |
+| `list_mutation` | 1,014 iter/s | 1,334 iter/s | **0.76×** | Same pattern with collection field |
+
+**Analysis**: coodie's `save()` always re-serializes **all** fields via `getattr()` extraction
+and sends a full INSERT (upsert). cqlengine tracks dirty fields and only sends changed
+columns in the UPDATE. For read-modify-write patterns, this means coodie sends N field values
+while cqlengine sends only the 1-2 changed values.
+
+Additionally, `_snake_case()` in `query.py` does `import re` **inside the function body**
+on every call, adding unnecessary import overhead. The `usertype.py` version correctly uses
+a module-level import.
+
+#### Category C: Inherent Pydantic Trade-offs (2 losses — accepted)
+
+| Benchmark | coodie | cqlengine | Ratio | Root Cause |
+|-----------|--------|-----------|-------|------------|
+| `udt_serialization` | 663K iter/s | 780K iter/s | **0.85×** | `model_dump()` vs simple `getattr()` dict comprehension |
+| `nested_udt_serialization` | 585K iter/s | 1.2M iter/s | **0.48×** | Recursive `model_dump()` — Pydantic validates nested models |
+| `udt_ddl_generation` | 124K iter/s | 602K iter/s | **0.21×** | `_get_field_cql_types()` not cached; calls `python_type_to_cql_type_str()` per field |
+
+**Analysis**: `model_dump()` is inherently costlier than `getattr()` dict comprehension because
+Pydantic performs validation, serialization, and type coercion. This is the accepted trade-off
+for type safety, FastAPI integration, and schema validation that coodie provides.
+
+However, `udt_ddl_generation` is **not** an inherent trade-off — `_get_field_cql_types()`
+recomputes the field-to-CQL-type mapping on every call despite the type annotations being
+immutable at runtime. Adding an `@lru_cache` would make this benchmark competitive.
+
+### 13E.2 Proposed Optimizations
+
+#### Task 8.1 — Fair Benchmark for Partial UPDATE (P0, benchmark-only change)
+
+**Current** (`bench_update.py`):
+```python
+# coodie — 2 round-trips
+def _update():
+    doc = CoodieProduct.get(id=_UPDATE_ID)     # round-trip 1: GET
+    doc.update(price=42.0)                      # round-trip 2: UPDATE
+
+# cqlengine — 1 round-trip
+def _update():
+    CqlProduct.objects(id=_UPDATE_ID).update(price=42.0)  # round-trip 1: UPDATE
+```
+
+**Proposed**: Add a parallel `test_coodie_partial_update_queryset` benchmark:
+```python
+# coodie — 1 round-trip (fair comparison)
+def _update():
+    CoodieProduct.find(id=_UPDATE_ID).update(price=42.0)  # round-trip 1: UPDATE
+```
+
+Keep the existing benchmark as-is (it represents a valid usage pattern) and add the new one
+as a fair apples-to-apples comparison. Similarly for `update_if_condition`.
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~30 (benchmark only) | Expected: coodie ~1.0–1.2× vs cqlengine |
+| Risk | None | No source code changes |
+
+#### Task 8.2 — Cache `build_count()`, `build_update()`, `build_delete()` (P0)
+
+`build_select()` and `build_insert_from_columns()` have shape-based CQL caching. The other
+CQL builders do not:
+
+| Builder | Cached? | Calls per operation |
+|---------|---------|-------------------|
+| `build_select()` | ✅ Yes (§3.1) | Every `all()`, `first()`, `get()` |
+| `build_insert_from_columns()` | ✅ Yes (§3.6) | Every `save()`, `insert()` |
+| `build_count()` | ❌ No | Every `count()` |
+| `build_update()` | ❌ No | Every `update()` |
+| `build_delete()` | ❌ No | Every `delete()` |
+
+**Proposed**: Add shape-based caching to all three:
+
+```python
+_count_cql_cache: dict[tuple, str] = {}
+
+def build_count(table, keyspace, where=None, allow_filtering=False):
+    where_shape = _where_shape(where) if where else ()
+    cache_key = (table, keyspace, where_shape, allow_filtering)
+    # ... cache lookup and store pattern from build_select()
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~60 | −3–5% on COUNT, UPDATE, DELETE operations |
+| Risk | Low | Cache invalidation is by shape (immutable key) |
+
+#### Task 8.3 — Pre-compile `_snake_case` regex (P0)
+
+`_snake_case()` in `query.py` does `import re` inside the function body on every call:
+
+```python
+# Current (query.py:369)
+def _snake_case(name: str) -> str:
+    import re                                           # ← re-evaluated every call
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)   # ← regex compiled every call
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+```
+
+**Proposed**: Move `import re` to module level, pre-compile the regex patterns, and add
+`@lru_cache` since class names are immutable:
+
+```python
+import re
+
+_CAMEL_RE1 = re.compile(r"(.)([A-Z][a-z]+)")
+_CAMEL_RE2 = re.compile(r"([a-z0-9])([A-Z])")
+
+@functools.lru_cache(maxsize=128)
+def _snake_case(name: str) -> str:
+    s1 = _CAMEL_RE1.sub(r"\1_\2", name)
+    return _CAMEL_RE2.sub(r"\1_\2", s1).lower()
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~8 | −1–2 µs per table name lookup (every query) |
+| Risk | None | Pure function, deterministic output |
+
+#### Task 8.4 — Cache UDT `_get_field_cql_types()` (P1)
+
+`UserType._get_field_cql_types()` calls `python_type_to_cql_type_str()` for each field
+on every invocation. Type annotations are immutable at runtime, so the result can be
+cached per class:
+
+```python
+@classmethod
+@functools.lru_cache(maxsize=128)
+def _get_field_cql_types(cls) -> tuple[tuple[str, str], ...]:
+    # ... existing logic, return tuple instead of list for hashability
+```
+
+**Expected impact**: Close the 0.21× gap on `udt_ddl_generation` benchmark. The benchmark
+calls `_get_field_cql_types()` + `build_create_type()` in a loop — caching the former
+eliminates ~80% of the per-iteration cost.
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~5 | −70–80% on UDT DDL generation benchmark |
+| Risk | Low | Immutable input → safe to cache |
+
+#### Task 8.5 — Prepared Statement Warming at `sync_table()` Time (P1)
+
+Currently, prepared statements are lazily created on first `execute()` call. The first
+query for each CQL shape pays a ~100–200 µs preparation penalty. For common patterns
+(SELECT *, INSERT), this can be pre-warmed during `sync_table()`:
+
+```python
+def sync_table(self, table, keyspace, cols, ...):
+    # ... existing sync_table logic ...
+
+    # Pre-prepare common queries for this table
+    insert_cql = build_insert_from_columns(table, keyspace, columns, ...)
+    self._prepare(insert_cql)
+    select_cql = build_select(table, keyspace)
+    self._prepare(select_cql)
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~15 | Eliminates first-query cold-start (−100–200 µs) |
+| Risk | Low | Preparation is idempotent |
+| Note | | Only benefits the first query per shape per session |
+
+#### Task 8.6 — Dirty-Field Tracking for `save()` (P2)
+
+coodie's `save()` always serializes **all** fields and sends a full INSERT (upsert).
+For read-modify-write patterns, cqlengine only sends changed fields.
+
+**Proposed approach**: Track which fields have been modified since the last DB load:
+
+```python
+class Document(BaseModel):
+    _dirty_fields: ClassVar[set[str]]  # set of field names modified since load
+
+    def __setattr__(self, name, value):
+        if name in self.model_fields:
+            self._dirty_fields.add(name)
+        super().__setattr__(name, value)
+
+    def save(self, ...):
+        if self._dirty_fields:
+            # Partial UPDATE with only dirty fields
+            self.update(**{f: getattr(self, f) for f in self._dirty_fields})
+            self._dirty_fields.clear()
+        else:
+            # Full INSERT (new document)
+            ...
+```
+
+**Complexity warning**: This is a significant behavioral change. Pydantic's `__setattr__`
+is a Rust-level slot, so overriding it may negate the performance gain. Needs careful
+benchmarking before implementation.
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~40–60 | −10–30% on read-modify-write patterns |
+| Risk | **High** | Changes save() semantics; Pydantic `__setattr__` override may be slow |
+| Note | | May require `model_config = {"validate_assignment": True}` interaction |
+
+#### Task 8.7 — UDT Serialization Trade-off (Accepted — No Change)
+
+`model_dump()` (coodie) vs `getattr()` dict comprehension (cqlengine) represents a
+fundamental design choice:
+
+| | coodie (Pydantic) | cqlengine (manual) |
+|---|---|---|
+| Serialization | `model_dump()` — validates, coerces types | `getattr()` — raw attribute access |
+| Nested types | Recursive validation | No validation |
+| Type safety | ✅ Full | ❌ None |
+| FastAPI integration | ✅ Native | ❌ Manual |
+
+The 0.85× ratio on flat UDTs and 0.48× on nested UDTs is the accepted cost of type safety.
+No optimization is proposed for this category.
+
+### 13E.3 Priority and Impact Matrix
+
+| Task | Priority | Effort | Expected Impact | Closes Gap |
+|------|----------|--------|-----------------|------------|
+| 8.1 Fair benchmark for partial UPDATE | **P0** | Small (benchmark only) | Reveals true ratio (~1.0–1.2×) | partial_update, update_if_condition |
+| 8.2 Cache build_count/update/delete | **P0** | Small (~60 lines) | −3–5% on affected ops | count, delete, update |
+| 8.3 Pre-compile `_snake_case` regex | **P0** | Tiny (~8 lines) | −1–2 µs per query | All operations |
+| 8.4 Cache `_get_field_cql_types()` | **P1** | Tiny (~5 lines) | −70–80% on UDT DDL | udt_ddl_generation |
+| 8.5 Prepared statement warming | **P1** | Small (~15 lines) | −100–200 µs first query | First-query latency |
+| 8.6 Dirty-field tracking | **P2** | Medium (~50 lines) | −10–30% read-modify-write | status_update, list_mutation |
+| 8.7 UDT serialization (accepted) | — | None | — | udt_serialization (accepted trade-off) |
+
+### 13E.4 Expected Outcome After Phase 8
+
+If tasks 8.1–8.5 are implemented:
+
+| Metric | Current (Phase 7) | Expected (Phase 8) |
+|--------|-------------------|---------------------|
+| Benchmarks won | 27 of 34 | **30–31 of 34** |
+| Worst loss | partial_update (0.58×) | udt_serialization (0.85×, accepted) |
+| Benchmark fairness | 2 unfair comparisons | All comparisons fair |
+| First-query latency | +100–200 µs cold penalty | Pre-warmed |
+
+The remaining 3–4 losses would all be in the "accepted Pydantic trade-off" category
+(UDT serialization, nested UDT serialization) or within noise (status_update ~0.9×).
+
+---
+
 ## 14. Notes
 
 - coodie's Pydantic-based model system is **already 5.8× faster** than cqlengine for
@@ -1553,6 +1835,12 @@ noise floor of CI benchmarks), consistent with the original §14.5.4 estimate.
   native async changes maintain all gains from prior phases. Partial UPDATE ratio
   improved marginally (1.75× → 1.72×). The native async improvements target async
   workloads not captured by the sync benchmark suite.
+- **After Phase 7, coodie wins 27 of 34 benchmarks** (34 benchmarks include 4 new UDT
+  benchmarks added in Phase 7). 7 losses remain: 2 are unfair benchmark comparisons
+  (partial_update, update_if_condition use 2 round-trips vs cqlengine's 1), 3 are
+  read-modify-write overhead (status_update, list_mutation), and 2 are accepted Pydantic
+  trade-offs (UDT serialization). Phase 8 (§13E) proposes targeted fixes to close to
+  **30–31 of 34 wins**.
 
 ---
 

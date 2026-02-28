@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772317708668,
+  "lastUpdate": 1772318874316,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -7536,6 +7536,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000100755138704865",
             "extra": "mean: 5.312637994387405 usec\nrounds: 7638"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "21d7c4af6b3b709893541ae615c04f72e703e49e",
+          "message": "feat(demo): add django-taskboard demo (The Hivemind Kanban)\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T00:46:29+02:00",
+          "tree_id": "ee54b78b5c2adc1b980536a5c76be2c9bc7f38f9",
+          "url": "https://github.com/fruch/coodie/commit/21d7c4af6b3b709893541ae615c04f72e703e49e"
+        },
+        "date": 1772318873592,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52439.5032347578,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016667968435567727",
+            "extra": "mean: 19.069593308755504 usec\nrounds: 8429"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 569131.8218652185,
+            "unit": "iter/sec",
+            "range": "stddev: 4.937274992283309e-7",
+            "extra": "mean: 1.7570621806433089 usec\nrounds: 36008"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 593793.5563839179,
+            "unit": "iter/sec",
+            "range": "stddev: 5.096198504496982e-7",
+            "extra": "mean: 1.6840869848601874 usec\nrounds: 44479"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 806838.4332421806,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4059489465990105e-7",
+            "extra": "mean: 1.239405510198149 usec\nrounds: 105731"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 922596.0079137599,
+            "unit": "iter/sec",
+            "range": "stddev: 4.3918746756774107e-7",
+            "extra": "mean: 1.083898034917007 usec\nrounds: 80302"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 701279.504705264,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5833624276936404e-7",
+            "extra": "mean: 1.425964958751052 usec\nrounds: 88724"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 187886.7060054307,
+            "unit": "iter/sec",
+            "range": "stddev: 6.810317351723921e-7",
+            "extra": "mean: 5.322356335158145 usec\nrounds: 7782"
           }
         ]
       }

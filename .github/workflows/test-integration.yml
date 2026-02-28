@@ -57,3 +57,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: integration
+
+  self-heal:
+    needs: [test-integration]
+    if: ${{ failure() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      models: read
+    uses: ./.github/workflows/self-healing-ci.yml
+    secrets: inherit

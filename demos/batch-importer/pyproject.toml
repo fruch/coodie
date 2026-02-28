@@ -1,0 +1,14 @@
+[project]
+name = "coodie-batch-importer-demo"
+version = "0.1.0"
+description = "Batch Importer demo showcasing coodie's BatchQuery with logged and unlogged batches"
+requires-python = ">=3.10"
+dependencies = [
+    "coodie[scylla]",
+    "click>=8.0",
+    "faker>=18.0",
+    "rich>=13.0",
+]
+
+[tool.uv.sources]
+coodie = { path = "../..", editable = true }

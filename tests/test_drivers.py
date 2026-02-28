@@ -1306,3 +1306,184 @@ async def test_lazy_driver_connects_on_execute_async():
         rows = await driver.execute_async("SELECT * FROM ks.t", [])
         mock_ensure.assert_awaited_once()
         assert rows == [{"id": "2"}]
+
+
+# ------------------------------------------------------------------
+# §14.5.6 Connection-level optimizations
+# ------------------------------------------------------------------
+
+
+def test_init_coodie_compression_forwarded_to_cluster():
+    """compression= is forwarded to Cluster() when not None."""
+    _registry.clear()
+
+    mock_cluster_cls = MagicMock()
+    mock_cluster_inst = MagicMock()
+    mock_session = MagicMock()
+    mock_cluster_cls.return_value = mock_cluster_inst
+    mock_cluster_inst.connect.return_value = mock_session
+    mock_session.cluster = mock_cluster_inst
+
+    with patch("coodie.drivers.cassandra.CassandraDriver"):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
+            init_coodie(hosts=["node1"], keyspace="ks", compression="lz4")
+    mock_cluster_cls.assert_called_once_with(["node1"], compression="lz4")
+    _registry.clear()
+
+
+def test_init_coodie_compression_not_added_when_none():
+    """When compression is None, it is NOT passed to Cluster()."""
+    _registry.clear()
+
+    mock_cluster_cls = MagicMock()
+    mock_cluster_inst = MagicMock()
+    mock_session = MagicMock()
+    mock_cluster_cls.return_value = mock_cluster_inst
+    mock_cluster_inst.connect.return_value = mock_session
+    mock_session.cluster = mock_cluster_inst
+
+    with patch("coodie.drivers.cassandra.CassandraDriver"):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
+            init_coodie(hosts=["node1"], keyspace="ks")
+    call_kwargs = mock_cluster_cls.call_args[1]
+    assert "compression" not in call_kwargs
+    _registry.clear()
+
+
+def test_init_coodie_speculative_execution_policy_forwarded_to_cluster():
+    """speculative_execution_policy= is forwarded to Cluster() when not None."""
+    _registry.clear()
+
+    mock_cluster_cls = MagicMock()
+    mock_cluster_inst = MagicMock()
+    mock_session = MagicMock()
+    mock_cluster_cls.return_value = mock_cluster_inst
+    mock_cluster_inst.connect.return_value = mock_session
+    mock_session.cluster = mock_cluster_inst
+
+    mock_policy = MagicMock()
+
+    with patch("coodie.drivers.cassandra.CassandraDriver"):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
+            init_coodie(hosts=["node1"], keyspace="ks", speculative_execution_policy=mock_policy)
+    mock_cluster_cls.assert_called_once_with(["node1"], speculative_execution_policy=mock_policy)
+    _registry.clear()
+
+
+def test_init_coodie_speculative_execution_policy_not_added_when_none():
+    """When speculative_execution_policy is None, it is NOT passed to Cluster()."""
+    _registry.clear()
+
+    mock_cluster_cls = MagicMock()
+    mock_cluster_inst = MagicMock()
+    mock_session = MagicMock()
+    mock_cluster_cls.return_value = mock_cluster_inst
+    mock_cluster_inst.connect.return_value = mock_session
+    mock_session.cluster = mock_cluster_inst
+
+    with patch("coodie.drivers.cassandra.CassandraDriver"):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
+            init_coodie(hosts=["node1"], keyspace="ks")
+    call_kwargs = mock_cluster_cls.call_args[1]
+    assert "speculative_execution_policy" not in call_kwargs
+    _registry.clear()
+
+
+def test_cassandra_driver_sync_table_warms_prepared_cache(cassandra_driver, mock_cassandra_session):
+    """sync_table() pre-prepares SELECT-by-PK and INSERT queries after table sync."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE
+        [SysRow(column_name="id"), SysRow(column_name="name")],  # system_schema
+    ]
+    cassandra_driver.sync_table("my_table", "test_ks", cols)
+
+    prepared_stmts = list(cassandra_driver._prepared.keys())
+    assert any("SELECT" in s and "my_table" in s and '"id" = ?' in s for s in prepared_stmts)
+    assert any("INSERT" in s and "my_table" in s for s in prepared_stmts)
+
+
+def test_cassandra_driver_sync_table_warm_skipped_on_dry_run(cassandra_driver, mock_cassandra_session):
+    """dry_run=True should NOT warm the prepared statement cache."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="name", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        [SysRow(column_name="id")],  # system_schema introspection only
+    ]
+    cassandra_driver.sync_table("my_table", "test_ks", cols, dry_run=True)
+    assert cassandra_driver._prepared == {}
+
+
+def test_cassandra_driver_sync_table_warm_skipped_on_cache_hit(cassandra_driver, mock_cassandra_session):
+    """Warming is not triggered again when sync_table returns early (cache hit)."""
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    mock_cassandra_session.execute.side_effect = [
+        None,  # CREATE TABLE (first sync)
+        [SysRow(column_name="id")],  # system_schema (first sync)
+    ]
+    cassandra_driver.sync_table("my_table", "test_ks", cols)
+    prepare_count_after_first = mock_cassandra_session.prepare.call_count
+
+    # Second call — cache hit, no new prepares
+    cassandra_driver.sync_table("my_table", "test_ks", cols)
+    assert mock_cassandra_session.prepare.call_count == prepare_count_after_first
+
+
+async def test_cassandra_driver_sync_table_async_warms_prepared_cache(cassandra_driver, mock_cassandra_session):
+    """sync_table_async() also pre-prepares SELECT-by-PK and INSERT queries."""
+    import asyncio
+    from coodie.schema import ColumnDefinition
+
+    cols = [
+        ColumnDefinition(name="id", cql_type="uuid", primary_key=True),
+        ColumnDefinition(name="value", cql_type="text"),
+    ]
+    SysRow = namedtuple("SysRow", ["column_name"])
+    call_count = 0
+
+    def fake_execute_async(stmt, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        future = MagicMock()
+        if call_count == 1:
+            result = None
+        else:
+            result = [SysRow(column_name="id"), SysRow(column_name="value")]
+
+        def add_callbacks(on_success, on_error):
+            loop = asyncio.get_event_loop()
+            loop.call_soon(on_success, result)
+
+        future.add_callbacks = add_callbacks
+        return future
+
+    mock_cassandra_session.execute_async.side_effect = fake_execute_async
+    await cassandra_driver.sync_table_async("warm_table", "test_ks", cols)
+
+    prepared_stmts = list(cassandra_driver._prepared.keys())
+    assert any("SELECT" in s and "warm_table" in s and '"id" = ?' in s for s in prepared_stmts)
+    assert any("INSERT" in s and "warm_table" in s for s in prepared_stmts)

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772309195390,
+  "lastUpdate": 1772310329299,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -7025,6 +7025,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 6.489976138514164e-7",
             "extra": "mean: 5.187764381828477 usec\nrounds: 7805"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "1785810bf316ca4d271d4fe33e86c82a0f513716",
+          "message": "fix(ci): remove ruff/linting from demo workflow, rely on repo-level pre-commit\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-02-28T22:24:48+02:00",
+          "tree_id": "19c1eb78a68d3fc4f773bfe3512047b03363f46a",
+          "url": "https://github.com/fruch/coodie/commit/1785810bf316ca4d271d4fe33e86c82a0f513716"
+        },
+        "date": 1772310328345,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 51858.6718361742,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001576161042394402",
+            "extra": "mean: 19.283178002689347 usec\nrounds: 8101"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 574513.0209201435,
+            "unit": "iter/sec",
+            "range": "stddev: 4.511702863197201e-7",
+            "extra": "mean: 1.7406045878618976 usec\nrounds: 41109"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 599383.290896031,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7881859116183604e-7",
+            "extra": "mean: 1.6683815101102977 usec\nrounds: 47215"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 828428.053449127,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3925229696610385e-7",
+            "extra": "mean: 1.2071054279687174 usec\nrounds: 147864"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 950810.788037146,
+            "unit": "iter/sec",
+            "range": "stddev: 4.5017515693747185e-7",
+            "extra": "mean: 1.0517339649294475 usec\nrounds: 92251"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 721624.6060000886,
+            "unit": "iter/sec",
+            "range": "stddev: 3.793712014666381e-7",
+            "extra": "mean: 1.3857620592276163 usec\nrounds: 88480"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188953.72748633043,
+            "unit": "iter/sec",
+            "range": "stddev: 7.280644300934445e-7",
+            "extra": "mean: 5.2923009950800965 usec\nrounds: 7638"
           }
         ]
       }

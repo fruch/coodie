@@ -28,6 +28,7 @@ jobs:
       contents: read
       pull-requests: write
       actions: read
+      models: read
     steps:
       - uses: actions/checkout@v4
 
@@ -80,6 +81,16 @@ jobs:
           # Store logs in a file (too large for output variable)
           echo "${failed_logs}" > /tmp/failed_logs.txt
 
+      - name: Summarize failure with Copilot
+        if: steps.pr.outputs.found == 'true'
+        id: copilot_summary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .github/scripts/summarize-failure.py \
+            --logs-file /tmp/failed_logs.txt \
+            --output-file /tmp/copilot_summary.txt
+
       - name: Comment on pull request
         if: steps.pr.outputs.found == 'true'
         env:
@@ -90,6 +101,7 @@ jobs:
           run_url="${{ steps.logs.outputs.run_url }}"
           head_sha="${{ steps.logs.outputs.head_sha }}"
           failed_logs=$(cat /tmp/failed_logs.txt)
+          copilot_summary=$(cat /tmp/copilot_summary.txt)
 
           cat > /tmp/comment.md <<EOF
           ## CI Failure: ${workflow_name}
@@ -97,7 +109,10 @@ jobs:
           **Commit:** \`${head_sha}\`
           **Run:** ${run_url}
 
-          The **${workflow_name}** workflow failed. Below are the logs from the failed jobs.
+          ### 🤖 Copilot Failure Analysis
+          ${copilot_summary}
+
+          ---
 
           @copilot please investigate the failure and suggest a fix.
 

@@ -135,6 +135,40 @@ We like to have the pull request open as soon as possible, that's a great place 
 2. Update the documentation for significant features.
 3. Ensure tests are passing on CI.
 
+### Plan-Linking Convention
+
+If your PR implements a phase of a multi-phase plan in `docs/plans/`, you can
+link the PR to the plan so the **Plan Phase Continuation** workflow automatically
+delegates the next phase to Copilot after merge.
+
+Add one or both of these lines to your PR body:
+
+```
+Plan: docs/plans/<plan-name>.md
+Phase: N
+```
+
+- **`Plan:`** — path to the plan file (case-insensitive, relative to repo root)
+- **`Phase:`** — the phase number this PR completes (optional; if omitted the
+  workflow detects the completed phase from the plan's own ✅ markers)
+
+**Example PR body:**
+
+```
+Implements phase 2 of the UDT support plan.
+
+Plan: docs/plans/udt-support.md
+Phase: 2
+```
+
+As a fallback the workflow also detects the plan from the **branch name** if
+it follows the convention `plan/<plan-name>/phase-N`
+(e.g. `plan/udt-support/phase-2`).
+
+When a PR **introduces a new plan file** (adds a `docs/plans/*.md` file), the
+workflow treats the merge as the bootstrap trigger and automatically starts
+Phase 1 — no explicit `Plan:` line is needed.
+
 ### Slash Commands
 
 Maintainers and collaborators with write access can use slash-commands in PR
@@ -275,13 +309,15 @@ The repository's GitHub Actions workflows are tested at three levels:
 
 ### Manual Smoke Tests (workflow_dispatch)
 
-The `PR Rebase & Squash` and `Self-Healing CI` workflows support `workflow_dispatch` triggers for manual testing:
+The `PR Rebase & Squash`, `Self-Healing CI`, and `Plan Phase Continuation` workflows
+support `workflow_dispatch` triggers for manual testing:
 
 1. Go to **Actions** → select the workflow → **Run workflow**.
 2. For `PR Rebase & Squash`: enter a PR number and select the command (`rebase`, `squash`, or `rebase squash`).
 3. For `Self-Healing CI`: enter a workflow run ID to inspect.
-4. Verify the expected comment is posted on the PR.
-5. **Cleanup:** If the operation modified the PR branch (rebase/squash), restore it with `git reflog` and `git push --force-with-lease`.
+4. For `Plan Phase Continuation`: enter the plan file path (e.g. `docs/plans/udt-support.md`) and optionally the completed phase number.
+5. Verify the expected comment is posted on the PR.
+6. **Cleanup:** If the operation modified the PR branch (rebase/squash), restore it with `git reflog` and `git push --force-with-lease`.
 
 ## Making a new release
 

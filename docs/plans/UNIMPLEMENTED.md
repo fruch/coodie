@@ -4,9 +4,10 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-02-28 (post-merge: UDT fully implemented,
-> dict_factory done, client-encryption all phases done, plan-continuation
-> action all phases done, demo CI workflow added)
+> **Last reviewed:** 2026-02-28 (post-merge: Phase B migrations done,
+> django-taskboard demo shipped, `__slots__` on hot-path classes done,
+> Phase 1 cqlengine test coverage done, `map__update` operator done,
+> new plans: sync-api-support, pr-conflict-detection-solve)
 
 ---
 
@@ -19,6 +20,8 @@
 5. [Demo Suite Extension](#5-demo-suite-extension)
 6. [cqlengine Test Coverage Gaps](#6-cqlengine-test-coverage-gaps)
 7. [Integration Test Coverage Gaps](#7-integration-test-coverage-gaps)
+8. [Sync API Support](#8-sync-api-support)
+9. [PR Conflict Detection & /solve Command](#9-pr-conflict-detection--solve-command)
 
 ---
 
@@ -42,17 +45,13 @@
 
 *Source: `migration-strategy.md`*
 
-> *Phase A (enhanced `sync_table`) is ✅ Done. Phases B, C, and D are not implemented — the `src/coodie/migrations/` module does not exist yet.*
+> *Phase A (enhanced `sync_table`) is ✅ Done. Phase B (migration framework core) is ✅ Done — `src/coodie/migrations/` exists with `base.py`, `runner.py`, `cli.py`, and `coodie migrate` CLI. Phases C and D remain.*
 
-### 2.1 Phase B — Migration Framework Core
-
-> **Prompt:** Implement the core migration framework for coodie. Create `src/coodie/migrations/` package with: (1) `base.py` — `Migration` base class with `upgrade(ctx)` and `downgrade(ctx)` methods, `MigrationContext` with `execute()` for running CQL. (2) `runner.py` — `MigrationRunner` that discovers migration files matching `YYYYMMDD_NNN_description.py` pattern using `importlib.util.spec_from_file_location`, orders them by timestamp, and tracks applied state in a `_coodie_migrations` Cassandra table. (3) `cli.py` — `coodie migrate` CLI entry point supporting `--dry-run`, `--rollback --steps N`, `--status`, and `--target`. (4) Add LWT-based single-writer lock via `_coodie_migrations_lock` table to prevent concurrent migration execution. (5) Add schema agreement wait before DDL. Add the `coodie` CLI entry point to `pyproject.toml`. Add unit and integration tests. See `docs/plans/migration-strategy.md` Phase B (tasks B.1–B.6).
-
-### 2.2 Phase C — Auto-Generation (`coodie makemigration`)
+### 2.1 Phase C — Auto-Generation (`coodie makemigration`)
 
 > **Prompt:** Implement migration auto-generation for coodie. Add a `coodie makemigration --name <description>` CLI command that: (1) introspects the live database schema via `system_schema.columns` and `system_schema.tables`, (2) diffs against the current `Document` class definitions, (3) generates a migration file with `upgrade()` containing the required CQL statements, (4) flags unsafe or unsupported operations (e.g., primary key changes) with TODO comments and warnings. The generated file should follow the `YYYYMMDD_NNN_description.py` naming convention and define a `ForwardMigration(Migration)` class. Also add a `coodie schema-diff` command that shows the diff without creating a file. See `docs/plans/migration-strategy.md` Phase C (tasks C.1–C.5).
 
-### 2.3 Phase D — Data Migrations (Tier 3)
+### 2.2 Phase D — Data Migrations (Tier 3)
 
 > **Prompt:** Implement data migration support for coodie's migration framework. Add `ctx.scan_table(keyspace, table)` to `MigrationContext` that uses token-range queries to iterate over all rows in batches without loading the entire table into memory. Add progress reporting (log percentage for long-running migrations). Add resume-from-token support so a failed migration can resume where it stopped. Add optional rate limiting / throttle support. See `docs/plans/migration-strategy.md` Phase D (tasks D.1–D.4).
 
@@ -62,13 +61,9 @@
 
 *Source: `performance-improvement.md`*
 
-> *Phases 1–6 are ✅ Done (Phase 5: PK cache + native async; Phase 6: `dict_factory` on CassandraDriver session). The following lower-priority items from §14.5 remain.*
+> *Phases 1–7 are ✅ Done (Phase 5: PK cache + native async; Phase 6: `dict_factory` on CassandraDriver session; Phase 7: `__slots__` on LWTResult, PagedResult, BatchQuery). Only connection-level optimizations (P2) remain.*
 
-### 3.1 `__slots__` on Remaining Hot-Path Classes (P2)
-
-> **Prompt:** Add `__slots__` to the remaining hot-path classes that still use `__dict__`: `LWTResult` in `results.py`, `PagedResult` in `results.py`, and `BatchQuery` in `batch.py`. These are created frequently and `__slots__` saves ~40–60 bytes per instance and speeds up attribute access by ~10–20%. See `docs/plans/performance-improvement.md` §14.5.4.
-
-### 3.2 Connection-Level Optimizations (P2)
+### 3.1 Connection-Level Optimizations (P2)
 
 > **Prompt:** Implement connection-level performance optimizations for coodie: (1) Prepared statement warming — pre-prepare common queries at `sync_table()` time instead of lazily on first execute, eliminating ~100–200 µs cold-start penalty. (2) Add support for enabling LZ4 protocol compression on the cassandra-driver connection for large result sets. (3) Add support for speculative execution policy to reduce tail latency. These are driver-configuration changes exposed via `init_coodie()` parameters. See `docs/plans/performance-improvement.md` §14.5.6.
 
@@ -106,57 +101,53 @@
 
 *Source: `demos-extension-plan.md`*
 
-> *2 demos exist: `demos/fastapi-catalog/` and `demos/flask-blog/` (✅). Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for 12+ additional demos.*
+> *3 demos exist: `demos/fastapi-catalog/`, `demos/flask-blog/`, and `demos/django-taskboard/` (✅). Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for 11+ additional demos.*
 
-### 5.1 Django Task Board Demo
-
-> **Prompt:** Create `demos/django-taskboard/` — a Django integration demo showing coodie alongside Django's ORM. Use Cassandra for high-write task events (`TaskEvent`, `TaskCounter` models via coodie) and SQLite for auth. Add a `manage.py sync_cassandra` management command. Build a colorful Kanban-style board UI with Django templates. Add `seed.py` with Faker data and `rich` progress bars. Include `Makefile` with standard targets and a `README.md` with numbered quick-start. See `docs/plans/demos-extension-plan.md` Phase 3.
-
-### 5.2 TTL & Ephemeral Data Demo
+### 5.1 TTL & Ephemeral Data Demo
 
 > **Prompt:** Create `demos/ttl-sessions/` — an ephemeral session store demo showcasing coodie's TTL support. Demonstrate `ttl=` on save, `__default_ttl__` on the model's Settings, and show data auto-expiring. Include a web UI that displays session tokens and their remaining TTL. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.1).
 
-### 5.3 Real-Time Counters Demo
+### 5.2 Real-Time Counters Demo
 
 > **Prompt:** Create `demos/realtime-counters/` — a page-view analytics demo showcasing coodie's `CounterDocument`, `increment()`, and `decrement()`. Build a live analytics dashboard showing counter updates in real-time. Add `seed.py` to generate synthetic traffic, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.2).
 
-### 5.4 Lightweight Transactions Demo
+### 5.3 Lightweight Transactions Demo
 
 > **Prompt:** Create `demos/lwt-user-registry/` — a user registration demo showcasing coodie's Lightweight Transactions (`if_not_exists`, `if_exists`, `if_conditions`). Demonstrate uniqueness guarantees and optimistic locking patterns. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.3).
 
-### 5.5 Batch Operations Demo
+### 5.4 Batch Operations Demo
 
 > **Prompt:** Create `demos/batch-importer/` — a CSV bulk import tool demo showcasing coodie's `BatchQuery` with logged and unlogged batches. Use `rich` for progress bars during import. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.1).
 
-### 5.6 Collections & Tags Demo
+### 5.5 Collections & Tags Demo
 
 > **Prompt:** Create `demos/collections-tags/` — an article tagging system demo showcasing coodie's collection types (`list`, `set`, `map` fields) and collection mutation operations (`add__`, `remove__`, `append__`, `prepend__`). Include frozen collection examples. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.2).
 
-### 5.7 Materialized Views Demo
+### 5.6 Materialized Views Demo
 
 > **Prompt:** Create `demos/materialized-views/` — a product catalog demo with auto-maintained `MaterializedView` by category. Show `sync_view()`, read-only queries against the view, and how the view auto-updates when the base table changes. Add `seed.py`, UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.3).
 
-### 5.8 Vector Similarity Search (Library + Demo)
+### 5.7 Vector Similarity Search (Library + Demo)
 
 > **Prompt:** Add vector column support to coodie and create a vector search demo. **Library work:** (1) Add `Vector(dimensions=N)` field annotation to `coodie/fields.py` mapping to CQL `vector<float, N>`. (2) Update `coodie/schema.py` to emit `vector<float, N>` in DDL. (3) Add `VectorIndex(similarity_function="COSINE")` annotation for `CREATE INDEX ... USING 'vector_index'`. (4) Support ANN queries via a QuerySet method that emits `ORDER BY field ANN OF [...]` CQL. (5) Validate vector dimensions on save. (6) Add unit and integration tests. **Demo work:** Create `demos/vector-search/` — semantic product search using sentence-transformer embeddings with ANN queries. See `docs/plans/demos-extension-plan.md` Phase 6.
 
-### 5.9 Time-Series IoT Demo
+### 5.8 Time-Series IoT Demo
 
 > **Prompt:** Create `demos/timeseries-iot/` — an IoT sensor data demo showcasing time-bucketed partitions, clustering keys with DESC order, `per_partition_limit()`, and `paged_all()` for pagination. Add `seed.py` generating synthetic sensor readings, colorful dashboard UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.1).
 
-### 5.10 Polymorphic CMS Demo
+### 5.9 Polymorphic CMS Demo
 
 > **Prompt:** Create `demos/polymorphic-cms/` — a content management system demo showcasing coodie's single-table inheritance with `Discriminator` column. Define `Article`, `Video`, and `Podcast` subtypes sharing a single table. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.2).
 
-### 5.11 Argus-Style Test Tracker Demo
+### 5.10 Argus-Style Test Tracker Demo
 
 > **Prompt:** Create `demos/argus-tracker/` — a scaled-down test tracker inspired by scylladb/argus. Define complex models: User, TestRun (composite PK + clustering), Event (compound partition), Notification (TimeUUID). Include batch event ingestion, prepared-statement caching patterns, and partition-scoped queries. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.1).
 
-### 5.12 cqlengine → coodie Migration Guide Demo
+### 5.11 cqlengine → coodie Migration Guide Demo
 
 > **Prompt:** Create `demos/migration-guide/` — a side-by-side migration walkthrough from cqlengine to coodie. Include `cqlengine_models.py` and `coodie_models.py` with equivalent models, a `migrate.py` script that syncs tables, and a `verify.py` that checks data round-trip. Reference argus model patterns. Add `README.md` with step-by-step walkthrough. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.3).
 
-### 5.13 Schema Migrations Demo
+### 5.12 Schema Migrations Demo
 
 > **Prompt:** Create `demos/schema-migrations/` — a demo showcasing coodie's Phase B migration framework CLI (`coodie migrate`). Demonstrate `apply`, `rollback`, `dry-run`, and state tracking with the `_coodie_migrations` table. Include sample migration files following the `YYYYMMDD_NNN_description.py` pattern. Add `Makefile` and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 10 reference.
 
@@ -166,11 +157,11 @@
 
 *Source: `cqlengine-test-coverage-plan.md`*
 
-> *This plan identifies cqlengine behaviours covered by the scylladb/python-driver test suite that coodie does NOT yet test. Many require small API additions before tests can be written.*
+> *Phase 1 (unit test completeness) is ✅ Done. `map__update` collection operator is ✅ Done in `cql_builder.py`. Phases 2–8 (integration tests) remain.*
 
 ### 6.1 Collection Mutation Integration Tests
 
-> **Prompt:** Add integration tests for collection mutation operations against a real ScyllaDB instance. Currently only unit tests exist. Test: (1) `list__append` and `list__prepend` round-trip. (2) `set__add` and `set__remove` round-trip. (3) `map__update` and `map__remove` round-trip (requires implementing `map__update` and `map__remove` in QuerySet). (4) Frozen collection round-trip. See `docs/plans/cqlengine-test-coverage-plan.md` §1.2.
+> **Prompt:** Add integration tests for collection mutation operations against a real ScyllaDB instance. Currently only unit tests exist. Test: (1) `list__append` and `list__prepend` round-trip. (2) `set__add` and `set__remove` round-trip. (3) `map__update` and `map__remove` round-trip (`map__update` is now implemented in `cql_builder.py`). (4) Frozen collection round-trip. See `docs/plans/cqlengine-test-coverage-plan.md` Phase 2 (tasks 2.1–2.6).
 
 ### 6.2 Counter Column Integration Tests
 
@@ -223,3 +214,59 @@
 ### 7.3 AcsyllaDriver Integration Tests
 
 > **Prompt:** Add CI workflow support and integration tests for the `AcsyllaDriver` (async native driver at `src/coodie/drivers/acsylla.py`). Currently all async integration tests run through the `CassandraDriver` asyncio bridge. Add a separate CI workflow or matrix entry targeting the `acsylla` driver. See `docs/plans/integration-test-coverage.md` §"AcsyllaDriver".
+
+---
+
+## 8. Sync API Support
+
+*Source: `sync-api-support.md`*
+
+> *AcsyllaDriver's `connect()` classmethod supports sync, but `init_coodie_async()` and `init_coodie()` host-based paths do not. PythonRsDriver (`src/coodie/drivers/python_rs.py`) does not exist yet. All 5 phases are pending.*
+
+### 8.1 Fix AcsyllaDriver `init_coodie_async` Sync Path
+
+> **Prompt:** Fix `init_coodie_async(driver_type="acsylla", hosts=...)` so the returned driver has `_bridge_to_bg_loop = True` and sync calls work. Currently, the session is created on the caller's event loop instead of the background loop that powers the sync bridge. Replace `acsylla.create_cluster(...).create_session()` with `AcsyllaDriver.connect(session_factory=lambda: ...)` in the acsylla path of `init_coodie_async()`. See `docs/plans/sync-api-support.md` Phase 1 (tasks 1.1–1.4).
+
+### 8.2 Add sync-capable `init_coodie` for AcsyllaDriver
+
+> **Prompt:** Allow `init_coodie(driver_type="acsylla", hosts=...)` to auto-create a sync-capable session instead of raising `ConfigurationError`. Add `AcsyllaDriver.connect_sync(hosts, keyspace, **kwargs)` — a blocking classmethod that bootstraps the background loop and creates the session on it. Add a `UserWarning` when `AcsyllaDriver(session=...)` is used directly (sync calls may not work). See `docs/plans/sync-api-support.md` Phase 2 (tasks 2.1–2.5).
+
+### 8.3 Implement PythonRsDriver with Sync Bridge
+
+> **Prompt:** Create `src/coodie/drivers/python_rs.py` with a fully functional `PythonRsDriver(AbstractDriver)` that mirrors the AcsyllaDriver sync bridge pattern. Implement: `_prepare()` with cache, DDL detection, `_rows_to_dicts()` via `RequestResult.iter_rows()`, `_execute_async_impl()`, sync/async `execute()`, `sync_table()`, `close()`. Add `PythonRsDriver.connect(session_factory)` classmethod. Register `driver_type="python-rs"` in `init_coodie()` and `init_coodie_async()`. See `docs/plans/sync-api-support.md` Phase 3 (tasks 3.1–3.11).
+
+### 8.4 Sync API Integration Tests
+
+> **Prompt:** Verify both AcsyllaDriver and PythonRsDriver pass the integration test suite in sync and async variants. Add `"python-rs"` to `--driver-type` choices, create `create_python_rs_session()` helper, update `coodie_driver` fixture, and add CI matrix entries for both drivers. See `docs/plans/sync-api-support.md` Phase 4 (tasks 4.1–4.5).
+
+### 8.5 Sync API Documentation
+
+> **Prompt:** Document the sync bridge pattern, supported init paths, and caveats for AcsyllaDriver and PythonRsDriver. Update class docstrings and `init_coodie()`/`init_coodie_async()` docstrings. See `docs/plans/sync-api-support.md` Phase 5 (tasks 5.1–5.3).
+
+---
+
+## 9. PR Conflict Detection & /solve Command
+
+*Source: `pr-conflict-detection-solve.md`*
+
+> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). All 5 workflow phases are pending — no conflict detection or `/solve` command workflows exist yet.*
+
+### 9.1 Conflict Detection & Labeling Workflow
+
+> **Prompt:** Create `.github/workflows/pr-conflict-detect.yml` — a workflow that detects merge conflicts on PRs. Trigger on `push` to default branch and `pull_request` events (`opened`, `synchronize`, `reopened`). For each open PR, attempt `git merge --no-commit --no-ff` and add/remove the `conflict` label based on result. See `docs/plans/pr-conflict-detection-solve.md` Phase 1 (tasks 1.1–1.5).
+
+### 9.2 `/solve` Slash-Command Workflow
+
+> **Prompt:** Create `.github/workflows/pr-solve-command.yml` — a workflow triggered by `issue_comment` with `/solve` command. Checkout the PR branch, attempt `git merge origin/<base>`, and if conflicts exist, invoke Copilot CLI to resolve them (reusing logic from `resolve-conflicts.sh`). Push the merge commit. See `docs/plans/pr-conflict-detection-solve.md` Phase 2 (tasks 2.1–2.6).
+
+### 9.3 Shared Conflict-Resolution Script
+
+> **Prompt:** Extract and generalize the conflict-resolution logic from the existing `resolve-conflicts.sh` (rebase-focused) into a shared script that also supports merge-based resolution. Add a `--strategy` flag (`rebase` vs `merge`). Update both the existing `/rebase` workflow and the new `/solve` workflow to use the shared script. See `docs/plans/pr-conflict-detection-solve.md` Phase 3 (tasks 3.1–3.5).
+
+### 9.4 Safety Gates & Edge Cases
+
+> **Prompt:** Add safety gates to the conflict detection and `/solve` workflows: draft PR skip, max file limit, protected branch checks, binary file conflict handling, concurrent run prevention. See `docs/plans/pr-conflict-detection-solve.md` Phase 4 (tasks 4.1–4.6).
+
+### 9.5 Testing & Documentation
+
+> **Prompt:** Add Bats tests for the shared conflict-resolution script, Python workflow convention tests, and update `CONTRIBUTING.md` with `/solve` command documentation. See `docs/plans/pr-conflict-detection-solve.md` Phase 5 (tasks 5.1–5.4).

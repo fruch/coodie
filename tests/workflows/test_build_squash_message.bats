@@ -73,3 +73,33 @@ teardown() {
   [[ "$MESSAGE" != *"└ Done"* ]]
   [[ "$MESSAGE" != *'$ npm'* ]]
 }
+
+@test "Copilot output has check-failure markers and permission errors — stripped out" {
+  export TITLE="test: add counter tests"
+  printf '✗ Check commit details\n  2>/dev/null | head -20\n  Permission denied and could not request permission from user\n\nAdd integration tests for counter operations.\n' > "$COPILOT_OUTPUT_FILE"
+  export PR_BODY=""
+  source "$SCRIPT_DIR/build-squash-message.sh"
+  [[ "$MESSAGE" == *"Add integration tests for counter operations."* ]]
+  [[ "$MESSAGE" != *"✗ Check commit details"* ]]
+  [[ "$MESSAGE" != *"2>/dev/null"* ]]
+  [[ "$MESSAGE" != *"Permission denied"* ]]
+}
+
+@test "Copilot output has check-success markers — stripped out" {
+  export TITLE="fix: typo"
+  printf '✓ Verified changes\nFixed typo in README\n' > "$COPILOT_OUTPUT_FILE"
+  export PR_BODY=""
+  source "$SCRIPT_DIR/build-squash-message.sh"
+  [[ "$MESSAGE" == *"Fixed typo in README"* ]]
+  [[ "$MESSAGE" != *"✓ Verified"* ]]
+}
+
+@test "All Copilot noise stripped — falls back to PR body" {
+  export TITLE="feat: new feature"
+  printf '✗ Check commit details\n  2>/dev/null | head -20\n  Permission denied and could not request permission from user\n' > "$COPILOT_OUTPUT_FILE"
+  export PR_BODY="Fallback body"
+  source "$SCRIPT_DIR/build-squash-message.sh"
+  [[ "$MESSAGE" == *"Fallback body"* ]]
+  [[ "$MESSAGE" != *"✗"* ]]
+  [[ "$MESSAGE" != *"Permission denied"* ]]
+}

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772201213637,
+  "lastUpdate": 1772308197780,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -6733,6 +6733,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 5.566941490636374e-7",
             "extra": "mean: 5.275462325967383 usec\nrounds: 7326"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "8501cdd890e955c82b5c4c32b76d8a5848bd4b53",
+          "message": "feat(ci): extract resolve-conflicts script, add Bats tests, document act commands\n\n- Extract conflict-resolution loop into .github/scripts/resolve-conflicts.sh\n  (Phase 2 of github-actions-testing-plan.md: shell scripts in .github/scripts/)\n- Update pr-rebase-squash.yml to call bash .github/scripts/resolve-conflicts.sh\n  (npm install stays in the workflow; resolution logic lives in the script)\n- Add 9 Bats tests in tests/workflows/test_resolve_conflicts.bats:\n  no conflicts, Copilot resolves, empty response, markers still present,\n  fenced-block stripping, multi-round rebase, MAX_ROUNDS exceeded\n- Add testing docs to CONTRIBUTING.md:\n  bats/pytest commands, workflow_dispatch gh-workflow-run (preferred),\n  and act command with event payload template\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-02-28T21:49:16+02:00",
+          "tree_id": "31aad9dd9842af1b1684028fafbc5b15f282cd88",
+          "url": "https://github.com/fruch/coodie/commit/8501cdd890e955c82b5c4c32b76d8a5848bd4b53"
+        },
+        "date": 1772308196726,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52952.85080363864,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001903274642150638",
+            "extra": "mean: 18.88472452046501 usec\nrounds: 8919"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 552497.605151093,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0314716926527934e-7",
+            "extra": "mean: 1.809962596537459 usec\nrounds: 50824"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 586122.8590104614,
+            "unit": "iter/sec",
+            "range": "stddev: 5.222644560408868e-7",
+            "extra": "mean: 1.7061269401576975 usec\nrounds: 57531"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 814728.4960397246,
+            "unit": "iter/sec",
+            "range": "stddev: 3.430682721484332e-7",
+            "extra": "mean: 1.227402754243718 usec\nrounds: 158958"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 927346.0470888306,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3987188694459854e-7",
+            "extra": "mean: 1.0783461073018517 usec\nrounds: 95612"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 732444.8690393802,
+            "unit": "iter/sec",
+            "range": "stddev: 3.988477732317359e-7",
+            "extra": "mean: 1.3652904706828313 usec\nrounds: 127796"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 184076.0816737709,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010932552939594178",
+            "extra": "mean: 5.432536323606949 usec\nrounds: 6800"
           }
         ]
       }

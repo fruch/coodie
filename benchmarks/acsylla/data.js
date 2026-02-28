@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772318874316,
+  "lastUpdate": 1772318975778,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -7609,6 +7609,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 6.810317351723921e-7",
             "extra": "mean: 5.322356335158145 usec\nrounds: 7782"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "daa0d40363d42f358d5d85471e73eb1143c9877f",
+          "message": "feat(migrations): implement Phase B migration framework core\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T00:48:48+02:00",
+          "tree_id": "c7eab623030404acbb63c449209517d8b0fd8c42",
+          "url": "https://github.com/fruch/coodie/commit/daa0d40363d42f358d5d85471e73eb1143c9877f"
+        },
+        "date": 1772318974724,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52614.01747249444,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000019047079549010377",
+            "extra": "mean: 19.006341808488205 usec\nrounds: 8771"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 565925.4491998213,
+            "unit": "iter/sec",
+            "range": "stddev: 4.474062289338687e-7",
+            "extra": "mean: 1.767017195310671 usec\nrounds: 45536"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 622616.0677808803,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2977959132653933e-7",
+            "extra": "mean: 1.606126233722471 usec\nrounds: 52894"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 843245.7375385066,
+            "unit": "iter/sec",
+            "range": "stddev: 3.0684428908522634e-7",
+            "extra": "mean: 1.1858939280488627 usec\nrounds: 149210"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 921256.1301720146,
+            "unit": "iter/sec",
+            "range": "stddev: 3.416936996349159e-7",
+            "extra": "mean: 1.08547445954393 usec\nrounds: 94967"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 739548.2205266113,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7457063556901913e-7",
+            "extra": "mean: 1.352176872642501 usec\nrounds: 100513"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 191677.04073400144,
+            "unit": "iter/sec",
+            "range": "stddev: 7.45573602990041e-7",
+            "extra": "mean: 5.217108925360255 usec\nrounds: 7932"
           }
         ]
       }

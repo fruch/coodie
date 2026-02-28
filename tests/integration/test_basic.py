@@ -254,6 +254,8 @@ class TestIntegration:
 
     async def test_fetch_size_limits_page(self, coodie_driver, Product, driver_type) -> None:
         """fetch_size(n) limits the number of rows returned per page."""
+        if driver_type == "python-rs":
+            pytest.skip("python-rs-driver uses execute_unpaged — no pagination support")
         from coodie.results import PagedResult
 
         brand = f"FetchBrand_{uuid4().hex[:8]}"

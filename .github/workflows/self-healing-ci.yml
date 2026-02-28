@@ -3,6 +3,23 @@ name: Self-Healing CI
 # NOTE: workflow_run triggers only fire for workflow files that exist on the
 # default branch. This workflow must be merged to main before it will react
 # to failures in other workflows.
+#
+# GH_PAT secret — required for @copilot mentions to work on Copilot-authored PRs
+# ─────────────────────────────────────────────────────────────────────────────
+# The "Comment on pull request" step uses secrets.GH_PAT so the comment appears
+# to come from a real user account.  Copilot ignores @copilot mentions that are
+# posted by the GitHub Actions bot (GITHUB_TOKEN) on PRs it authored.
+#
+# Create a fine-grained Personal Access Token with the following settings:
+#   URL:          https://github.com/settings/personal-access-tokens/new
+#   Resource owner: fruch (or the org that owns this repo)
+#   Repository access: Only select repositories → fruch/coodie
+#   Repository permissions:
+#     • Pull requests: Read and write   ← needed to post PR comments
+#
+# Store the generated token as a repository secret named GH_PAT:
+#   https://github.com/fruch/coodie/settings/secrets/actions/new
+
 on:
   workflow_run:
     workflows:
@@ -94,7 +111,7 @@ jobs:
       - name: Comment on pull request
         if: steps.pr.outputs.found == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           pr_number="${{ steps.pr.outputs.number }}"
           workflow_name="${{ steps.logs.outputs.workflow_name }}"

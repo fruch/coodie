@@ -406,9 +406,9 @@ def parse_update_kwargs(
 
     Returns ``(set_data, collection_ops)`` where *collection_ops* is a list of
     ``(column, operator, value)`` tuples.  Supported operators: ``add``,
-    ``remove``, ``append``, ``prepend``.
+    ``remove``, ``append``, ``prepend``, ``update`` (alias for ``add``).
     """
-    collection_operators = {"add", "remove", "append", "prepend"}
+    collection_operators = {"add", "remove", "append", "prepend", "update"}
     set_data: dict[str, Any] = {}
     collection_ops: list[tuple[str, str, Any]] = []
     for key, value in kwargs.items():
@@ -437,7 +437,7 @@ def build_update(
 
     if collection_ops:
         for col, op, value in collection_ops:
-            if op in ("add", "append"):
+            if op in ("add", "append", "update"):
                 set_parts.append(f'"{col}" = "{col}" + ?')
                 params.append(value)
             elif op == "prepend":

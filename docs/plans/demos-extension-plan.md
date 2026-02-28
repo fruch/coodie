@@ -98,7 +98,7 @@ Legend:
 |---|---|---|---|
 | Product Catalog (existing) | FastAPI + HTMX | Async | ✅ |
 | Flask Blog | Flask + Jinja2 | Sync | ❌ |
-| Django Task Board | Django + templates | Sync | ❌ |
+| Django Task Board | Django + templates | Sync | ✅ |
 
 **Gap summary — framework integrations:**
 - Flask Blog → demonstrate coodie's sync API with Flask's request lifecycle,
@@ -141,6 +141,7 @@ Legend:
 |---|---|---|---|
 | Argus-Style Test Tracker | Complex models, UDTs, composite keys, plugin architecture | scylladb/argus | ❌ |
 | cqlengine → coodie Migration | Side-by-side models, sync_table migration, data verification | reddit/cqlmapper, argus | ❌ |
+| Schema Migration Framework | Versioned migration files, apply/rollback, dry-run, status tracking, CLI | coodie Phase B, Django, Alembic | ❌ |
 
 **Gap summary — migration patterns:**
 - Argus-Style → scaled-down version of argus models (User, TestRun, Event,
@@ -149,6 +150,11 @@ Legend:
 - Migration → step-by-step guide with cqlengine models on the left, coodie
   models on the right, and a migration script that syncs tables and verifies
   data round-trip
+- Schema Migration Framework → standalone demo showing coodie's Phase B
+  migration framework in action: versioned migration files that add columns,
+  create indexes, change table options, and perform data transformations; the
+  `coodie migrate` CLI for apply, rollback, dry-run, and status; state
+  tracking in `_coodie_migrations`; and the LWT-based distributed lock
 
 ### 4.4 Data Generation & Feeds
 
@@ -286,6 +292,18 @@ demos/
     ├── coodie_models.py
     ├── migrate.py
     └── verify.py
+└── schema-migrations/                 # NEW: coodie Phase B migration framework
+    ├── README.md
+    ├── Makefile
+    ├── pyproject.toml
+    ├── main.py                        # FastAPI app using migrated schema
+    ├── models.py                      # coodie Document models
+    ├── seed.py
+    └── migrations/
+        ├── 20260115_001_create_base_tables.py
+        ├── 20260203_002_add_featured_column.py
+        ├── 20260220_003_set_reviews_ttl.py
+        └── 20260310_004_add_search_index.py
 ```
 
 ---
@@ -423,6 +441,24 @@ demos/
 | 9.3 | Ensure every demo has consistent Makefile targets, color theming, README structure, and seed.py interface |
 | 9.4 | Update the top-level `README.md` to link to the new `demos/` directory |
 | 9.5 | Final review of all demos for consistency and correctness |
+
+### Phase 10: Schema Migration Framework Demo (Priority: Medium)
+
+**Goal:** Demonstrate coodie's Phase B versioned migration framework — the `coodie migrate` CLI, migration file authoring, apply/rollback/dry-run lifecycle, state tracking, and distributed locking — in a standalone demo application.
+
+| Task | Description |
+|---|---|
+| 10.1 | Create `demos/schema-migrations/` with `pyproject.toml`, `Makefile`, and `README.md` |
+| 10.2 | Define base `Product` and `Review` models in `models.py` (reuse the catalog schema) |
+| 10.3 | Create `migrations/20260115_001_create_base_tables.py` — initial table creation via `sync_table()` wrapped in a migration |
+| 10.4 | Create `migrations/20260203_002_add_featured_column.py` — `ALTER TABLE ... ADD "featured" boolean` + secondary index |
+| 10.5 | Create `migrations/20260220_003_set_reviews_ttl.py` — `ALTER TABLE ... WITH default_time_to_live = 31536000` |
+| 10.6 | Create `migrations/20260310_004_add_search_index.py` — add a secondary index on product name for search |
+| 10.7 | Build `main.py` as a minimal FastAPI app that uses the migrated schema (products with `featured` flag) |
+| 10.8 | Add `seed.py` with `rich` progress output seeding products and reviews, including featured products |
+| 10.9 | Write README with step-by-step walkthrough: start ScyllaDB → create keyspace → apply migrations → seed → run app → rollback → dry-run → status |
+| 10.10 | Include a "Writing Your Own Migration" section in the README showing the file naming convention and `ForwardMigration` class pattern |
+| 10.11 | Manual end-to-end test: `make db-up` → `make migrate` → `make seed` → `make run` → `make migrate-rollback` → `make migrate-status` |
 
 ---
 
@@ -939,6 +975,38 @@ entire multiverse collapses. No pressure.
 
 ---
 
+#### 🔧 **schema-migrations** — *"The Temporal Engineer"*
+
+**Background:** When SCYLLA-9 corrupted the multiverse, it didn't just
+break the present — it fractured the timeline of every database schema
+ever created. Tables gain columns from the future, lose indexes from the
+past, and TTLs shift unpredictably. The Coodie Corps needs a **Temporal
+Engineer** — an AI fragment called **SCHEMATA** — who can apply versioned
+schema patches across time. Each migration file is a "temporal patch"
+that repairs one fracture. Apply them in order and the timeline heals.
+Roll one back and reality rewrites itself. But run two migrations
+concurrently and the timeline collapses — which is why SCHEMATA uses
+LWT locks to ensure only one engineer works on the timeline at a time.
+
+**Visual Theme:**
+- **Primary accent:** Chrono-teal (`#14b8a6`) with timeline silver
+  (`#94a3b8`) — futuristic engineering blueprint aesthetic with timeline
+  branching diagrams
+- **Migration timeline:** Vertical timeline UI showing each migration as
+  a node: applied = glowing teal ✅, pending = dim silver ⏳, rolled
+  back = crossed-out red ↩️; clicking a node shows the CQL diff
+- **Seed animation:** `rich` shows a timeline of applied patches:
+  `[🔧 SCHEMATA]  Applying patch #001: "Add featured column"  ██████████  ✅`
+  with a chrono-teal gradient progress bar labeled
+  `"Repairing the Schema Timeline..."`
+- **Dry-run display:** `rich` shows planned CQL in a code panel with
+  syntax highlighting: `[🔧 SCHEMATA]  [DRY RUN] Would execute:` followed
+  by highlighted CQL statements
+- **Rollback animation:** Progress bar runs in reverse with amber color:
+  `[🔧 SCHEMATA]  ↩️ Rolling back patch #003  ██████████  ✅ Timeline reverted`
+
+---
+
 ### 9.3 Visual Guidelines Summary Table
 
 | Demo | Accent Color(s) | Aesthetic | CLI Seed Persona | Signature Effect |
@@ -957,6 +1025,7 @@ entire multiverse collapses. No pressure.
 | vector-search | Purple `#7c3aed` + Pink `#ec4899` | Neural network | `🧠 VECTORMIND` | Particle convergence on search |
 | argus-tracker | Emerald `#10b981` + Red `#ef4444` | Panopticon | `🐙 ARGUS-PRIME` | Coverage heatmap build-up |
 | migration-guide | Gold `#d97706` + Blue `#0ea5e9` | Ancient-futuristic | `🏛️ Rosetta` | Side-by-side diff animation |
+| schema-migrations | Chrono-teal `#14b8a6` + Silver `#94a3b8` | Engineering blueprint | `🔧 SCHEMATA` | Timeline node animation |
 
 **Universal rules:**
 - Every CLI seed script uses `rich` with the demo's accent color and its
@@ -1091,6 +1160,7 @@ For conference talks and live demos, the recommended flow is:
 | vector-search | ANN query latency visible as a distinct read pattern |
 | argus-tracker | Batch INSERT storm + composite-key range reads |
 | migration-guide | Schema change events visible in metrics during `migrate.py` |
+| schema-migrations | DDL latency spikes on apply, LWT lock visible as serial reads, schema agreement delay |
 
 ---
 

@@ -64,6 +64,7 @@ guide/batch-operations
 guide/sync-vs-async
 guide/drivers
 guide/encryption
+guide/schema-management
 guide/exceptions
 guide/recipes
 guide/integrations

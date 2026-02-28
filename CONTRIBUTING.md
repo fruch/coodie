@@ -273,6 +273,7 @@ act issue_comment \
   -e /tmp/rebase-event.json \
   --secret GITHUB_TOKEN="$(gh auth token)" \
   --secret COPILOT_PAT="$(gh auth token)" \
+  --secret WORKFLOW_PUSH_PAT="$(gh auth token)" \
   -W .github/workflows/pr-rebase-squash.yml \
   --job rebase-squash \
   -P ubuntu-latest=catthehacker/ubuntu:act-22.04

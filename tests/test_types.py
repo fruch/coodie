@@ -96,9 +96,61 @@ def test_frozen_type(annotated_type, expected_cql):
     assert python_type_to_cql_type_str(annotated_type) == expected_cql
 
 
+# ---- python_type_to_cql_type_str: frozen + indexed combination ----
+
+
+def test_frozen_collection_with_index():
+    """Frozen collection combined with Indexed should preserve the CQL type string."""
+    from coodie.fields import Indexed
+
+    assert python_type_to_cql_type_str(Annotated[list[str], Frozen(), Indexed()]) == "frozen<list<text>>"
+    assert python_type_to_cql_type_str(Annotated[set[int], Frozen(), Indexed()]) == "frozen<set<int>>"
+    assert python_type_to_cql_type_str(Annotated[dict[str, int], Frozen(), Indexed()]) == "frozen<map<text, int>>"
+
+
 def test_unsupported_type_raises():
     with pytest.raises(InvalidQueryError):
         python_type_to_cql_type_str(object)
+
+
+# ---- python_type_to_cql_type_str: UDT (BaseModel subclass) ----
+
+
+def test_usertype_definition_without_connection():
+    """A UserType (BaseModel) subclass and a Document referencing it can be
+    defined before any driver is registered, and python_type_to_cql_type_str
+    resolves the frozen UDT type string.
+    """
+    from pydantic import BaseModel
+
+    class Address(BaseModel):
+        street: str
+        city: str
+
+    class Order(BaseModel):
+        id: Annotated[UUID, PrimaryKey()]
+        shipping: Address
+
+        class Settings:
+            name = "orders"
+            keyspace = "test_ks"
+
+    # Class definition did not raise — no connection required
+    assert python_type_to_cql_type_str(Address) == "frozen<address>"
+    assert python_type_to_cql_type_str(Annotated[Address, Frozen()]) == "frozen<address>"
+
+
+def test_usertype_custom_type_name():
+    """Settings.__type_name__ overrides the derived CQL type name."""
+    from pydantic import BaseModel
+
+    class MyAddress(BaseModel):
+        street: str
+
+        class Settings:
+            __type_name__ = "custom_addr"
+
+    assert python_type_to_cql_type_str(MyAddress) == "frozen<custom_addr>"
 
 
 def test_no_cqlengine_import():

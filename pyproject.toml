@@ -30,6 +30,9 @@ acsylla = [
     "acsylla>=0.1.0",
 ]
 
+[project.scripts]
+coodie = "coodie.migrations.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/fruch/coodie"
 Documentation = "https://fruch.github.io/coodie/"

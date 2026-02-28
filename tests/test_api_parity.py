@@ -67,3 +67,19 @@ def test_queryset_has_slots():
     assert hasattr(AsyncQS, "__slots__")
     assert "_doc_cls" in SyncQS.__slots__
     assert "_doc_cls" in AsyncQS.__slots__
+
+
+def test_lwt_result_has_slots():
+    """LWTResult should use __slots__ via @dataclass(slots=True)."""
+    from coodie.results import LWTResult
+
+    result = LWTResult(applied=True)
+    assert not hasattr(result, "__dict__")
+
+
+def test_paged_result_has_slots():
+    """PagedResult should use __slots__ via @dataclass(slots=True)."""
+    from coodie.results import PagedResult
+
+    result = PagedResult()
+    assert not hasattr(result, "__dict__")

@@ -1,34 +1,3 @@
-● Read tests/test_drivers.py lines 163-175
-  └ 13 lines read
-
-All three conflicts are identical — replacing a single-line `patch.dict` call with a multi-line formatted version. I'll take the reformatted (multi-line) version from the incoming branch `de5c066`.
-
-✗ Edit tests/test_drivers.py
-  Permission denied and could not request permission from user
-
-● Check file permissions
-  $ ls -la /home/runner/work/coodie/coodie/tests/test_drivers.py
-  └ 2 lines...
-
-✗ Make file writable
-  $ chmod u+w /home/runner/work/coodie/coodie/tests/test_drivers.py && ls -la
-  /home/runner/work/coodie/coodie/tests/test_drivers.py
-  Permission denied and could not request permission from user
-
-● Check current user
-  $ whoami && id
-  └ 3 lines...
-
-● Check file stat
-  $ stat /home/runner/work/coodie/coodie/tests/test_drivers.py
-  └ 9 lines...
-
-✗ Test write access
-  $ touch /home/runner/work/coodie/coodie/tests/test_drivers.py 2>&1; echo "exit: $?"
-  Permission denied and could not request permission from user
-
-The file is read-only due to environment permissions. The task asks me to output the complete resolved file content. Here it is:
-
 from __future__ import annotations
 
 from collections import namedtuple
@@ -43,6 +12,7 @@ from coodie.drivers import (
     register_driver,
     _registry,
 )
+import coodie.drivers as _drivers_mod
 from coodie.drivers.base import AbstractDriver
 from coodie.exceptions import ConfigurationError
 
@@ -65,6 +35,18 @@ def test_get_driver_no_registration_raises():
     with pytest.raises(ConfigurationError):
         get_driver()
     _registry.clear()
+
+
+def test_register_driver_on_empty_registry(mock_driver):
+    """register_driver succeeds on a completely empty registry."""
+    _registry.clear()
+    _drivers_mod._default_driver_name = None
+    register_driver("fresh", mock_driver)
+    assert get_driver("fresh") is mock_driver
+    # Also becomes the default since no default existed
+    assert get_driver() is mock_driver
+    _registry.clear()
+    _drivers_mod._default_driver_name = None
 
 
 def test_mock_driver_execute(mock_driver):

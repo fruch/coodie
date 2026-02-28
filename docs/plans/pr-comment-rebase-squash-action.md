@@ -107,7 +107,7 @@ Legend:
 | Task | Description | Status |
 |---|---|---|
 | 1.1 | Create `.github/workflows/pr-rebase-squash.yml` with `issue_comment` trigger filtered to `/rebase`, `/squash`, `/rebase squash` | ✅ |
-| 1.2 | **Prerequisite:** Generate a fine-grained PAT with "Copilot Requests" permission and store it as repo secret `COPILOT_PAT` (see [§5 Copilot CLI Setup](#5-copilot-cli-setup--credentials)) | ⚙️ Manual step — repo owner must create and store the PAT |
+| 1.2 | **Prerequisite:** Create two fine-grained PATs and store as repo secrets: `COPILOT_PAT` (Account: Copilot Requests Read) for AI features, and `WORKFLOW_PUSH_PAT` (Repository: Contents Read and write) for pushing branches with workflow-file changes (see [§5 Copilot CLI Setup](#5-copilot-cli-setup--credentials)) | ⚙️ Manual step — repo owner must create and store the PATs |
 | 1.3 | Add permission check: verify comment author is a collaborator (write access) or the PR author | ✅ |
 | 1.4 | Checkout PR branch with `fetch-depth: 0` and configure Git identity (`github-actions[bot]`) | ✅ |
 | 1.5 | Add "eyes" reaction to the trigger comment to acknowledge the command | ✅ |
@@ -187,14 +187,22 @@ the Copilot CLI package needs to be installed.
 ### 5.2 Authentication
 
 > **Important:** The default `GITHUB_TOKEN` provided by GitHub Actions does
-> **not** include Copilot API access. A dedicated token is required.
+> **not** include Copilot API access, and **cannot** push changes to
+> `.github/workflows/` files (a GitHub platform restriction). Two separate
+> tokens are used to handle these limitations independently.
 
-| Requirement | Detail |
-|---|---|
-| **Token type** | Fine-grained Personal Access Token (PAT) starting with `github_pat_` |
-| **Required permission** | "Copilot Requests" (under the Copilot permission category) |
-| **Classic PATs** | **Not supported** — classic tokens (`ghp_...`) cannot access the Copilot API |
-| **Copilot subscription** | The GitHub account that owns the PAT must have an active GitHub Copilot subscription (Individual, Business, or Enterprise) |
+#### Token overview
+
+| Secret name | Token type | Required scopes | Owner requirement | Purpose |
+|---|---|---|---|---|
+| **`COPILOT_PAT`** | Fine-grained PAT (`github_pat_`) | Account → **Copilot Requests (Read)** | Must have an active **Copilot subscription** | Copilot CLI calls (conflict resolution, squash messages, plan delegation) |
+| **`WORKFLOW_PUSH_PAT`** | Fine-grained PAT (`github_pat_`) | Repository → **Contents (Read and write)** | Any collaborator with write access | `actions/checkout` token for force-pushing branches that include `.github/workflows/` changes |
+
+> **Why two tokens?** In an open-source project the Copilot subscription
+> holder and the repo maintainer may be different people. Splitting the tokens
+> means Copilot features can be set up (or removed) without affecting the
+> ability to push workflow-file changes, and vice versa. Each token follows
+> the principle of least privilege.
 
 The Copilot CLI resolves credentials in this order:
 
@@ -213,12 +221,12 @@ env:
   COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}   # for copilot CLI commands
 ```
 
-### 5.3 Generating the Fine-Grained PAT (Step-by-Step)
+### 5.3 Creating `COPILOT_PAT` (Copilot CLI Access)
 
 > **Direct link to create a new token:**
 > [`https://github.com/settings/personal-access-tokens/new`](https://github.com/settings/personal-access-tokens/new)
 
-Follow these steps to generate the required token:
+Follow these steps to generate the Copilot CLI token:
 
 1. **Open the token creation page** — Click the link above, or navigate manually:
    GitHub avatar (top-right) → **Settings** → **Developer settings** (bottom of
@@ -228,26 +236,58 @@ Follow these steps to generate the required token:
 
    | Field | Value |
    |---|---|
-   | **Token name** | `coodie-copilot-rebase-squash` (or any descriptive name) |
+   | **Token name** | `coodie-copilot-pat` (or any descriptive name) |
    | **Expiration** | Pick a reasonable lifetime (e.g., 90 days); set a calendar reminder to rotate |
-   | **Description** | "Copilot CLI access for PR rebase/squash workflow" |
+   | **Description** | "Copilot CLI access for coodie CI workflows" |
    | **Resource owner** | Your personal account (the one with the Copilot subscription) |
-   | **Repository access** | "Public Repositories (read-only)" or scope to this repository only |
+   | **Repository access** | "Public Repositories (read-only)" — Copilot Requests is an **account-level** permission and does not need repo write access |
 
-3. **Set permissions** — Expand the **Account permissions** section and enable:
+3. **Set permissions:**
+
+   **Account permissions** (expand the section):
 
    | Permission | Access level | Why |
    |---|---|---|
    | **GitHub Copilot** → **Copilot Requests** | **Read** | Required by the Copilot CLI API |
 
-   No other permissions are needed. Do **not** grant repository write/admin
-   permissions — the workflow uses the separate `GITHUB_TOKEN` for pushes and
-   API calls.
+   No **repository permissions** are needed for this token.
 
 4. **Generate & copy** — Click **Generate token**. Copy the token value
    immediately (it starts with `github_pat_` and is only shown once).
 
-### 5.4 Adding the Token as a Repository Secret
+### 5.4 Creating `WORKFLOW_PUSH_PAT` (Workflow File Push Access)
+
+> **Direct link to create a new token:**
+> [`https://github.com/settings/personal-access-tokens/new`](https://github.com/settings/personal-access-tokens/new)
+
+Follow these steps to generate the workflow push token:
+
+1. **Open the token creation page** — same as above.
+
+2. **Fill in the token form:**
+
+   | Field | Value |
+   |---|---|
+   | **Token name** | `coodie-workflow-push-pat` (or any descriptive name) |
+   | **Expiration** | Pick a reasonable lifetime (e.g., 90 days); set a calendar reminder to rotate |
+   | **Description** | "Push access for branches with .github/workflows/ changes" |
+   | **Resource owner** | Your personal account (any collaborator with write access) |
+   | **Repository access** | Select **"Only select repositories"** and choose `fruch/coodie` |
+
+3. **Set permissions:**
+
+   **Repository permissions** (expand the section):
+
+   | Permission | Access level | Why |
+   |---|---|---|
+   | **Contents** | **Read and write** | Allows `git push --force-with-lease` on branches that contain `.github/workflows/` changes. This is needed because `GITHUB_TOKEN` cannot push workflow-file modifications — a [GitHub platform restriction](https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication#permissions-for-the-github_token) that is not configurable |
+
+   No **account permissions** are needed for this token.
+
+4. **Generate & copy** — Click **Generate token**. Copy the token value
+   immediately (it starts with `github_pat_` and is only shown once).
+
+### 5.5 Adding the Tokens as Repository Secrets
 
 > **Direct link (replace `OWNER/REPO`):**
 > `https://github.com/OWNER/REPO/settings/secrets/actions/new`
@@ -257,21 +297,37 @@ Follow these steps to generate the required token:
 
 1. Open the link above, or navigate: Repository → **Settings** → **Secrets and
    variables** → **Actions** → **New repository secret**
-2. Set **Name** to `COPILOT_PAT`
-3. Paste the fine-grained PAT value into the **Secret** field
-4. Click **Add secret**
+2. Create secret **`COPILOT_PAT`** — paste the Copilot CLI PAT value
+3. Create secret **`WORKFLOW_PUSH_PAT`** — paste the workflow push PAT value
+4. Click **Add secret** for each
 
-### 5.5 Repository Setup Checklist
+### 5.6 Repository Setup Checklist
 
-- [ ] PAT owner has an active **GitHub Copilot subscription** (Individual, Business, or Enterprise)
-- [ ] Fine-grained PAT generated with **"Copilot Requests"** permission (see [§5.3](#53-generating-the-fine-grained-pat-step-by-step))
-- [ ] PAT stored as repo secret **`COPILOT_PAT`** (see [§5.4](#54-adding-the-token-as-a-repository-secret))
-- [ ] **Local smoke test** passed: `COPILOT_GITHUB_TOKEN=github_pat_... copilot -p "hello"` returns a suggestion
+- [ ] **`COPILOT_PAT`** (optional — AI features degrade gracefully without it):
+  - [ ] PAT owner has an active **GitHub Copilot subscription** (Individual, Business, or Enterprise)
+  - [ ] Fine-grained PAT generated with **"Copilot Requests (Read)"** account permission (see [§5.3](#53-creating-copilot_pat-copilot-cli-access))
+  - [ ] PAT stored as repo secret **`COPILOT_PAT`**
+  - [ ] **Local smoke test** passed: `COPILOT_GITHUB_TOKEN=github_pat_... copilot -p "hello"` returns a suggestion
+- [ ] **`WORKFLOW_PUSH_PAT`** (required for pushing branches that touch `.github/workflows/`):
+  - [ ] Fine-grained PAT generated with **"Contents (Read and write)"** repository permission scoped to this repo (see [§5.4](#54-creating-workflow_push_pat-workflow-file-push-access))
+  - [ ] PAT stored as repo secret **`WORKFLOW_PUSH_PAT`**
 
-> **Fallback behavior:** If `COPILOT_PAT` is not configured or the token is
-> invalid, the workflow gracefully degrades — conflict resolution is skipped
-> (rebase aborts on conflict), and squash uses a generic commit message
-> (`chore: squash N commits`) instead of a Copilot-generated one.
+### 5.7 Where These Tokens Are Used
+
+| Secret | Workflow | Step(s) | Purpose |
+|---|---|---|---|
+| **`WORKFLOW_PUSH_PAT`** | `pr-rebase-squash.yml` | Checkout (`actions/checkout` token) | Force-push branches that include `.github/workflows/` changes — `GITHUB_TOKEN` cannot push workflow-file modifications |
+| **`COPILOT_PAT`** | `pr-rebase-squash.yml` | Resolve conflicts (`COPILOT_GITHUB_TOKEN` env) | Copilot CLI auto-resolves rebase conflicts |
+| **`COPILOT_PAT`** | `pr-rebase-squash.yml` | Squash commits (`COPILOT_GITHUB_TOKEN` env) | Copilot CLI generates squash commit messages |
+| **`COPILOT_PAT`** | `plan-continuation.yml` | Delegate next phase (`COPILOT_GITHUB_TOKEN` env) | Copilot CLI creates follow-up PRs for the next plan phase |
+
+> **Fallback behavior:**
+> - If **`COPILOT_PAT`** is not configured, AI features degrade gracefully —
+>   conflict resolution is skipped (rebase aborts on conflict) and squash uses
+>   a generic commit message (`chore: squash N commits`).
+> - If **`WORKFLOW_PUSH_PAT`** is not configured, the checkout falls back to
+>   `GITHUB_TOKEN`. Pushes that only modify non-workflow files will succeed;
+>   pushes that include `.github/workflows/` changes will fail.
 
 ---
 
@@ -310,8 +366,9 @@ git config user.email "${{ github.event.comment.user.id }}+${{ github.event.comm
 | Actor | Role |
 |---|---|
 | **Comment author** (`github.event.comment.user.login`) | Git committer and author on the rebased/squashed commits |
-| **`GITHUB_TOKEN`** (github-actions bot) | Used for `git push`, PR comments, and reactions — no commits are made under this identity |
-| **`COPILOT_PAT` owner** | Used **only** for Copilot API calls (`copilot -p`) — never appears in Git history |
+| **`GITHUB_TOKEN`** (github-actions bot) | Used for PR comments, reactions, and API calls — no commits are made under this identity |
+| **`WORKFLOW_PUSH_PAT` owner** | Used as the `actions/checkout` token so `git push --force-with-lease` can update branches containing `.github/workflows/` files. Falls back to `GITHUB_TOKEN` when the PAT is unavailable (pushes touching workflow files will fail in that case) |
+| **`COPILOT_PAT` owner** | Used for Copilot CLI calls (`copilot -p`) via the `COPILOT_GITHUB_TOKEN` env var. Requires an active Copilot subscription. Falls back gracefully when unavailable |
 
 > **Why the comment author?** This preserves `git blame` accuracy and makes
 > the commit history reflect who actually requested the operation. GitHub's
@@ -429,7 +486,9 @@ jobs:
         with:
           ref: ${{ steps.pr.outputs.head_ref }}
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # WORKFLOW_PUSH_PAT enables force-push of branches with .github/workflows/ changes.
+          # Falls back to GITHUB_TOKEN (pushes touching workflow files will fail without the PAT).
+          token: ${{ secrets.WORKFLOW_PUSH_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Configure Git identity
         run: |
@@ -595,9 +654,12 @@ jobs:
 | Copilot CLI leaking secrets in suggestions | Copilot CLI operates on diff context only; no secrets are passed as input |
 | Concurrent trigger on same PR | Concurrency group `pr-rebase-squash-${{ github.event.issue.number }}` ensures only one run at a time |
 | Malicious comment body injection | Command parsing uses strict regex anchored to `^\s*/rebase` or `^\s*/squash`; arbitrary text is not executed |
-| `GITHUB_TOKEN` scope | Default token is scoped to the repository and expires after the workflow run; used only for Git push and GitHub API calls |
-| `COPILOT_PAT` secret exposure | The PAT is only exposed via `COPILOT_GITHUB_TOKEN` env var in the two steps that call `copilot -p`; it is never logged or passed to other steps. If the secret is missing, the workflow degrades gracefully (no AI features) |
-| PAT owner's Copilot subscription | The PAT must belong to an account with an active Copilot subscription; if the subscription lapses, only the AI features stop working — rebase/squash still function manually |
+| `GITHUB_TOKEN` scope | Default token is scoped to the repository and expires after the workflow run; used for GitHub API calls, PR comments, and reactions |
+| `WORKFLOW_PUSH_PAT` secret exposure | This PAT is used only as the `actions/checkout` token for pushing branches with workflow-file changes. It is never logged or passed to other steps. If the secret is missing, the workflow falls back to `GITHUB_TOKEN` (pushes touching `.github/workflows/` will fail). See [§5.4](#54-creating-workflow_push_pat-workflow-file-push-access) |
+| `WORKFLOW_PUSH_PAT` permissions | Fine-grained PAT with **Contents (Read and write)** scoped to this repository only. The Contents permission is needed because `GITHUB_TOKEN` cannot push modifications to `.github/workflows/` files (GitHub platform restriction) |
+| `COPILOT_PAT` secret exposure | This PAT is exposed only via `COPILOT_GITHUB_TOKEN` env var in the two Copilot CLI steps. It is never logged or passed to other steps. If the secret is missing, AI features degrade gracefully. See [§5.3](#53-creating-copilot_pat-copilot-cli-access) |
+| `COPILOT_PAT` permissions | Fine-grained PAT with **Copilot Requests (Read)** account permission only — no repository write access needed |
+| PAT owner's Copilot subscription | `COPILOT_PAT` must belong to an account with an active Copilot subscription; if the subscription lapses, only the AI features stop working — rebase/squash still function manually. `WORKFLOW_PUSH_PAT` does not require a Copilot subscription |
 
 > **Note:** The `issue_comment` trigger runs the workflow from the **default branch**,
 > not the PR branch. This means the workflow YAML must be merged to the default branch

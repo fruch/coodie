@@ -17,7 +17,7 @@ from coodie.exceptions import (
     InvalidQueryError,
 )
 from tests.conftest import _maybe_await
-from tests.models import make_product, make_tagged_product, make_page_view, make_products_by_brand
+from tests.models import make_product, make_tagged_product, make_page_view, make_products_by_brand, make_sensor_reading
 
 
 # ------------------------------------------------------------------
@@ -81,6 +81,11 @@ def PageView(counter_document_cls):
 @pytest.fixture
 def ProductsByBrand(mv_cls):
     return make_products_by_brand(mv_cls)
+
+
+@pytest.fixture
+def SensorReading(document_cls):
+    return make_sensor_reading(document_cls)
 
 
 # ------------------------------------------------------------------
@@ -170,6 +175,34 @@ def test_snake_case_default_table_name(document_cls):
             keyspace = "test_ks"
 
     assert MyDocument._get_table() == "my_document"
+
+
+# ------------------------------------------------------------------
+# Model equality tests
+# ------------------------------------------------------------------
+
+
+def test_model_equality(Product):
+    """Two instances with the same field values are equal (Pydantic __eq__)."""
+    pid = uuid4()
+    a = Product(id=pid, name="Widget", price=9.99)
+    b = Product(id=pid, name="Widget", price=9.99)
+    assert a == b
+
+
+def test_model_inequality_different_fields(Product):
+    """Instances with different field values are not equal."""
+    a = Product(name="Widget", price=9.99)
+    b = Product(name="Gadget", price=19.99)
+    assert a != b
+
+
+def test_model_inequality_non_model(Product):
+    """A Document instance is not equal to a non-model object."""
+    p = Product(name="Widget", price=9.99)
+    assert p != "not a model"
+    assert p != 42
+    assert p is not None
 
 
 # ------------------------------------------------------------------
@@ -290,6 +323,81 @@ async def test_update_noop_when_empty(TaggedProduct, registered_mock_driver):
     await _maybe_await(p.update)
     assert len(registered_mock_driver.executed) == 0
     assert p.name == "Widget"
+
+
+# ------------------------------------------------------------------
+# Phase 2: Additional collection mutation tests
+# ------------------------------------------------------------------
+
+
+async def test_update_list_remove(TaggedProduct, registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    await _maybe_await(p.update, items__remove=["old_item"])
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"items" = "items" - ?' in stmt
+    assert ["old_item"] in params
+
+
+async def test_update_map_update(TaggedProduct, registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    await _maybe_await(p.update, meta__update={"key": "value"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"meta" = "meta" + ?' in stmt
+    assert {"key": "value"} in params
+
+
+async def test_update_map_remove(TaggedProduct, registered_mock_driver):
+    p = TaggedProduct(name="Widget")
+    await _maybe_await(p.update, meta__remove={"key"})
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"meta" = "meta" - ?' in stmt
+    assert {"key"} in params
+
+
+# ------------------------------------------------------------------
+# Phase 2: Counter accumulation tests
+# ------------------------------------------------------------------
+
+
+async def test_counter_increment_accumulates(PageView, registered_mock_driver):
+    """Multiple increments generate independent UPDATE statements."""
+    pv = PageView(url="/home")
+    await _maybe_await(pv.increment, view_count=1)
+    await _maybe_await(pv.increment, view_count=3)
+    assert len(registered_mock_driver.executed) == 2
+    stmt1, params1 = registered_mock_driver.executed[0]
+    stmt2, params2 = registered_mock_driver.executed[1]
+    assert '"view_count" = "view_count" + ?' in stmt1
+    assert params1 == [1, "/home"]
+    assert '"view_count" = "view_count" + ?' in stmt2
+    assert params2 == [3, "/home"]
+
+
+# ------------------------------------------------------------------
+# Phase 2: Static column tests
+# ------------------------------------------------------------------
+
+
+async def test_static_column_in_schema(SensorReading):
+    """Static column should appear as STATIC in the schema."""
+    from coodie.schema import build_schema
+
+    schema = build_schema(SensorReading)
+    sensor_name_col = next(c for c in schema if c.name == "sensor_name")
+    assert sensor_name_col.static is True
+    value_col = next(c for c in schema if c.name == "value")
+    assert value_col.static is False
+
+
+async def test_static_column_in_create_table(SensorReading):
+    """Static column should produce STATIC keyword in CREATE TABLE CQL."""
+    from coodie.cql_builder import build_create_table
+    from coodie.schema import build_schema
+
+    schema = build_schema(SensorReading)
+    cql = build_create_table("sensor_readings", "test_ks", schema)
+    assert '"sensor_name" text STATIC' in cql
+    assert '"value" float STATIC' not in cql
 
 
 # ------------------------------------------------------------------

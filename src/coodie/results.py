@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LWTResult:
     """Typed result for Lightweight Transaction (LWT) operations.
 
@@ -17,7 +17,7 @@ class LWTResult:
     existing: dict[str, Any] | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PagedResult:
     """Result of a paged query.
 

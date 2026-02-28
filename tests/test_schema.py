@@ -259,6 +259,34 @@ def test_build_schema_non_static_column_default():
 
 
 # ------------------------------------------------------------------
+# Frozen collection + Indexed metadata tests
+# ------------------------------------------------------------------
+
+
+class FrozenIndexedDoc(BaseModel):
+    id: Annotated[UUID, PrimaryKey()]
+    tags: Annotated[list[str], Frozen(), Indexed()]
+
+    class Settings:
+        name = "frozen_indexed_docs"
+        keyspace = "test_ks"
+
+
+def test_build_schema_frozen_indexed_cql_type():
+    """Frozen collection with Indexed should have frozen<> CQL type."""
+    schema = build_schema(FrozenIndexedDoc)
+    col = next(c for c in schema if c.name == "tags")
+    assert col.cql_type == "frozen<list<text>>"
+
+
+def test_build_schema_frozen_indexed_preserves_index():
+    """Indexed metadata should be preserved on a frozen collection column."""
+    schema = build_schema(FrozenIndexedDoc)
+    col = next(c for c in schema if c.name == "tags")
+    assert col.index is True
+
+
+# ------------------------------------------------------------------
 # _pk_columns cache tests
 # ------------------------------------------------------------------
 

@@ -1,0 +1,9 @@
+"""WSGI config for the Hivemind Kanban task board."""
+
+import os
+
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "taskboard.settings")
+
+application = get_wsgi_application()

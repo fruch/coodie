@@ -238,7 +238,7 @@ Use `frozen<>` collections or separate tables as a workaround.
 | SASI / SAI index support | ✅ | `__like` filter operator |
 | Counter increment/decrement API | ✅ | `CounterDocument.increment()` / `decrement()` |
 | Static columns | ✅ | `Annotated[T, Static()]` marker |
-| Column-level delete | 🔧 `build_delete(columns=[...])` exists | Not exposed on Document |
+| Column-level delete | ✅ | `Document.delete_columns(*column_names)` (sync + async) |
 
 ---
 

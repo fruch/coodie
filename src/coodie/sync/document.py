@@ -216,6 +216,32 @@ class Document(BaseModel):
         else:
             cls._get_driver().execute(cql, params, consistency=consistency, timeout=timeout)
 
+    def delete_columns(
+        self,
+        *column_names: str,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+        batch: BatchQuery | None = None,
+    ) -> None:
+        """Set one or more non-primary-key columns to null for this document.
+
+        Generates ``DELETE col1, col2 FROM table WHERE pk = ?``.
+        """
+        pk_names = _pk_columns(self.__class__)
+        where = [(c, "=", getattr(self, c)) for c in pk_names]
+        cql, params = build_delete(
+            self.__class__._get_table(),
+            self.__class__._get_keyspace(),
+            where,
+            columns=list(column_names),
+            timestamp=timestamp,
+        )
+        if batch is not None:
+            batch.add(cql, params)
+        else:
+            self.__class__._get_driver().execute(cql, params, consistency=consistency, timeout=timeout)
+
     def delete(
         self,
         if_exists: bool = False,

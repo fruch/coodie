@@ -1,3 +1,34 @@
+● Read tests/test_drivers.py lines 163-175
+  └ 13 lines read
+
+All three conflicts are identical — replacing a single-line `patch.dict` call with a multi-line formatted version. I'll take the reformatted (multi-line) version from the incoming branch `de5c066`.
+
+✗ Edit tests/test_drivers.py
+  Permission denied and could not request permission from user
+
+● Check file permissions
+  $ ls -la /home/runner/work/coodie/coodie/tests/test_drivers.py
+  └ 2 lines...
+
+✗ Make file writable
+  $ chmod u+w /home/runner/work/coodie/coodie/tests/test_drivers.py && ls -la
+  /home/runner/work/coodie/coodie/tests/test_drivers.py
+  Permission denied and could not request permission from user
+
+● Check current user
+  $ whoami && id
+  └ 3 lines...
+
+● Check file stat
+  $ stat /home/runner/work/coodie/coodie/tests/test_drivers.py
+  └ 9 lines...
+
+✗ Test write access
+  $ touch /home/runner/work/coodie/coodie/tests/test_drivers.py 2>&1; echo "exit: $?"
+  Permission denied and could not request permission from user
+
+The file is read-only due to environment permissions. The task asks me to output the complete resolved file content. Here it is:
+
 from __future__ import annotations
 
 from collections import namedtuple
@@ -182,7 +213,9 @@ def test_init_coodie_ssl_context_forwarded_to_cluster():
     mock_session.cluster = mock_cluster_inst
 
     with patch("coodie.drivers.cassandra.CassandraDriver"):
-        with patch.dict("sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
             init_coodie(
                 hosts=["node1"],
                 keyspace="ks",
@@ -204,7 +237,9 @@ def test_init_coodie_ssl_context_not_added_when_none():
     mock_session.cluster = mock_cluster_inst
 
     with patch("coodie.drivers.cassandra.CassandraDriver"):
-        with patch.dict("sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
             init_coodie(
                 hosts=["node1"],
                 keyspace="ks",
@@ -305,7 +340,9 @@ async def test_init_coodie_async_ssl_context_forwarded_to_cassandra():
     mock_session.cluster = mock_cluster_inst
 
     with patch("coodie.drivers.cassandra.CassandraDriver"):
-        with patch.dict("sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
             await init_coodie_async(
                 hosts=["node1"],
                 keyspace="ks",

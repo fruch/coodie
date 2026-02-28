@@ -189,6 +189,7 @@ Group test cases by file (`tests/test_types.py`, `tests/test_cql_builder.py`, et
 | Workflow | Purpose |
 |----------|---------|
 | [create-a-plan.md](workflows/create-a-plan.md) | Step-by-step process for creating a new plan from scratch |
+| [Plan Phase Continuation](../../workflows/plan-continuation.yml) | GitHub Actions workflow — automatically delegates the next phase to Copilot when a PR merges a plan file or references one via `Plan: docs/plans/<name>.md` in the PR body |
 
 ## Success Criteria
 
@@ -207,3 +208,29 @@ A well-written plan:
 - [ ] Cross-references test cases to implementation phases
 - [ ] Uses `---` horizontal rules between major sections
 - [ ] Has no empty sections or TODOs without context
+
+## Automation: Plan Phase Continuation
+
+When a PR **introduces a new plan file** or **references an existing plan** via
+`Plan: docs/plans/<name>.md` in the PR body, the
+[Plan Phase Continuation](../../workflows/plan-continuation.yml) workflow
+triggers automatically on merge to master and delegates the next incomplete
+phase to Copilot CLI.
+
+**Phase status markers the automation recognises:**
+
+| Marker | Location | Effect |
+|--------|----------|--------|
+| `✅` in `### Phase N:` header | Phase header line | Phase is complete |
+| All task rows contain `✅` | Task table Status column | Phase is complete |
+| All checkboxes are `- [x]` | Milestone/checkbox list | Phase is complete |
+
+**PR body convention to link a PR to a plan:**
+
+```
+Plan: docs/plans/<plan-name>.md
+Phase: N        ← optional: the phase number this PR completes
+```
+
+See [CONTRIBUTING.md](../../../CONTRIBUTING.md#plan-linking-convention) for
+details and branch-name fallback convention.

@@ -1,0 +1,317 @@
+# NOTE: The `pull_request: closed` trigger runs the workflow from the PR's head
+# branch for the workflow file, but `actions/checkout` checks out the default
+# branch (post-merge). This workflow YAML must be merged to master before it
+# will trigger on subsequent PR merges. This is a GitHub Actions platform
+# constraint, not a bug.
+#
+# Automatic plan continuation on PR merge:
+#   - Detects docs/plans/*.md files added/modified by the merged PR (bootstrap)
+#   - Extracts "Plan: docs/plans/<name>.md" / "Phase: N" from PR body
+#   - Falls back to branch-name convention "plan/<name>/phase-N"
+#   - Parses the plan file, finds the next incomplete phase
+#   - Delegates execution via Copilot CLI; falls back to a PR comment prompt
+#
+# Manual testing (via Actions tab → "Run workflow"):
+#   Provide a plan file path and optional completed phase number.
+#
+# See docs/plans/plan-phase-continuation-action.md for full design details.
+
+name: Plan Phase Continuation
+
+# See docs/plans/plan-phase-continuation-action.md for full design details.
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+  # Manual dispatch for testing — provide plan file path and optional phase.
+  workflow_dispatch:
+    inputs:
+      plan_file:
+        description: "Path to plan file (e.g. docs/plans/udt-support.md)"
+        required: true
+        type: string
+      phase:
+        description: "Completed phase number (or 'auto' to detect from plan)"
+        required: false
+        default: "auto"
+        type: string
+
+concurrency:
+  group: plan-continuation-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  continue-plan:
+    name: Continue Plan Phase
+    runs-on: ubuntu-latest
+    # Run if: manually dispatched, OR PR was actually merged AND not labelled skip-continuation
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.pull_request.merged == true &&
+        !contains(github.event.pull_request.labels.*.name, 'skip-continuation')
+      )
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # ── 0. Handle manual dispatch (workflow_dispatch) ─────────────────────
+      - name: Use workflow_dispatch inputs
+        if: github.event_name == 'workflow_dispatch'
+        id: dispatch
+        run: |
+          {
+            echo "plan_file=${{ inputs.plan_file }}"
+            echo "phase=${{ inputs.phase }}"
+            echo "has_plan=true"
+          } >> "$GITHUB_OUTPUT"
+          echo "📋 Manual dispatch: plan=${{ inputs.plan_file }}, phase=${{ inputs.phase }}"
+
+      # ── 1. Detect plan files from PR changed files (bootstrap trigger) ────
+      - name: Detect plan files in PR changed files
+        if: github.event_name != 'workflow_dispatch'
+        id: changed-plans
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # List files changed in this PR and filter for docs/plans/*.md
+          CHANGED_PLANS=$(gh api \
+            "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --paginate --jq '.[].filename' \
+            | grep -E '^docs/plans/[^/]+\.md$' || true)
+
+          if [ -n "$CHANGED_PLANS" ]; then
+            HAS_CHANGED_PLANS=true
+          else
+            HAS_CHANGED_PLANS=false
+          fi
+          {
+            echo "files<<EOF"
+            echo "$CHANGED_PLANS"
+            echo "EOF"
+            echo "has_changed_plans=${HAS_CHANGED_PLANS}"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ -n "$CHANGED_PLANS" ]; then
+            echo "📄 Plan files found in PR changed files:"
+            echo "$CHANGED_PLANS"
+          fi
+
+      # ── 2. Extract plan reference from PR body / branch name ──────────────
+      - name: Extract plan reference from PR
+        if: github.event_name != 'workflow_dispatch'
+        id: plan-ref
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          # Try PR body first: "Plan: docs/plans/<name>.md" (case-insensitive)
+          PLAN_FILE=$(echo "$PR_BODY" \
+            | grep -ioP '(?<=Plan:\s)docs/plans/[a-z0-9._-]+\.md' | head -1 || true)
+
+          # Fallback: branch name "plan/<name>/phase-N"
+          if [ -z "$PLAN_FILE" ]; then
+            PLAN_NAME=$(echo "$PR_BRANCH" \
+              | grep -oP '(?<=^plan/)[a-z0-9-]+(?=/phase-)' || true)
+            if [ -n "$PLAN_NAME" ]; then
+              PLAN_FILE="docs/plans/${PLAN_NAME}.md"
+            fi
+          fi
+
+          # Extract completed phase number if present in PR body or branch name
+          PHASE=$(echo "$PR_BODY" | grep -ioP '(?<=Phase:\s)\d+' | head -1 || true)
+          if [ -z "$PHASE" ]; then
+            PHASE=$(echo "$PR_BRANCH" | grep -oP '(?<=phase-)\d+' || true)
+          fi
+
+          # Merge: combine PR body/branch plan with changed-files plans,
+          # deduplicate, and remove empty lines
+          CHANGED_PLANS="${{ steps.changed-plans.outputs.files }}"
+          ALL_PLANS=$(printf '%s\n%s\n' "$PLAN_FILE" "$CHANGED_PLANS" \
+            | grep -v '^$' | sort -u || true)
+
+          HAS_PLAN=$( [ -n "$ALL_PLANS" ] && echo true || echo false )
+          {
+            echo "plan_file=${PLAN_FILE}"
+            echo "phase=${PHASE}"
+            echo "all_plans<<EOF"
+            echo "$ALL_PLANS"
+            echo "EOF"
+            echo "has_plan=${HAS_PLAN}"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── 3. Exit silently if no plan reference found ────────────────────────
+      - name: Skip if no plan reference
+        if: >-
+          steps.dispatch.outputs.has_plan != 'true' &&
+          steps.plan-ref.outputs.has_plan != 'true'
+        run: echo "No plan reference found in PR — skipping."
+
+      # ── 4. Checkout repo ───────────────────────────────────────────────────
+      - uses: actions/checkout@v6
+        if: >-
+          steps.dispatch.outputs.has_plan == 'true' ||
+          steps.plan-ref.outputs.has_plan == 'true'
+
+      # ── 5. Set up Python ───────────────────────────────────────────────────
+      - uses: actions/setup-python@v6
+        if: >-
+          steps.dispatch.outputs.has_plan == 'true' ||
+          steps.plan-ref.outputs.has_plan == 'true'
+        with:
+          python-version: "3.12"
+
+      # ── 6. Parse plan file and find next incomplete phase ──────────────────
+      - name: Parse plan and find next phase
+        if: >-
+          steps.dispatch.outputs.has_plan == 'true' ||
+          steps.plan-ref.outputs.has_plan == 'true'
+        id: parse
+        run: |
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
+          COMPLETED_PHASE="${{ steps.dispatch.outputs.phase || steps.plan-ref.outputs.phase }}"
+
+          if [ ! -f "$PLAN_FILE" ]; then
+            echo "plan_exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "plan_exists=true" >> "$GITHUB_OUTPUT"
+
+          # Run the plan parser and capture JSON output
+          RESULT=$(python .github/scripts/parse-plan.py \
+            --plan-file "$PLAN_FILE" \
+            --completed-phase "${COMPLETED_PHASE:-auto}")
+
+          NEXT_PHASE_NUMBER=$(echo "$RESULT" | python -c \
+            'import json,sys; d=json.load(sys.stdin); print(d["next_phase"]["number"] if d["next_phase"] else "")')
+          NEXT_PHASE_TITLE=$(echo "$RESULT" | python -c \
+            'import json,sys; d=json.load(sys.stdin); print(d["next_phase"]["title"] if d["next_phase"] else "")')
+          ALL_COMPLETE=$(echo "$RESULT" | python -c \
+            'import json,sys; d=json.load(sys.stdin); print(str(d["all_complete"]).lower())')
+          {
+            echo "next_phase_number=${NEXT_PHASE_NUMBER}"
+            echo "next_phase_title=${NEXT_PHASE_TITLE}"
+            echo "all_complete=${ALL_COMPLETE}"
+          } >> "$GITHUB_OUTPUT"
+
+          # Store full phase content for the delegation prompt
+          echo "$RESULT" | python -c \
+            'import json,sys; d=json.load(sys.stdin); print(d["next_phase"]["content"] if d["next_phase"] else "")' \
+            > /tmp/next-phase-content.md
+
+      # ── 7. Warn if plan file not found ─────────────────────────────────────
+      - name: Warn if plan file not found
+        if: >-
+          (steps.dispatch.outputs.has_plan == 'true' || steps.plan-ref.outputs.has_plan == 'true') &&
+          steps.parse.outputs.plan_exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
+          echo "⚠️ Plan file not found: ${PLAN_FILE}"
+          {
+            echo "### ⚠️ Plan File Not Found"
+            echo ""
+            echo "\`${PLAN_FILE}\` does not exist in the repository."
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Post PR comment only when triggered by a PR (not manual dispatch)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" \
+              --repo "${{ github.repository }}" \
+              --body "⚠️ **Plan file not found:** \`${PLAN_FILE}\` referenced in this PR does not exist."
+          fi
+
+      # ── 8. Celebrate when all phases are complete ─────────────────────────
+      - name: Celebrate completion
+        if: >-
+          steps.parse.outputs.plan_exists == 'true' &&
+          steps.parse.outputs.all_complete == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
+          echo "🎉 All phases of ${PLAN_FILE} are complete!"
+          {
+            echo "### 🎉 All Phases Complete"
+            echo ""
+            echo "Every phase in \`${PLAN_FILE}\` is now marked as done."
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Post PR comment only when triggered by a PR (not manual dispatch)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" \
+              --repo "${{ github.repository }}" \
+              --body "🎉 **All phases complete!** Every phase in [\`${PLAN_FILE}\`](${PLAN_FILE}) is now marked as done. Great work!"
+          fi
+
+      # ── 9. Delegate next phase via Copilot CLI ────────────────────────────
+      - name: Delegate next phase to Copilot
+        if: >-
+          steps.parse.outputs.plan_exists == 'true' &&
+          steps.parse.outputs.all_complete != 'true' &&
+          steps.parse.outputs.next_phase_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          PLAN_FILE="${{ steps.dispatch.outputs.plan_file || steps.plan-ref.outputs.plan_file }}"
+          PHASE="${{ steps.parse.outputs.next_phase_number }}"
+          TITLE="${{ steps.parse.outputs.next_phase_title }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PHASE_CONTENT=$(cat /tmp/next-phase-content.md)
+
+          # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
+          npm install -g @github/copilot 2>/dev/null || true
+
+          # Construct the delegation prompt
+          PROMPT="Continue to phase ${PHASE} of plan ${PLAN_FILE}.
+          Phase title: ${TITLE}.
+
+          ## Tasks
+
+          ${PHASE_CONTENT}
+
+          ---
+          Read the full plan at ${PLAN_FILE} for context.
+          Implement all tasks listed above for Phase ${PHASE}."
+
+          # Delegate via Copilot CLI — capture exit code explicitly
+          EXIT_CODE=0
+          RESPONSE=$(copilot -p "$PROMPT" 2>&1) || EXIT_CODE=$?
+
+          # Fallback: if Copilot CLI failed or is unavailable, post a PR comment
+          # with the prompt so a developer can pick it up manually.
+          if [ "$EXIT_CODE" -ne 0 ] || [ -z "$RESPONSE" ]; then
+            echo "⚠️ Copilot CLI not available (exit code: ${EXIT_CODE})"
+            if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${PR_NUMBER}" ]; then
+              gh pr comment "${PR_NUMBER}" \
+                --repo "${{ github.repository }}" \
+                --body "🔄 **Next phase ready:** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}).
+
+          Copilot CLI was not available (exit code: ${EXIT_CODE}). Run manually:
+          \`\`\`
+          copilot -p \"Continue to phase ${PHASE} of plan ${PLAN_FILE}\"
+          \`\`\`"
+            fi
+          else
+            if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${PR_NUMBER}" ]; then
+              gh pr comment "${PR_NUMBER}" \
+                --repo "${{ github.repository }}" \
+                --body "🔄 **Next phase delegated!** Phase ${PHASE}: ${TITLE} of [\`${PLAN_FILE}\`](${PLAN_FILE}) has been sent to Copilot CLI."
+            fi
+          fi
+
+          # Log summary (first 20 lines of Copilot response to avoid verbose/sensitive output)
+          {
+            echo "### Plan Phase Continuation"
+            echo ""
+            echo "- **Plan:** \`${PLAN_FILE}\`"
+            echo "- **Next phase:** ${PHASE} — ${TITLE}"
+            echo "- **Copilot CLI exit code:** ${EXIT_CODE}"
+            echo "- **Status:** $( [ "$EXIT_CODE" -eq 0 ] && echo '✅ Delegated' || echo '⚠️ Fallback (manual prompt posted)')"
+            echo ""
+            echo "**Copilot response (first 20 lines):**"
+            echo "${RESPONSE:-'(not available)'}" | head -20
+          } >> "$GITHUB_STEP_SUMMARY"

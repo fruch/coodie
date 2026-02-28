@@ -131,34 +131,34 @@ Legend:
 
 ## 4. Implementation Phases
 
-### Phase 1: Plan Parsing Library (Priority: High)
+### Phase 1: Plan Parsing Library ✅
 
 **Goal:** Create a reusable script that reads a plan markdown file and extracts
 phase structure, status, and task tables.
 
 | Task | Description | Status |
 |---|---|---|
-| 1.1 | Create `.github/scripts/parse-plan.py` — Python script that reads a plan `.md` file and outputs JSON with phase titles, status (complete/incomplete), and task content | ❌ |
-| 1.2 | Support phase header formats: `### Phase N: Title ✅`, `### Phase N: Title (Priority: X)`, and `### Phase N: Title` | ❌ |
-| 1.3 | Detect phase completion via ✅ in phase header **or** all tasks in the phase table having ✅ status | ❌ |
-| 1.4 | Extract the task table (markdown) for each phase so it can be included in the delegation prompt | ❌ |
-| 1.5 | Add unit tests for the parser in `.github/scripts/test_parse_plan.py` using `pytest` | ❌ |
-| 1.6 | Test against real plan files: `udt-support.md`, `documentation-plan.md`, `pr-comment-rebase-squash-action.md` | ❌ |
+| 1.1 | Create `.github/scripts/parse-plan.py` — Python script that reads a plan `.md` file and outputs JSON with phase titles, status (complete/incomplete), and task content | ✅ |
+| 1.2 | Support phase header formats: `### Phase N: Title ✅`, `### Phase N: Title (Priority: X)`, and `### Phase N: Title` | ✅ |
+| 1.3 | Detect phase completion via ✅ in phase header **or** all tasks in the phase table having ✅ status | ✅ |
+| 1.4 | Extract the task table (markdown) for each phase so it can be included in the delegation prompt | ✅ |
+| 1.5 | Add unit tests for the parser in `.github/scripts/test_parse_plan.py` using `pytest` | ✅ |
+| 1.6 | Test against real plan files: `udt-support.md`, `documentation-plan.md`, `pr-comment-rebase-squash-action.md` | ✅ |
 
-### Phase 2: PR-to-Plan Linking Convention (Priority: High)
+### Phase 2: PR-to-Plan Linking Convention ✅
 
 **Goal:** Define and document the convention for linking a PR to a specific plan
 and phase.
 
 | Task | Description | Status |
 |---|---|---|
-| 2.1 | Define the linking convention: PR body must contain a line matching `Plan: docs/plans/<name>.md` (case-insensitive) | ❌ |
-| 2.2 | Optionally support `Phase: N` in the PR body to indicate which phase this PR completes | ❌ |
-| 2.3 | Support branch-name convention as fallback: `plan/<plan-name>/phase-N` (e.g., `plan/udt-support/phase-3`) | ❌ |
-| 2.4 | Add a PR template snippet (`.github/PULL_REQUEST_TEMPLATE.md` or amendment) documenting the convention | ❌ |
-| 2.5 | Update `CONTRIBUTING.md` with the plan-linking convention | ❌ |
+| 2.1 | Define the linking convention: PR body must contain a line matching `Plan: docs/plans/<name>.md` (case-insensitive) | ✅ |
+| 2.2 | Optionally support `Phase: N` in the PR body to indicate which phase this PR completes | ✅ |
+| 2.3 | Support branch-name convention as fallback: `plan/<plan-name>/phase-N` (e.g., `plan/udt-support/phase-3`) | ✅ |
+| 2.4 | Add a PR template snippet (`.github/PULL_REQUEST_TEMPLATE.md` or amendment) documenting the convention | ✅ |
+| 2.5 | Update `CONTRIBUTING.md` with the plan-linking convention | ✅ |
 
-### Phase 3: Core Workflow — Detect & Trigger (Priority: High)
+### Phase 3: Core Workflow — Detect & Trigger ✅
 
 **Goal:** Create the GitHub Actions workflow that triggers on PR merge, detects
 plan references (or new plan files in changed files), parses the plan, and
@@ -166,56 +166,56 @@ identifies the next phase.
 
 | Task | Description | Status |
 |---|---|---|
-| 3.1 | Create `.github/workflows/plan-continuation.yml` with `pull_request: types: [closed]` and `workflow_dispatch` triggers | ❌ |
-| 3.2 | Add merge guard: run if manually dispatched OR if the PR was actually merged | ❌ |
-| 3.3 | **Bootstrap detection:** Use GitHub API to list PR changed files and find any `docs/plans/*.md` additions/modifications — this starts Phase 1 when a plan is first merged | ❌ |
-| 3.4 | Extract plan reference from PR body (`Plan: docs/plans/<name>.md`) and optionally from branch name (for subsequent phase PRs) | ❌ |
-| 3.5 | Merge detected plan files: combine plans found via changed files (3.3) and PR body/branch (3.4), deduplicate | ❌ |
-| 3.6 | Handle `workflow_dispatch` inputs: use `inputs.plan_file` and `inputs.phase` directly, bypassing PR detection | ❌ |
-| 3.7 | Checkout the repo and run `parse-plan.py` on each detected plan file | ❌ |
-| 3.8 | Determine which phase was completed (from `Phase: N` in PR body, `inputs.phase`, or infer from latest ✅ phase; for bootstrap PRs, no completed phase — start at Phase 1) | ❌ |
-| 3.9 | Identify next incomplete phase from parser output | ❌ |
-| 3.10 | If no plan reference found and no plan files in changed files, exit silently (success, no-op) | ❌ |
+| 3.1 | Create `.github/workflows/plan-continuation.yml` with `pull_request: types: [closed]` and `workflow_dispatch` triggers | ✅ |
+| 3.2 | Add merge guard: run if manually dispatched OR if the PR was actually merged | ✅ |
+| 3.3 | **Bootstrap detection:** Use GitHub API to list PR changed files and find any `docs/plans/*.md` additions/modifications — this starts Phase 1 when a plan is first merged | ✅ |
+| 3.4 | Extract plan reference from PR body (`Plan: docs/plans/<name>.md`) and optionally from branch name (for subsequent phase PRs) | ✅ |
+| 3.5 | Merge detected plan files: combine plans found via changed files (3.3) and PR body/branch (3.4), deduplicate | ✅ |
+| 3.6 | Handle `workflow_dispatch` inputs: use `inputs.plan_file` and `inputs.phase` directly, bypassing PR detection | ✅ |
+| 3.7 | Checkout the repo and run `parse-plan.py` on each detected plan file | ✅ |
+| 3.8 | Determine which phase was completed (from `Phase: N` in PR body, `inputs.phase`, or infer from latest ✅ phase; for bootstrap PRs, no completed phase — start at Phase 1) | ✅ |
+| 3.9 | Identify next incomplete phase from parser output | ✅ |
+| 3.10 | If no plan reference found and no plan files in changed files, exit silently (success, no-op) | ✅ |
 
-### Phase 4: Copilot CLI Delegation (Priority: High)
+### Phase 4: Copilot CLI Delegation ✅
 
 **Goal:** When a next phase is identified, use the Copilot CLI to directly
 delegate execution of that phase — no intermediate GitHub issue needed.
 
 | Task | Description | Status |
 |---|---|---|
-| 4.1 | Install Copilot CLI in the workflow (`npm install -g @github/copilot` or use `gh copilot`) | ❌ |
-| 4.2 | Construct the delegation prompt: "Continue to phase N of plan `<path>`. Goal: `<goal>`. Tasks: `<task list>`" | ❌ |
-| 4.3 | Invoke `gh copilot` (or `copilot -p`) with the constructed prompt to delegate the task | ❌ |
-| 4.4 | Authenticate with Copilot using the `COPILOT_PAT` secret (same pattern as `pr-rebase-squash.yml`) | ❌ |
-| 4.5 | If all phases are complete, post a comment on the merged PR: "🎉 All phases of \<plan\> are now complete!" | ❌ |
-| 4.6 | If Copilot CLI is unavailable (no `COPILOT_PAT`), degrade gracefully: post a PR comment with the next phase details and a manual prompt suggestion instead | ❌ |
-| 4.7 | Log the delegation prompt and Copilot CLI response to `$GITHUB_STEP_SUMMARY` | ❌ |
+| 4.1 | Install Copilot CLI in the workflow (`npm install -g @github/copilot` or use `gh copilot`) | ✅ |
+| 4.2 | Construct the delegation prompt: "Continue to phase N of plan `<path>`. Goal: `<goal>`. Tasks: `<task list>`" | ✅ |
+| 4.3 | Invoke `gh copilot` (or `copilot -p`) with the constructed prompt to delegate the task | ✅ |
+| 4.4 | Authenticate with Copilot using the `COPILOT_PAT` secret (same pattern as `pr-rebase-squash.yml`) | ✅ |
+| 4.5 | If all phases are complete, post a comment on the merged PR: "🎉 All phases of \<plan\> are now complete!" | ✅ |
+| 4.6 | If Copilot CLI is unavailable (no `COPILOT_PAT`), degrade gracefully: post a PR comment with the next phase details and a manual prompt suggestion instead | ✅ |
+| 4.7 | Log the delegation prompt and Copilot CLI response to `$GITHUB_STEP_SUMMARY` | ✅ |
 
-### Phase 5: Safety Gates & Edge Cases (Priority: Medium)
+### Phase 5: Safety Gates & Edge Cases ✅
 
 **Goal:** Handle edge cases and prevent undesired behavior.
 
 | Task | Description | Status |
 |---|---|---|
-| 5.1 | Skip if the plan file does not exist (post warning comment on PR) | ❌ |
-| 5.2 | Skip if the plan has no recognizable phase structure | ❌ |
-| 5.3 | Handle plans where phase status is tracked only in task tables (not in headers) | ❌ |
-| 5.4 | Add a `skip-continuation` label that, when present on the PR, prevents the workflow from running | ❌ |
-| 5.5 | Add concurrency group per plan file to prevent parallel delegation runs | ❌ |
-| 5.6 | Log all decisions to `$GITHUB_STEP_SUMMARY` for auditability | ❌ |
+| 5.1 | Skip if the plan file does not exist (post warning comment on PR) | ✅ |
+| 5.2 | Skip if the plan has no recognizable phase structure | ✅ |
+| 5.3 | Handle plans where phase status is tracked only in task tables (not in headers) | ✅ |
+| 5.4 | Add a `skip-continuation` label that, when present on the PR, prevents the workflow from running | ✅ |
+| 5.5 | Add concurrency group per plan file to prevent parallel delegation runs | ✅ |
+| 5.6 | Log all decisions to `$GITHUB_STEP_SUMMARY` for auditability | ✅ |
 
-### Phase 6: Documentation & Rollout (Priority: Medium)
+### Phase 6: Documentation & Rollout ✅
 
 **Goal:** Document the feature and prepare for merge to the default branch.
 
 | Task | Description | Status |
 |---|---|---|
-| 6.1 | Add usage instructions to `CONTRIBUTING.md` (plan-linking convention) | ❌ |
-| 6.2 | Add inline comments in the workflow YAML explaining each step | ❌ |
-| 6.3 | Note that `pull_request` workflows must exist on the default branch to trigger on merge | ❌ |
-| 6.4 | Update this plan with ✅ status for completed phases | ❌ |
-| 6.5 | Add a section to the writing-plans skill referencing this automation | ❌ |
+| 6.1 | Add usage instructions to `CONTRIBUTING.md` (plan-linking convention) | ✅ |
+| 6.2 | Add inline comments in the workflow YAML explaining each step | ✅ |
+| 6.3 | Note that `pull_request` workflows must exist on the default branch to trigger on merge | ✅ |
+| 6.4 | Update this plan with ✅ status for completed phases | ✅ |
+| 6.5 | Add a section to the writing-plans skill referencing this automation | ✅ |
 
 ---
 

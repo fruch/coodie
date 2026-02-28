@@ -48,13 +48,15 @@ class TestPagination:
     # Tests
     # ------------------------------------------------------------------
 
-    async def test_full_table_scan_spanning_multiple_pages(self, coodie_driver, Product) -> None:
+    async def test_full_table_scan_spanning_multiple_pages(self, coodie_driver, Product, driver_type) -> None:
         """paged_all() with fetch_size collects all rows across multiple pages.
 
         Inserts TOTAL_ROWS (>FETCH_SIZE) rows, then iterates page by page
         using the paging_state token to ensure every row is returned exactly
         once across all pages.
         """
+        if driver_type == "python-rs":
+            pytest.skip("python-rs-driver uses execute_unpaged — no pagination support")
         await _maybe_await(Product.sync_table)
         brand = f"PaginationFullScan_{uuid4().hex[:8]}"
         ids = await self._seed_products(Product, brand, TOTAL_ROWS)
@@ -84,8 +86,10 @@ class TestPagination:
 
         await self._cleanup(Product, ids)
 
-    async def test_fetch_size_limits_rows_per_page(self, coodie_driver, Product) -> None:
+    async def test_fetch_size_limits_rows_per_page(self, coodie_driver, Product, driver_type) -> None:
         """Each page returned by paged_all() should have at most fetch_size rows."""
+        if driver_type == "python-rs":
+            pytest.skip("python-rs-driver uses execute_unpaged — no pagination support")
         await _maybe_await(Product.sync_table)
         brand = f"PaginationLimit_{uuid4().hex[:8]}"
         ids = await self._seed_products(Product, brand, TOTAL_ROWS)

@@ -460,6 +460,8 @@ async def _retry(fn, retries=5, delay=1):
 
 @pytest.fixture(params=["sync", "async"])
 def variant(request, driver_type):
+    if request.param == "sync" and driver_type in ("acsylla", "python-rs"):
+        pytest.skip(f"{driver_type} is async-only — sync variant not applicable")
     return request.param
 
 

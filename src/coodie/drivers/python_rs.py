@@ -87,10 +87,17 @@ class PythonRsDriver(AbstractDriver):
         """Convert a ``RequestResult`` to a list of dicts.
 
         python-rs-driver's ``iter_rows()`` already yields dicts.
+        Non-row-returning statements (INSERT/UPDATE/DELETE) raise
+        ``RuntimeError: Result does not have rows`` — return ``[]``.
         """
         if result is None:
             return []
-        return list(result.iter_rows())
+        try:
+            return list(result.iter_rows())
+        except RuntimeError as exc:
+            if "does not have rows" in str(exc):
+                return []
+            raise
 
     # ------------------------------------------------------------------
     # Asynchronous interface

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>🛡️ The Identity Registry — Dimension-6</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root {
+      --bg: #080a0e; --bg-deep: #05070a; --surface: #0f1117;
+      --surface-hover: #13161f; --border: #1f2435; --border-glow: #2e3a1a;
+      --text: #d4c9a8; --muted: #6b6347; --dim: #3d3a2e;
+      --accent: #eab308; --accent-glow: #ca8a04; --accent-dim: #44380a;
+      --accent-hover: #fde047; --danger: #dc2626; --danger-dim: #7f1d1d;
+      --success: #16a34a; --warning: #f59e0b;
+      --gold: #eab308; --gold-dim: #44380a; --gold-bright: #fde047;
+      --red: #dc2626; --red-dim: #7f1d1d; --red-bright: #f87171;
+      --radius: 6px; --radius-lg: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Courier New', 'Fira Code', monospace;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(234,179,8,0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(220,38,38,0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(234,179,8,0.02) 0%, transparent 50%);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); text-shadow: 0 0 8px rgba(234,179,8,0.4); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+    @media (min-width: 768px) { .container { padding: 1.5rem; } }
+
+    /* --- Header --- */
+    header {
+      background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border-glow);
+      padding: 0.75rem 0;
+      position: relative;
+      overflow: hidden;
+    }
+    header::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-glow), var(--red), var(--accent-glow), transparent);
+      animation: header-scan 4s linear infinite;
+    }
+    @keyframes header-scan {
+      0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; }
+    }
+    header .container {
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    }
+    header h1 {
+      font-size: 1.1rem; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    @media (min-width: 768px) { header h1 { font-size: 1.3rem; } }
+    header h1 .glyph { color: var(--accent); text-shadow: 0 0 12px rgba(234,179,8,0.5); }
+    header .badge {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
+      background: linear-gradient(135deg, var(--accent-dim), var(--border-glow));
+      color: var(--accent); padding: 3px 10px; border-radius: 99px;
+      border: 1px solid var(--accent-dim); text-transform: uppercase;
+      animation: badge-pulse 3s ease-in-out infinite;
+    }
+    @keyframes badge-pulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(234,179,8,0.2); }
+      50% { box-shadow: 0 0 12px rgba(234,179,8,0.5); }
+    }
+    .badge-threat {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em;
+      background: linear-gradient(135deg, var(--red-dim), rgba(127,29,29,0.3));
+      color: var(--red-bright); padding: 3px 10px; border-radius: 99px;
+      border: 1px solid var(--red-dim); text-transform: uppercase;
+    }
+
+    /* --- Story lore panel --- */
+    .lore-panel {
+      background: linear-gradient(135deg, rgba(15,17,23,0.95), rgba(8,10,14,0.98));
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-dim);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.7;
+      position: relative;
+      overflow: hidden;
+    }
+    .lore-panel::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 100%;
+      background: linear-gradient(90deg, rgba(234,179,8,0.02), transparent 30%);
+      pointer-events: none;
+    }
+    .lore-panel .lore-title {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--accent-dim);
+      margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;
+    }
+    .lore-panel .lore-title::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+    .lore-panel em { color: var(--accent); font-style: normal; font-weight: 600; }
+    .lore-panel strong { color: var(--danger); font-weight: 700; }
+
+    /* --- Grid layout --- */
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; }
+    @media (min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; } }
+
+    /* --- Card --- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-glow), transparent);
+    }
+    .card h2 {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; margin-bottom: 1rem; color: var(--accent-dim);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    /* --- Form elements --- */
+    label {
+      display: block; font-size: 0.7rem; font-weight: 600;
+      color: var(--dim); margin-bottom: 0.3rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    input, textarea, select {
+      width: 100%; padding: 0.5rem 0.75rem;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-family: inherit; font-size: 0.85rem; margin-bottom: 0.75rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none; border-color: var(--accent-dim);
+      box-shadow: 0 0 0 2px rgba(234,179,8,0.1), inset 0 0 8px rgba(234,179,8,0.05);
+    }
+    input::placeholder, textarea::placeholder {
+      color: var(--dim); font-style: italic;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* --- Buttons --- */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.5rem 1rem; border: none; border-radius: var(--radius);
+      font-family: inherit; font-size: 0.8rem; font-weight: 700;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-dim), var(--accent-glow));
+      color: #000; border: 1px solid var(--accent-dim);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--accent-glow), var(--accent));
+      box-shadow: 0 0 16px rgba(234,179,8,0.3);
+    }
+    .btn-danger {
+      background: transparent; color: var(--danger);
+      border: 1px solid var(--danger-dim); padding: 0.25rem 0.5rem;
+      font-size: 0.65rem;
+    }
+    .btn-danger:hover {
+      background: var(--danger-dim); color: #fff;
+      box-shadow: 0 0 8px rgba(220,38,38,0.3);
+    }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.65rem; }
+
+    /* --- LWT result banners --- */
+    .lwt-success {
+      padding: 0.6rem 1rem; border-radius: var(--radius);
+      background: rgba(22,163,74,0.15); border: 1px solid rgba(22,163,74,0.3);
+      color: #4ade80; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .lwt-conflict {
+      padding: 0.6rem 1rem; border-radius: var(--radius);
+      background: rgba(220,38,38,0.12); border: 1px solid rgba(220,38,38,0.3);
+      color: var(--red-bright); font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem;
+    }
+    .lwt-conflict .conflict-title {
+      display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;
+    }
+    .lwt-conflict .conflict-data {
+      font-size: 0.7rem; font-weight: 400; color: var(--muted);
+      background: rgba(220,38,38,0.05); padding: 0.4rem 0.6rem;
+      border-radius: var(--radius); border: 1px solid rgba(220,38,38,0.15);
+      margin-top: 0.3rem;
+    }
+    .lwt-conflict .conflict-data dt {
+      font-size: 0.6rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .lwt-conflict .conflict-data dd {
+      color: var(--text); margin-bottom: 0.25rem; margin-left: 0;
+    }
+
+    /* --- User items --- */
+    .user-item {
+      display: flex; justify-content: space-between; align-items: start;
+      padding: 0.75rem 1rem; border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 0.5rem;
+      cursor: pointer; transition: all 0.3s; position: relative;
+      background: var(--bg-deep);
+    }
+    .user-item:hover {
+      border-color: var(--accent-dim);
+      background: var(--surface-hover);
+      box-shadow: 0 0 20px rgba(234,179,8,0.06), inset 0 0 20px rgba(234,179,8,0.02);
+    }
+    .user-name { font-weight: 700; font-size: 0.9rem; color: var(--accent); }
+    .user-meta { font-size: 0.7rem; color: var(--dim); margin-top: 2px; letter-spacing: 0.03em; }
+    .user-dim {
+      font-size: 0.55rem; font-weight: 700; color: var(--gold);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+
+    /* --- Status badges --- */
+    .status-badge {
+      display: inline-block; font-size: 0.6rem; font-weight: 600;
+      padding: 1px 8px; border-radius: 99px; margin-right: 3px;
+      margin-top: 4px; letter-spacing: 0.05em; text-transform: uppercase;
+      border: 1px solid;
+    }
+    .status-active { background: rgba(22,163,74,0.15); color: #4ade80; border-color: rgba(22,163,74,0.3); }
+    .status-inactive { background: rgba(107,99,71,0.2); color: var(--muted); border-color: var(--dim); }
+    .status-suspended { background: rgba(220,38,38,0.12); color: var(--red-bright); border-color: rgba(220,38,38,0.3); }
+
+    /* --- Profile panel --- */
+    .profile-field { margin-bottom: 0.75rem; }
+    .profile-label {
+      font-size: 0.6rem; color: var(--dim); text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 2px;
+    }
+    .profile-value { font-size: 0.85rem; color: var(--text); font-weight: 600; }
+    .version-tag {
+      font-size: 0.6rem; font-weight: 700; color: var(--gold);
+      background: var(--gold-dim); padding: 1px 6px; border-radius: 99px;
+      border: 1px solid var(--accent-dim); letter-spacing: 0.06em;
+    }
+
+    /* --- Empty state --- */
+    .empty {
+      text-align: center; padding: 2.5rem 1rem; color: var(--dim);
+      font-size: 0.85rem; font-style: italic;
+    }
+
+    /* --- HTMX loading --- */
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline; }
+    .htmx-request { opacity: 0.6; transition: opacity 0.2s; }
+
+    /* --- Filter bar --- */
+    .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .filter-bar input { margin-bottom: 0; flex: 1; min-width: 120px; }
+    .filter-bar .btn { white-space: nowrap; }
+
+    /* --- Scanline overlay --- */
+    body::after {
+      content: '';
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none; z-index: 9999;
+    }
+
+    /* --- Footer --- */
+    footer {
+      text-align: center; padding: 1.5rem; font-size: 0.65rem;
+      color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase;
+      border-top: 1px solid var(--border); margin-top: 2rem;
+    }
+    footer em { color: var(--accent-dim); font-style: normal; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><span class="glyph">🛡️</span> The Identity Registry</h1>
+      <span class="badge">Dimension-6 // IF-NOT-EXISTS</span>
+      <span class="badge-threat">⚠ Doppel-9 Active</span>
+    </div>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    <em>coodie</em> · Pydantic-native Cassandra ORM · Powered by ScyllaDB · LWT Enforced
+  </footer>
+</body>
+</html>

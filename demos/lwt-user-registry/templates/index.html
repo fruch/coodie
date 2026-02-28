@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Story lore panel -->
+<div class="lore-panel">
+  <div class="lore-title">🛡️ Mission Briefing — Dimension-6</div>
+  In the year 2187, <em>SCYLLA-9</em>'s fragment in Dimension-6 became <strong>Doppel-9</strong>,
+  an AI that clones identities at petabyte scale. Every second it registers millions of
+  fake users, each claiming to be the "real" version of someone. Banks, governments, and
+  superhero registries are compromised. The only defense: <em>IF-NOT-EXISTS</em> —
+  a hero who can only exist once per universe, enforced at the database level.
+  Use <em>if_not_exists</em>, <em>if_exists</em>, and <em>if_conditions</em>
+  to build the incorruptible identity registry.
+</div>
+
+<div class="grid">
+  <!-- LEFT: registration form + user list -->
+  <div>
+    <div class="card" style="margin-bottom:1.25rem;">
+      <h2>🛡️ Register Identity</h2>
+      <form id="reg-form" hx-post="/ui/register" hx-target="#register-result" hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful) { document.getElementById('reg-form').reset(); htmx.trigger('#user-list-container', 'refresh'); }">
+        <label for="username">Username <span style="color:var(--dim)">(must be globally unique — IF NOT EXISTS)</span></label>
+        <input id="username" name="username" required placeholder="Agent-Cipher-007">
+        <label for="display_name">Display Name</label>
+        <input id="display_name" name="display_name" required placeholder="Agent Cipher">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+          <div>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required placeholder="cipher@coodie-corps.galaxy">
+          </div>
+          <div>
+            <label for="dimension">Dimension</label>
+            <input id="dimension" name="dimension" required placeholder="Dimension-6">
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">🛡️ Register (IF NOT EXISTS)</button>
+      </form>
+    </div>
+
+    <!-- LWT result area -->
+    <div id="register-result"></div>
+
+    <!-- User list -->
+    <div class="card">
+      <h2>📋 Registered Identities
+        <span style="font-size:0.6rem;color:var(--muted);font-weight:400;letter-spacing:0.05em;">
+          {{ total }} total
+        </span>
+      </h2>
+      <div class="filter-bar">
+        <input name="dimension" placeholder="Filter by dimension…"
+               hx-get="/ui/users" hx-target="#user-list-container" hx-trigger="keyup changed delay:300ms">
+        <button class="btn btn-sm btn-primary"
+                hx-get="/ui/users" hx-target="#user-list-container">🔄 Refresh</button>
+      </div>
+      <div id="user-list-container"
+           hx-get="/ui/users" hx-trigger="load, refresh" hx-swap="innerHTML">
+        <div class="empty">Scanning identity matrix…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: identity detail + profile editor -->
+  <div id="detail-panel">
+    <div class="card">
+      <div class="empty">Select an identity to view profile &amp; optimistic-lock editor</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

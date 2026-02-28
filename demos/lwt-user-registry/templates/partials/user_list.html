@@ -1,0 +1,22 @@
+{% if users %}
+{% for u in users %}
+<div class="user-item"
+     hx-get="/ui/users/{{ u.username }}" hx-target="#detail-panel" hx-swap="innerHTML">
+  <div>
+    <div class="user-name">{{ u.username }}</div>
+    <div class="user-meta">
+      <span class="user-dim">🌀 {{ u.dimension }}</span> · {{ u.email }}
+    </div>
+    <div class="user-meta" style="margin-top:2px;color:var(--muted);">{{ u.display_name }}</div>
+  </div>
+  <div style="text-align:right;">
+    <button class="btn btn-danger btn-sm"
+            hx-delete="/ui/users/{{ u.username }}" hx-target="#user-list-container" hx-swap="innerHTML"
+            hx-confirm="Delete '{{ u.username }}'? Uses IF EXISTS — safe to retry."
+            onclick="event.stopPropagation()">✕</button>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty">No identities registered — use the form or run seed.py</div>
+{% endif %}

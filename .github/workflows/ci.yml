@@ -59,3 +59,14 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           pypi_token: ${{ secrets.PYPI_TOKEN }}
+
+  self-heal:
+    needs: [lint, commitlint]
+    if: ${{ failure() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      models: read
+    uses: ./.github/workflows/self-healing-ci.yml
+    secrets: inherit

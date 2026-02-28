@@ -43,3 +43,14 @@ jobs:
       - name: Syntax check (py_compile)
         run: |
           find . -name '*.py' -print -exec uv run python -m py_compile {} \;
+
+  self-heal:
+    needs: [validate-demo]
+    if: ${{ failure() }}
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      models: read
+    uses: ./.github/workflows/self-healing-ci.yml
+    secrets: inherit

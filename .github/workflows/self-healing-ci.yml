@@ -1,8 +1,9 @@
 name: Self-Healing CI
 
-# NOTE: workflow_run triggers only fire for workflow files that exist on the
-# default branch. This workflow must be merged to main before it will react
-# to failures in other workflows.
+# NOTE: This workflow is called from CI / Unit Tests / Integration Tests /
+# Benchmarks / Demo Apps on failure via workflow_call.  This avoids the
+# approval requirement that workflow_run triggers impose for bot-initiated
+# runs (e.g. copilot-swe-agent).
 #
 # GH_PAT secret — required for @copilot mentions to work on Copilot-authored PRs
 # ─────────────────────────────────────────────────────────────────────────────
@@ -21,13 +22,7 @@ name: Self-Healing CI
 #   https://github.com/fruch/coodie/settings/secrets/actions/new
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-      - Unit Tests
-      - Integration Tests
-    types:
-      - completed
+  workflow_call:
   workflow_dispatch:
     inputs:
       run_id:
@@ -38,9 +33,6 @@ on:
 jobs:
   on-failure:
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'failure'
     permissions:
       contents: read
       pull-requests: write
@@ -53,8 +45,15 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          head_branch="${{ github.event.workflow_run.head_branch }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            run_id="${{ inputs.run_id }}"
+            head_branch=$(gh api "repos/${{ github.repository }}/actions/runs/${run_id}" --jq '.head_branch')
+          else
+            head_branch="${HEAD_REF:-$REF_NAME}"
+          fi
 
           # Try to find an open PR for the branch that triggered the failed run
           pr_number=$(gh pr list \
@@ -77,10 +76,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          run_id=${{ github.event.workflow_run.id }}
-          workflow_name="${{ github.event.workflow_run.name }}"
-          run_url="${{ github.event.workflow_run.html_url }}"
-          head_sha="${{ github.event.workflow_run.head_sha }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            run_id="${{ inputs.run_id }}"
+            workflow_name=$(gh api "repos/${{ github.repository }}/actions/runs/${run_id}" --jq '.name')
+            run_url=$(gh api "repos/${{ github.repository }}/actions/runs/${run_id}" --jq '.html_url')
+            head_sha=$(gh api "repos/${{ github.repository }}/actions/runs/${run_id}" --jq '.head_sha')
+          else
+            run_id="${{ github.run_id }}"
+            workflow_name="${{ github.workflow }}"
+            run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            head_sha="${{ github.sha }}"
+          fi
 
           # Collect logs from all failed jobs
           export REPO="${{ github.repository }}"
@@ -111,32 +117,44 @@ jobs:
       - name: Comment on pull request
         if: steps.pr.outputs.found == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           pr_number="${{ steps.pr.outputs.number }}"
           workflow_name="${{ steps.logs.outputs.workflow_name }}"
           run_url="${{ steps.logs.outputs.run_url }}"
           head_sha="${{ steps.logs.outputs.head_sha }}"
-          failed_logs=$(cat /tmp/failed_logs.txt)
-          copilot_summary=$(cat /tmp/copilot_summary.txt)
 
-          cat > /tmp/comment.md <<EOF
-          ## CI Failure: ${workflow_name}
+          # Build comment from parts — avoid heredoc to prevent shell
+          # expansion of $, backticks, etc. inside CI log content.
+          {
+            echo "## CI Failure: ${workflow_name}"
+            echo ""
+            echo "**Commit:** \`${head_sha}\`"
+            echo "**Run:** ${run_url}"
+            echo ""
+            echo "### 🤖 Copilot Failure Analysis"
+            cat /tmp/copilot_summary.txt
+            echo ""
+            echo "---"
+            echo ""
+            echo "@copilot please investigate the failure and suggest a fix."
+            echo ""
+            echo "## Failed Job Logs"
+            cat /tmp/failed_logs.txt
+          } > /tmp/comment.md
 
-          **Commit:** \`${head_sha}\`
-          **Run:** ${run_url}
-
-          ### 🤖 Copilot Failure Analysis
-          ${copilot_summary}
-
-          ---
-
-          @copilot please investigate the failure and suggest a fix.
-
-          ## Failed Job Logs
-          ${failed_logs}
-          EOF
-
-          gh pr comment "${pr_number}" \
-            --repo "${{ github.repository }}" \
-            --body-file /tmp/comment.md
+          # Prefer GH_PAT (enables @copilot on bot PRs), fall back to GITHUB_TOKEN
+          fallback_token="$GH_TOKEN"
+          if [ -n "$GH_PAT" ]; then
+            export GH_TOKEN="$GH_PAT"
+          fi
+          if ! gh pr comment "${pr_number}" \
+               --repo "${{ github.repository }}" \
+               --body-file /tmp/comment.md; then
+            echo "::warning::GH_PAT failed, retrying with GITHUB_TOKEN"
+            export GH_TOKEN="$fallback_token"
+            gh pr comment "${pr_number}" \
+              --repo "${{ github.repository }}" \
+              --body-file /tmp/comment.md
+          fi

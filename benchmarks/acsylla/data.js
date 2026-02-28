@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772308197780,
+  "lastUpdate": 1772308443809,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -6806,6 +6806,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000010932552939594178",
             "extra": "mean: 5.432536323606949 usec\nrounds: 6800"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "e84ff7e9f023b723105006c470d9d209d767175c",
+          "message": "docs(perf): add Phase 6 dict_factory analysis to performance plan (§13C)\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-02-28T21:53:24+02:00",
+          "tree_id": "95b5afcbb57477d74295120b716b4dc57b779c35",
+          "url": "https://github.com/fruch/coodie/commit/e84ff7e9f023b723105006c470d9d209d767175c"
+        },
+        "date": 1772308442843,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52665.533008989485,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018215912539998978",
+            "extra": "mean: 18.987750486248945 usec\nrounds: 8224"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 580461.1344999097,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1529710839428993e-7",
+            "extra": "mean: 1.7227682278186287 usec\nrounds: 42490"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 623579.6414169982,
+            "unit": "iter/sec",
+            "range": "stddev: 4.142689001378457e-7",
+            "extra": "mean: 1.6036444001405157 usec\nrounds: 47126"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 842829.6866396889,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4576879313150125e-7",
+            "extra": "mean: 1.1864793277357606 usec\nrounds: 153563"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 932409.7452662613,
+            "unit": "iter/sec",
+            "range": "stddev: 3.1061414595952236e-7",
+            "extra": "mean: 1.0724898630423876 usec\nrounds: 91744"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 736671.0751821117,
+            "unit": "iter/sec",
+            "range": "stddev: 3.644106513223114e-7",
+            "extra": "mean: 1.3574579397634028 usec\nrounds: 102365"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 189489.4926117755,
+            "unit": "iter/sec",
+            "range": "stddev: 6.980307183958852e-7",
+            "extra": "mean: 5.277337472472903 usec\nrounds: 7731"
           }
         ]
       }

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772312198849,
+  "lastUpdate": 1772312277171,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -7244,6 +7244,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 6.303075188030962e-7",
             "extra": "mean: 5.186116043491715 usec\nrounds: 7592"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "95af4604754c6dad3bb79cad28d3a8048efa37fe",
+          "message": "fix(ci): add workflows write permission to pr-rebase-squash for force-pushing branches with workflow changes\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-02-28T22:57:20+02:00",
+          "tree_id": "9e8732608879b7b2f4b78f22733501e091333b9b",
+          "url": "https://github.com/fruch/coodie/commit/95af4604754c6dad3bb79cad28d3a8048efa37fe"
+        },
+        "date": 1772312276617,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52876.848376284346,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015516924738722663",
+            "extra": "mean: 18.911868439733016 usec\nrounds: 8460"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 550997.0182920061,
+            "unit": "iter/sec",
+            "range": "stddev: 7.268230019919866e-7",
+            "extra": "mean: 1.8148918538612502 usec\nrounds: 39798"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 620912.6736281362,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2172078339773314e-7",
+            "extra": "mean: 1.6105324347090053 usec\nrounds: 47850"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 841297.3640996347,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5341730059704266e-7",
+            "extra": "mean: 1.1886403579431282 usec\nrounds: 157679"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 954700.0354902198,
+            "unit": "iter/sec",
+            "range": "stddev: 3.312820027434174e-7",
+            "extra": "mean: 1.0474494216254213 usec\nrounds: 96909"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 736301.8282681435,
+            "unit": "iter/sec",
+            "range": "stddev: 3.89575136307366e-7",
+            "extra": "mean: 1.358138689336276 usec\nrounds: 104406"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188823.82235341507,
+            "unit": "iter/sec",
+            "range": "stddev: 8.692448410069282e-7",
+            "extra": "mean: 5.295941939615725 usec\nrounds: 7785"
           }
         ]
       }

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772318975778,
+  "lastUpdate": 1772319251508,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -7682,6 +7682,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.45573602990041e-7",
             "extra": "mean: 5.217108925360255 usec\nrounds: 7932"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "f9825531a87bb553943d4c4d96b224f909ddd0c5",
+          "message": "docs(plans): add Phase 7 benchmark analysis for __slots__ on hot-path classes\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T00:53:33+02:00",
+          "tree_id": "6517d66aca171901492d64ca0a06ef6080f3b7b5",
+          "url": "https://github.com/fruch/coodie/commit/f9825531a87bb553943d4c4d96b224f909ddd0c5"
+        },
+        "date": 1772319251074,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52889.859797280515,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014921735410752391",
+            "extra": "mean: 18.9072159357741 usec\nrounds: 8961"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 552060.8687111172,
+            "unit": "iter/sec",
+            "range": "stddev: 6.519049630587915e-7",
+            "extra": "mean: 1.8113944615105126 usec\nrounds: 51133"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 617765.2420062214,
+            "unit": "iter/sec",
+            "range": "stddev: 3.8756957216421137e-7",
+            "extra": "mean: 1.618737882941509 usec\nrounds: 58100"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 821498.7290521183,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2420707873119076e-7",
+            "extra": "mean: 1.2172873367118224 usec\nrounds: 152859"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 944945.4063489228,
+            "unit": "iter/sec",
+            "range": "stddev: 3.534876953470407e-7",
+            "extra": "mean: 1.0582621951291313 usec\nrounds: 88724"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 695195.0418338021,
+            "unit": "iter/sec",
+            "range": "stddev: 4.784474880749325e-7",
+            "extra": "mean: 1.438445241729826 usec\nrounds: 113161"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188103.6257687531,
+            "unit": "iter/sec",
+            "range": "stddev: 7.787983394300334e-7",
+            "extra": "mean: 5.316218631688466 usec\nrounds: 7396"
           }
         ]
       }

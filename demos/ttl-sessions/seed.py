@@ -185,7 +185,7 @@ async def _seed(count: int, ttl: int) -> None:
 
 @click.command()
 @click.option("--count", default=20, help="Number of memory sessions to generate")
-@click.option("--ttl", default=30, help="TTL in seconds for each session (overrides table default)")
+@click.option("--ttl", default=30, help="TTL in seconds for each session (passed to save(ttl=N), overriding __default_ttl__)")
 def seed(count: int, ttl: int) -> None:
     """Seed Ephemera's memory vault with stolen memories."""
     asyncio.run(_seed(count, ttl))

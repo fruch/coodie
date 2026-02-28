@@ -5,9 +5,12 @@ from __future__ import annotations
 import asyncio
 import ssl as _ssl
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from coodie.drivers.base import AbstractDriver
+
+if TYPE_CHECKING:
+    from coodie.drivers.cassandra import CassandraDriver
 
 
 class LazyDriver(AbstractDriver):
@@ -32,7 +35,7 @@ class LazyDriver(AbstractDriver):
         self._keyspace = keyspace
         self._ssl_context = ssl_context
         self._kwargs = kwargs
-        self._driver: CassandraDriver | None = None  # type: ignore[name-defined]
+        self._driver: CassandraDriver | None = None
         self._lock = threading.Lock()
 
     def _ensure_connected(self) -> None:

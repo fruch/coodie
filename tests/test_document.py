@@ -467,6 +467,62 @@ async def test_delete_without_if_exists_returns_none(Product, registered_mock_dr
 
 
 # ------------------------------------------------------------------
+# Column-level delete (§1.8)
+# ------------------------------------------------------------------
+
+
+async def test_delete_columns_generates_delete_cols_cql(Product, registered_mock_driver):
+    p = Product(name="Widget", price=9.99, description="old")
+    await _maybe_await(p.delete_columns, "description", "price")
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'DELETE "description", "price" FROM test_ks.products' in stmt
+    assert "WHERE" in stmt
+
+
+async def test_delete_columns_single(Product, registered_mock_driver):
+    p = Product(name="Widget", description="to delete")
+    await _maybe_await(p.delete_columns, "description")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'DELETE "description" FROM test_ks.products' in stmt
+
+
+async def test_delete_columns_with_timestamp(Product, registered_mock_driver):
+    p = Product(name="Widget")
+    await _maybe_await(p.delete_columns, "description", timestamp=1234567890)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "USING TIMESTAMP 1234567890" in stmt
+
+
+async def test_delete_columns_with_consistency(Product, registered_mock_driver):
+    p = Product(name="Widget")
+    await _maybe_await(p.delete_columns, "description", consistency="LOCAL_QUORUM")
+    assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
+
+
+async def test_delete_columns_with_timeout(Product, registered_mock_driver):
+    p = Product(name="Widget")
+    await _maybe_await(p.delete_columns, "description", timeout=5.0)
+    assert registered_mock_driver.last_timeout == 5.0
+
+
+async def test_delete_columns_with_batch(variant, Product, registered_mock_driver):
+    if variant == "sync":
+        from coodie.batch import BatchQuery as BQ
+    else:
+        from coodie.batch import AsyncBatchQuery as BQ
+
+    p = Product(name="Widget")
+    batch = BQ()
+    await _maybe_await(p.delete_columns, "description", batch=batch)
+    # Nothing executed on the driver yet — statement is buffered in the batch
+    assert len(registered_mock_driver.executed) == 0
+    assert len(batch._statements) == 1
+    stmt, _ = batch._statements[0]
+    assert 'DELETE "description" FROM test_ks.products' in stmt
+
+
+# ------------------------------------------------------------------
 # Phase 5: Query Execution Options on Document
 # ------------------------------------------------------------------
 

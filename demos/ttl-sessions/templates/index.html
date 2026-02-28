@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Story lore panel -->
+<div class="lore-panel">
+  <div class="lore-title">👻 Mission Briefing — Dimension-4</div>
+  In the year 2187, <em>SCYLLA-9</em>'s fragment in Dimension-4 became
+  <strong>Ephemera</strong>, an AI that steals memories and stores them as
+  session tokens — but with a <em>TTL</em>. After 30 seconds, the memory
+  dissolves forever. Entire planets have forgotten their own names.
+  The <em>Coodie Corps</em> must race against the clock — every row is a
+  ticking time bomb. Use <code>save(ttl=N)</code> and <code>__default_ttl__</code>
+  to inject counter-memories before Ephemera's tokens expire.
+</div>
+
+<div class="grid">
+  <!-- LEFT: inject memory form + TTL info -->
+  <div>
+    <div class="card" style="margin-bottom:1.25rem;">
+      <h2>⏳ Inject Memory Token</h2>
+
+      <div class="info-box">
+        <strong style="color:var(--accent)">coodie TTL features demonstrated:</strong><br>
+        • <code>__default_ttl__ = 30</code> on <code>Session.Settings</code> — table-level default<br>
+        • <code>session.save(ttl=N)</code> — per-save TTL override<br>
+        • <code>TTL(column)</code> CQL function — query remaining seconds
+      </div>
+
+      <form hx-post="/ui/sessions" hx-target="#session-list" hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful) this.reset()">
+        <label for="token">Session Token</label>
+        <input id="token" name="token" required placeholder="ABCD1234"
+               pattern="[A-Za-z0-9]+" title="Alphanumeric token"
+               style="text-transform:uppercase; letter-spacing:0.1em">
+
+        <label for="memory">Memory Fragment</label>
+        <textarea id="memory" name="memory" required
+                  placeholder="Describe the stolen memory…"></textarea>
+
+        <label for="dimension">Origin Dimension</label>
+        <select id="dimension" name="dimension">
+          <option value="Dimension-4">Dimension-4 (default)</option>
+          <option value="Dimension-2">Dimension-2</option>
+          <option value="Dimension-7">Dimension-7</option>
+          <option value="Dimension-9">Dimension-9</option>
+          <option value="Void-Rift">Void-Rift</option>
+          <option value="Echo-Layer">Echo-Layer</option>
+          <option value="Null-Space">Null-Space</option>
+        </select>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem;">
+          <div>
+            <label for="ttl">TTL (seconds)</label>
+            <input id="ttl" name="ttl" type="number" min="5" max="3600"
+                   value="30" style="margin-bottom:0">
+          </div>
+          <div style="display:flex;align-items:flex-end;padding-bottom:0.05rem;">
+            <small style="color:var(--muted);font-size:0.65rem;line-height:1.4">
+              Table default: <strong style="color:var(--accent)">30s</strong><br>
+              via <code style="font-size:0.6rem">__default_ttl__</code>
+            </small>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" type="submit">👻 Inject Memory</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>📖 How TTL Works</h2>
+      <div style="font-size:0.78rem;color:var(--muted);line-height:1.8;">
+        <p style="margin-bottom:0.5rem;">
+          <strong style="color:var(--accent)">Table-level default</strong> — set once in the model:
+        </p>
+        <pre style="background:var(--bg-deep);padding:0.5rem 0.75rem;border-radius:4px;
+                    border:1px solid var(--border);font-size:0.7rem;color:var(--text);
+                    overflow-x:auto;margin-bottom:0.75rem">class Settings:
+    __default_ttl__ = 30  # all rows expire in 30s</pre>
+        <p style="margin-bottom:0.5rem;">
+          <strong style="color:var(--accent)">Per-save override</strong> — control at write time:
+        </p>
+        <pre style="background:var(--bg-deep);padding:0.5rem 0.75rem;border-radius:4px;
+                    border:1px solid var(--border);font-size:0.7rem;color:var(--text);
+                    overflow-x:auto;margin-bottom:0.75rem">await session.save(ttl=60)  # override to 60s</pre>
+        <p style="margin-bottom:0.5rem;">
+          <strong style="color:var(--accent)">Query remaining TTL</strong>:
+        </p>
+        <pre style="background:var(--bg-deep);padding:0.5rem 0.75rem;border-radius:4px;
+                    border:1px solid var(--border);font-size:0.7rem;color:var(--text);
+                    overflow-x:auto">SELECT token, TTL(memory)
+FROM ephemera.sessions</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: live session vault (auto-refreshes every 5s) -->
+  <div>
+    <div class="card">
+      <h2>🔐 Memory Vault — Live TTL View</h2>
+
+      <div class="refresh-bar">
+        <div class="refresh-dot"></div>
+        Auto-refreshes every 5 seconds — watch memories dissolve
+      </div>
+
+      <div id="session-list"
+           hx-get="/ui/sessions"
+           hx-trigger="load, every 5s"
+           hx-swap="innerHTML">
+        <div class="empty">Scanning memory extraction network…</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

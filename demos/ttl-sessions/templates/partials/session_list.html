@@ -1,0 +1,44 @@
+{% if sessions %}
+<div class="session-grid">
+  {% for s in sessions %}
+  {% set remaining = s.remaining_ttl if s.remaining_ttl is not none else 0 %}
+  {% set ttl_class = "high" if remaining > 15 else ("mid" if remaining > 5 else "low") %}
+  <div class="session-card ttl-{{ ttl_class }}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div class="session-token">{{ s.token }}</div>
+        <div class="session-dimension">{{ s.dimension }}</div>
+      </div>
+      <span class="ttl-badge {{ ttl_class }}">
+        ⏳ {{ remaining }}s
+      </span>
+    </div>
+
+    <div class="session-memory">{{ s.memory }}</div>
+
+    <div class="session-footer">
+      <span style="font-size:0.6rem;color:var(--dim);">
+        {{ s.stolen_at.strftime('%H:%M:%S') if s.stolen_at else '—' }}
+      </span>
+      <button class="btn btn-danger"
+              hx-delete="/ui/sessions/{{ s.token }}"
+              hx-target="#session-list"
+              hx-swap="innerHTML"
+              hx-confirm="Purge this memory token immediately?">
+        🗑 Purge
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div style="margin-top:0.75rem;font-size:0.65rem;color:var(--dim);text-align:right;letter-spacing:0.05em;">
+  {{ sessions | length }} active token{{ 's' if sessions | length != 1 else '' }}
+  · next refresh in 5s
+</div>
+{% else %}
+<div class="empty">
+  👻 All memories have dissolved — the vault is empty<br>
+  <small style="color:var(--dim)">Inject a new memory token or run <code>make seed</code></small>
+</div>
+{% endif %}

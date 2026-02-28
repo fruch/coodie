@@ -473,7 +473,8 @@ async def test_delete_without_if_exists_returns_none(Product, registered_mock_dr
 
 async def test_delete_columns_generates_delete_cols_cql(Product, registered_mock_driver):
     p = Product(name="Widget", price=9.99, description="old")
-    await _maybe_await(p.delete_columns, "description", "price")
+    with pytest.warns(UserWarning, match="delete_columns\\(\\)"):
+        await _maybe_await(p.delete_columns, "description", "price")
     assert len(registered_mock_driver.executed) == 1
     stmt, params = registered_mock_driver.executed[0]
     assert 'DELETE "description", "price" FROM test_ks.products' in stmt
@@ -482,27 +483,31 @@ async def test_delete_columns_generates_delete_cols_cql(Product, registered_mock
 
 async def test_delete_columns_single(Product, registered_mock_driver):
     p = Product(name="Widget", description="to delete")
-    await _maybe_await(p.delete_columns, "description")
+    with pytest.warns(UserWarning, match="delete_columns\\(\\)"):
+        await _maybe_await(p.delete_columns, "description")
     stmt, _ = registered_mock_driver.executed[0]
     assert 'DELETE "description" FROM test_ks.products' in stmt
 
 
 async def test_delete_columns_with_timestamp(Product, registered_mock_driver):
     p = Product(name="Widget")
-    await _maybe_await(p.delete_columns, "description", timestamp=1234567890)
+    with pytest.warns(UserWarning, match="delete_columns\\(\\)"):
+        await _maybe_await(p.delete_columns, "description", timestamp=1234567890)
     stmt, _ = registered_mock_driver.executed[0]
     assert "USING TIMESTAMP 1234567890" in stmt
 
 
 async def test_delete_columns_with_consistency(Product, registered_mock_driver):
     p = Product(name="Widget")
-    await _maybe_await(p.delete_columns, "description", consistency="LOCAL_QUORUM")
+    with pytest.warns(UserWarning, match="delete_columns\\(\\)"):
+        await _maybe_await(p.delete_columns, "description", consistency="LOCAL_QUORUM")
     assert registered_mock_driver.last_consistency == "LOCAL_QUORUM"
 
 
 async def test_delete_columns_with_timeout(Product, registered_mock_driver):
     p = Product(name="Widget")
-    await _maybe_await(p.delete_columns, "description", timeout=5.0)
+    with pytest.warns(UserWarning, match="delete_columns\\(\\)"):
+        await _maybe_await(p.delete_columns, "description", timeout=5.0)
     assert registered_mock_driver.last_timeout == 5.0
 
 
@@ -514,12 +519,20 @@ async def test_delete_columns_with_batch(variant, Product, registered_mock_drive
 
     p = Product(name="Widget")
     batch = BQ()
-    await _maybe_await(p.delete_columns, "description", batch=batch)
+    with pytest.warns(UserWarning, match="delete_columns\\(\\)"):
+        await _maybe_await(p.delete_columns, "description", batch=batch)
     # Nothing executed on the driver yet — statement is buffered in the batch
     assert len(registered_mock_driver.executed) == 0
     assert len(batch._statements) == 1
     stmt, _ = batch._statements[0]
     assert 'DELETE "description" FROM test_ks.products' in stmt
+
+
+async def test_delete_columns_warns_about_migration(Product, registered_mock_driver):
+    """delete_columns() must emit a UserWarning mentioning sync_table/migrate."""
+    p = Product(name="Widget")
+    with pytest.warns(UserWarning, match="sync_table|coodie migrate"):
+        await _maybe_await(p.delete_columns, "description")
 
 
 # ------------------------------------------------------------------

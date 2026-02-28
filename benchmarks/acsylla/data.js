@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772309087185,
+  "lastUpdate": 1772309195390,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -6952,6 +6952,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 9.185922032501682e-7",
             "extra": "mean: 5.230105789616237 usec\nrounds: 7997"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "46f681e8059c325df8ce7a1d2c26e0a9ae2a9f20",
+          "message": "feat(ci): use Copilot to summarize CI failures before commenting on PR\n\n  2c16588 --stat && git --no-pager show 46cc2a7 --stat\n\nAdd a Copilot-powered failure summarization step to the self-healing CI workflow. When a PR build fails, the workflow now calls the GitHub Copilot API to generate a human-readable summary of the failure before posting the comment, making it easier to diagnose issues at a glance.\n\nThe summarization logic is extracted into `.github/scripts/summarize-failure.py` so it can be unit-tested in isolation. Tests live in `tests/workflows/test_summarize_failure.py` and cover both successful summarization and fallback behaviour when the API is unavailable.",
+          "timestamp": "2026-02-28T22:06:01+02:00",
+          "tree_id": "a2a8ae87e3a4fb43b865b0a8391385a71083af53",
+          "url": "https://github.com/fruch/coodie/commit/46f681e8059c325df8ce7a1d2c26e0a9ae2a9f20"
+        },
+        "date": 1772309195050,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52845.79882470708,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018772676323635863",
+            "extra": "mean: 18.922980108921514 usec\nrounds: 8446"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 573204.0429413859,
+            "unit": "iter/sec",
+            "range": "stddev: 5.095924737924179e-7",
+            "extra": "mean: 1.7445794605155236 usec\nrounds: 44821"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 594085.4311413614,
+            "unit": "iter/sec",
+            "range": "stddev: 3.940784690893697e-7",
+            "extra": "mean: 1.6832595912658428 usec\nrounds: 53434"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 833191.6938912056,
+            "unit": "iter/sec",
+            "range": "stddev: 3.235303024946946e-7",
+            "extra": "mean: 1.2002039954692294 usec\nrounds: 158680"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 953452.4503687714,
+            "unit": "iter/sec",
+            "range": "stddev: 3.31369121344661e-7",
+            "extra": "mean: 1.0488200010532513 usec\nrounds: 95795"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 709703.0481143991,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7395685640031854e-7",
+            "extra": "mean: 1.4090400240732899 usec\nrounds: 96442"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 192761.2602266143,
+            "unit": "iter/sec",
+            "range": "stddev: 6.489976138514164e-7",
+            "extra": "mean: 5.187764381828477 usec\nrounds: 7805"
           }
         ]
       }

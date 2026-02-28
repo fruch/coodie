@@ -37,6 +37,8 @@ def init_coodie(
     name: str = "default",
     ssl_context: _ssl.SSLContext | None = None,
     lazy: bool = False,
+    compression: str | bool | None = None,
+    speculative_execution_policy: Any | None = None,
     **kwargs: Any,
 ) -> AbstractDriver:
     if driver_type == "acsylla":
@@ -75,6 +77,10 @@ def init_coodie(
                     ) from exc
                 if ssl_context is not None:
                     kwargs["ssl_context"] = ssl_context
+                if compression is not None:
+                    kwargs["compression"] = compression
+                if speculative_execution_policy is not None:
+                    kwargs["speculative_execution_policy"] = speculative_execution_policy
                 cluster = Cluster(hosts or ["127.0.0.1"], **kwargs)
                 session = cluster.connect(keyspace)
 

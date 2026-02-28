@@ -179,8 +179,24 @@ class CassandraDriver(AbstractDriver):
 
         if not dry_run:
             self._known_tables[cache_key] = col_names
+            self._warm_prepared_cache(table, keyspace, cols)
 
         return planned
+
+    def _warm_prepared_cache(self, table: str, keyspace: str, cols: list[Any]) -> None:
+        """Pre-prepare SELECT-by-PK and INSERT queries to eliminate cold-start latency."""
+        pk_cols = sorted((c for c in cols if c.primary_key), key=lambda c: c.partition_key_index)
+        ck_cols = sorted((c for c in cols if c.clustering_key), key=lambda c: c.clustering_key_index)
+        key_cols = pk_cols + ck_cols
+        if key_cols:
+            where_clause = " AND ".join(f'"{c.name}" = ?' for c in key_cols)
+            self._prepare(f"SELECT * FROM {keyspace}.{table} WHERE {where_clause}")
+        # Counter tables do not support INSERT — only UPDATE … SET col = col + ?.
+        is_counter_table = any(getattr(c, "cql_type", None) == "counter" for c in cols)
+        if not is_counter_table:
+            all_col_names = ", ".join(f'"{c.name}"' for c in cols)
+            placeholders = ", ".join("?" * len(cols))
+            self._prepare(f"INSERT INTO {keyspace}.{table} ({all_col_names}) VALUES ({placeholders})")
 
     def _get_existing_columns(self, table: str, keyspace: str) -> set[str]:
         rows = self._session.execute(
@@ -371,6 +387,7 @@ class CassandraDriver(AbstractDriver):
 
         if not dry_run:
             self._known_tables[cache_key] = col_names
+            self._warm_prepared_cache(table, keyspace, cols)
 
         return planned
 

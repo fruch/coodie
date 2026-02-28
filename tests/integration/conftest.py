@@ -22,6 +22,7 @@ import pytest
 import pytest_asyncio
 from pydantic import Field, field_validator
 
+from coodie.aio.document import CounterDocument as AsyncCounterDocument
 from coodie.aio.document import Document as AsyncDocument
 from coodie.aio.document import MaterializedView as AsyncMaterializedView
 from coodie.drivers import _registry, init_coodie
@@ -29,6 +30,7 @@ from coodie.fields import (
     Ascii,
     BigInt,
     ClusteringKey,
+    Counter,
     Double,
     Frozen,
     Indexed,
@@ -38,6 +40,7 @@ from coodie.fields import (
     TinyInt,
     VarInt,
 )
+from coodie.sync.document import CounterDocument as SyncCounterDocument
 from coodie.sync.document import Document as SyncDocument
 from coodie.sync.document import MaterializedView as SyncMaterializedView
 from tests.conftest import _maybe_await
@@ -665,3 +668,45 @@ def PhaseADryRun(variant):
     if variant == "sync":
         return SyncPhaseADryRun
     return AsyncPhaseADryRun
+
+
+# ---------------------------------------------------------------------------
+# Counter document models & fixtures
+# ---------------------------------------------------------------------------
+
+
+class SyncPageView(SyncCounterDocument):
+    url: Annotated[str, PrimaryKey()]
+    view_count: Annotated[int, Counter()] = 0
+    unique_visitors: Annotated[int, Counter()] = 0
+
+    @field_validator("view_count", "unique_visitors", mode="before")
+    @classmethod
+    def _coerce_counter(cls, v: object) -> object:
+        return v if v is not None else 0
+
+    class Settings:
+        name = "it_sync_page_views"
+        keyspace = "test_ks"
+
+
+class AsyncPageView(AsyncCounterDocument):
+    url: Annotated[str, PrimaryKey()]
+    view_count: Annotated[int, Counter()] = 0
+    unique_visitors: Annotated[int, Counter()] = 0
+
+    @field_validator("view_count", "unique_visitors", mode="before")
+    @classmethod
+    def _coerce_counter(cls, v: object) -> object:
+        return v if v is not None else 0
+
+    class Settings:
+        name = "it_async_page_views"
+        keyspace = "test_ks"
+
+
+@pytest.fixture
+def PageView(variant):
+    if variant == "sync":
+        return SyncPageView
+    return AsyncPageView

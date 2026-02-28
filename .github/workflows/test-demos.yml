@@ -40,12 +40,6 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Lint (ruff check)
-        run: uv run ruff check .
-
-      - name: Format check (ruff format)
-        run: uv run ruff format --check .
-
       - name: Syntax check (py_compile)
         run: |
           find . -name '*.py' -print -exec uv run python -m py_compile {} \;

@@ -4,6 +4,7 @@ import ssl as _ssl
 from typing import Any
 
 from coodie.drivers.base import AbstractDriver
+from coodie.drivers.lazy import LazyDriver
 from coodie.exceptions import ConfigurationError
 
 _registry: dict[str, AbstractDriver] = {}
@@ -35,6 +36,7 @@ def init_coodie(
     driver_type: str = "scylla",
     name: str = "default",
     ssl_context: _ssl.SSLContext | None = None,
+    lazy: bool = False,
     **kwargs: Any,
 ) -> AbstractDriver:
     if driver_type == "acsylla":
@@ -47,22 +49,27 @@ def init_coodie(
             )
         driver: AbstractDriver = AcsyllaDriver(session=session, default_keyspace=keyspace)
     elif driver_type in ("scylla", "cassandra"):
-        from coodie.drivers.cassandra import CassandraDriver
+        if lazy and session is None:
+            from coodie.drivers.lazy import LazyDriver
 
-        if session is None:
-            try:
-                from cassandra.cluster import Cluster  # type: ignore[import-untyped]
-            except ImportError as exc:
-                raise ImportError(
-                    "cassandra-driver (or scylla-driver) is required for CassandraDriver. "
-                    "Install it with: pip install scylla-driver"
-                ) from exc
-            if ssl_context is not None:
-                kwargs["ssl_context"] = ssl_context
-            cluster = Cluster(hosts or ["127.0.0.1"], **kwargs)
-            session = cluster.connect(keyspace)
+            driver = LazyDriver(hosts=hosts, keyspace=keyspace, ssl_context=ssl_context, kwargs=kwargs)
+        else:
+            from coodie.drivers.cassandra import CassandraDriver
 
-        driver = CassandraDriver(session=session, default_keyspace=keyspace)
+            if session is None:
+                try:
+                    from cassandra.cluster import Cluster  # type: ignore[import-untyped]
+                except ImportError as exc:
+                    raise ImportError(
+                        "cassandra-driver (or scylla-driver) is required for CassandraDriver. "
+                        "Install it with: pip install scylla-driver"
+                    ) from exc
+                if ssl_context is not None:
+                    kwargs["ssl_context"] = ssl_context
+                cluster = Cluster(hosts or ["127.0.0.1"], **kwargs)
+                session = cluster.connect(keyspace)
+
+            driver = CassandraDriver(session=session, default_keyspace=keyspace)
     else:
         raise ConfigurationError(f"Unknown driver_type={driver_type!r}. Supported: 'scylla', 'cassandra', 'acsylla'.")
 
@@ -127,6 +134,7 @@ async def init_coodie_async(
 
 __all__ = [
     "AbstractDriver",
+    "LazyDriver",
     "register_driver",
     "get_driver",
     "init_coodie",

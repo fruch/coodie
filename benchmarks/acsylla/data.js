@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772310329299,
+  "lastUpdate": 1772310429755,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -7098,6 +7098,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.280644300934445e-7",
             "extra": "mean: 5.2923009950800965 usec\nrounds: 7638"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "fe2320cc007d5c307ea4f412e6042799294263a7",
+          "message": "feat(ci): implement plan-phase-continuation GitHub Actions workflow\n\n✗ View commit subjects\n  ac5a788 c67bdee 2>/dev/null | head -10\n  Permission denied and could not request permission from user\n\nImplement a GitHub Actions workflow that automatically detects the next incomplete phase in a plan file after a PR is merged and opens a new PR to continue it.\n\nAdd `parse-plan.py` to parse `docs/plans/*.md` files and extract phase status, along with a comprehensive test suite (`test_parse_plan.py`). The workflow (`plan-continuation.yml`) triggers on PR merge to master (when the PR body references a plan file and phase) or via `workflow_dispatch`, resolves merge conflicts with retries, and opens a follow-up PR targeting the next pending phase.\n\nAdd `.github/PULL_REQUEST_TEMPLATE.md` to standardise PR bodies with `Plan:` and `Phase:` fields. Document the workflow in `CONTRIBUTING.md` and add a `writing-plans` skill covering plan file conventions. Fix several shellcheck violations (SC2070, SC2086, SC2129) and a ruff-format issue surfaced during CI runs.",
+          "timestamp": "2026-02-28T22:26:31+02:00",
+          "tree_id": "6a68ad3ba09d5a60199f38f96f464a645d63bca0",
+          "url": "https://github.com/fruch/coodie/commit/fe2320cc007d5c307ea4f412e6042799294263a7"
+        },
+        "date": 1772310429029,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52736.53733766329,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016266780211030138",
+            "extra": "mean: 18.96218543127255 usec\nrounds: 8580"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 573191.0255753782,
+            "unit": "iter/sec",
+            "range": "stddev: 4.370491758215008e-7",
+            "extra": "mean: 1.7446190805171526 usec\nrounds: 43437"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 612994.14572181,
+            "unit": "iter/sec",
+            "range": "stddev: 3.589126487278891e-7",
+            "extra": "mean: 1.6313369499189663 usec\nrounds: 42858"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 835000.3098325076,
+            "unit": "iter/sec",
+            "range": "stddev: 3.590678342265933e-7",
+            "extra": "mean: 1.1976043460398111 usec\nrounds: 146800"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 937156.585193087,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0790581067861707e-7",
+            "extra": "mean: 1.0670575395828488 usec\nrounds: 90164"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 748797.6073834979,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3765577771945046e-7",
+            "extra": "mean: 1.3354743526682349 usec\nrounds: 97476"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 184727.7737442232,
+            "unit": "iter/sec",
+            "range": "stddev: 7.002099945654007e-7",
+            "extra": "mean: 5.413371144636944 usec\nrounds: 7749"
           }
         ]
       }

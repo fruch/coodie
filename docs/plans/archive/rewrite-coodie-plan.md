@@ -1,4 +1,4 @@
-# coodie Rewrite Plan
+# coodie Rewrite Plan — ✅ DONE
 
 > **coodie** = cassandra + beanie (hoodie)
 >

@@ -1,4 +1,4 @@
-# Test Refactoring Plan
+# Test Refactoring Plan — ✅ DONE
 
 > **Goal:** Reduce test duplication, improve maintainability, and shrink file
 > sizes by applying `pytest.mark.parametrize`, merging mirrored sync/async

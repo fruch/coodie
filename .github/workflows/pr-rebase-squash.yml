@@ -168,11 +168,22 @@ jobs:
             echo "status=conflict" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Abort on rebase conflicts
+      # ── 5b. Resolve conflicts with Copilot CLI ──────────────
+      - name: Resolve conflicts with Copilot CLI
+        id: resolve
         if: steps.rebase.outputs.status == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          npm install -g @github/copilot 2>/dev/null || true
+          bash .github/scripts/resolve-conflicts.sh
+
+      - name: Abort on rebase conflicts
+        if: steps.rebase.outputs.status == 'conflict' && steps.resolve.outputs.status != 'clean'
         run: |
           git rebase --abort
-          echo "Rebase failed due to merge conflicts. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
+          echo "Rebase failed: Copilot could not resolve all conflicts automatically. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
       - name: Push rebased branch

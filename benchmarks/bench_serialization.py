@@ -18,7 +18,10 @@ import pytest
 
 @pytest.mark.benchmark(group="model-instantiation")
 def test_cqlengine_model_instantiation(benchmark):
-    from benchmarks.models_cqlengine import CqlProduct
+    try:
+        from benchmarks.models_cqlengine import CqlProduct
+    except (ImportError, ModuleNotFoundError):
+        pytest.skip("cqlengine not available")
 
     data = {
         "id": uuid4(),
@@ -63,7 +66,10 @@ def test_coodie_model_instantiation(benchmark):
 
 @pytest.mark.benchmark(group="model-serialization")
 def test_cqlengine_model_serialization(benchmark):
-    from benchmarks.models_cqlengine import CqlProduct
+    try:
+        from benchmarks.models_cqlengine import CqlProduct
+    except (ImportError, ModuleNotFoundError):
+        pytest.skip("cqlengine not available")
 
     obj = CqlProduct(
         id=uuid4(),

@@ -74,12 +74,12 @@ Legend:
 
 | cqlengine Feature | Status | Notes |
 |---|---|---|
-| `UserType` base class | ❌ | No UDT support at all |
-| `columns.UserDefinedType(MyUDT)` column | ❌ | — |
-| `management.sync_type()` | ❌ | — |
-| `__type_name__` override | ❌ | — |
-| Nested UDTs | ❌ | — |
-| UDTs inside collections (`list<frozen<my_udt>>`) | ❌ | — |
+| `UserType` base class | ✅ | `coodie.usertype.UserType(BaseModel)` |
+| `columns.UserDefinedType(MyUDT)` column | ✅ | Auto-detected via type annotation — no wrapper needed |
+| `management.sync_type()` | ✅ | `MyUDT.sync_type()` classmethod (sync + async) |
+| `__type_name__` override | ✅ | `Settings.__type_name__` |
+| Nested UDTs | ✅ | Recursive depth-first dependency resolution |
+| UDTs inside collections (`list<frozen<my_udt>>`) | ✅ | Auto-detected in `python_type_to_cql_type_str()` |
 
 ### 1.2 Model API
 

@@ -10,7 +10,7 @@
 
 | # | cqlengine Feature | coodie Status | Action |
 |---|---|---|---|
-| 1 | User-Defined Types (UDT) | ❌ Missing | Phase A — new module |
+| 1 | User-Defined Types (UDT) | ✅ Implemented | Phase A — complete |
 | 2 | Static columns | ❌ Missing | Phase B — small addition |
 | 3 | `Model.create()` class method | ✅ Implemented | None — already exists |
 | 4 | `__like` filter operator (SASI / SAI) | ✅ Implemented | None — already in parser |
@@ -113,27 +113,32 @@ page.decrement(view_count=1)
 
 ---
 
-## Phase A: User-Defined Types (UDT) — Future
+## Phase A: User-Defined Types (UDT) — ✅ Complete
 
 **Priority:** Medium
 **Effort:** Large (new module, type system changes, serialization)
+**Status:** ✅ Implemented in `src/coodie/usertype.py`
 
-UDTs require:
+Completed tasks:
 
-| Task | Description |
-|---|---|
-| A.1 | Create `coodie.usertype` module with `UserType(BaseModel)` base class |
-| A.2 | Add `__type_name__` override (default: snake_case of class name) |
-| A.3 | Add `build_create_type()` / `build_drop_type()` to `cql_builder.py` |
-| A.4 | Add `sync_type()` classmethod to `UserType` |
-| A.5 | Register UDT types in `python_type_to_cql_type_str()` → emit `frozen<type_name>` |
-| A.6 | Support UDTs inside collections (`list[MyUDT]` → `list<frozen<my_udt>>`) |
-| A.7 | Support nested UDTs |
-| A.8 | Serialization/deserialization of UDT values to/from dicts |
-| A.9 | Register UDT with driver (e.g. `cluster.register_user_type()`) |
-| A.10 | Unit + integration tests |
+| Task | Description | Status |
+|---|---|---|
+| A.1 | Create `coodie.usertype` module with `UserType(BaseModel)` base class | ✅ |
+| A.2 | Add `__type_name__` override (default: snake_case of class name) | ✅ |
+| A.3 | Add `build_create_type()` / `build_drop_type()` / `build_alter_type_add()` to `cql_builder.py` | ✅ |
+| A.4 | Add `sync_type()` classmethod to `UserType` (sync + async) | ✅ |
+| A.5 | Register UDT types in `python_type_to_cql_type_str()` → emit `frozen<type_name>` | ✅ |
+| A.6 | Support UDTs inside collections (`list[MyUDT]` → `list<frozen<my_udt>>`) | ✅ |
+| A.7 | Support nested UDTs with recursive depth-first dependency resolution | ✅ |
+| A.8 | Serialization/deserialization via Pydantic `model_dump()`/`model_validate()` | ✅ |
+| A.9 | Register UDT with driver (e.g. `cluster.register_user_type()`) | ❌ Future |
+| A.10 | Unit + integration tests | ✅ Unit (46 tests); integration pending |
 
-**Workaround:** Use `frozen<>` collections or separate tables.
+Remaining work for future PRs:
+- **Driver registration** (A.9): `cluster.register_user_type()` for native UDT handling
+- **Integration tests**: Full round-trip with real ScyllaDB
+- **Auto-sync in sync_table()**: Auto-sync UDTs referenced by a Document before table creation
+- **ALTER TYPE ADD**: Detect new fields and alter existing types
 
 ---
 

@@ -135,6 +135,40 @@ We like to have the pull request open as soon as possible, that's a great place 
 2. Update the documentation for significant features.
 3. Ensure tests are passing on CI.
 
+### Plan-Linking Convention
+
+If your PR implements a phase of a multi-phase plan in `docs/plans/`, you can
+link the PR to the plan so the **Plan Phase Continuation** workflow automatically
+delegates the next phase to Copilot after merge.
+
+Add one or both of these lines to your PR body:
+
+```
+Plan: docs/plans/<plan-name>.md
+Phase: N
+```
+
+- **`Plan:`** — path to the plan file (case-insensitive, relative to repo root)
+- **`Phase:`** — the phase number this PR completes (optional; if omitted the
+  workflow detects the completed phase from the plan's own ✅ markers)
+
+**Example PR body:**
+
+```
+Implements phase 2 of the UDT support plan.
+
+Plan: docs/plans/udt-support.md
+Phase: 2
+```
+
+As a fallback the workflow also detects the plan from the **branch name** if
+it follows the convention `plan/<plan-name>/phase-N`
+(e.g. `plan/udt-support/phase-2`).
+
+When a PR **introduces a new plan file** (adds a `docs/plans/*.md` file), the
+workflow treats the merge as the bootstrap trigger and automatically starts
+Phase 1 — no explicit `Plan:` line is needed.
+
 ### Slash Commands
 
 Maintainers and collaborators with write access can use slash-commands in PR
@@ -159,6 +193,95 @@ available.
 > individual commits. Use `/squash` when the PR has many small or
 > work-in-progress commits and you want a clean single-commit history before
 > merging. Use `/rebase squash` to do both at once.
+
+### Testing the Rebase & Squash Workflow Locally
+
+#### Unit tests for the conflict-resolution script (fast, no Docker)
+
+The conflict-resolution logic lives in `.github/scripts/resolve-conflicts.sh`
+and is covered by Bats tests in `tests/workflows/test_resolve_conflicts.bats`.
+Run them directly with `bats` or via `pytest`:
+
+```bash
+# Install bats-core once (macOS or Debian/Ubuntu)
+brew install bats-core        # macOS
+# apt install bats            # Ubuntu
+
+# Run the Bats tests directly
+bats tests/workflows/test_resolve_conflicts.bats
+
+# Or run all workflow tests through pytest (unified reporting)
+uv run pytest tests/workflows/ -v
+```
+
+#### End-to-end smoke test via `workflow_dispatch` (recommended, no Docker)
+
+The workflow has a `workflow_dispatch` trigger so you can run it manually
+against a real PR without posting a comment:
+
+```bash
+# Trigger rebase on PR #<N>
+gh workflow run pr-rebase-squash.yml \
+  --field pr_number=<N> \
+  --field command=rebase
+
+# Trigger squash
+gh workflow run pr-rebase-squash.yml \
+  --field pr_number=<N> \
+  --field command=squash
+
+# Rebase then squash in one run
+gh workflow run pr-rebase-squash.yml \
+  --field pr_number=<N> \
+  --field "command=rebase squash"
+
+# Watch the run live
+gh run watch
+```
+
+#### Running with `act` (requires Docker)
+
+[`act`](https://github.com/nektos/act) can simulate the `issue_comment`
+trigger locally. Note that steps calling `gh api` require a real
+`GITHUB_TOKEN` pointing at a live PR — `act` cannot mock GitHub API state.
+
+```bash
+# Install act (macOS or Linux)
+brew install act     # macOS
+# or: curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+
+# Create a mock event payload (replace PR_NUMBER and COMMENT_ID)
+cat > /tmp/rebase-event.json << 'EOF'
+{
+  "action": "created",
+  "issue": {
+    "number": PR_NUMBER,
+    "pull_request": {"url": "https://api.github.com/repos/fruch/coodie/pulls/PR_NUMBER"}
+  },
+  "comment": {
+    "id": COMMENT_ID,
+    "body": "/rebase",
+    "user": {"login": "fruch", "id": 340979}
+  },
+  "repository": {"full_name": "fruch/coodie", "name": "coodie",
+                  "owner": {"login": "fruch"}}
+}
+EOF
+
+# Run the workflow (the -P flag maps ubuntu-latest to a smaller act image)
+act issue_comment \
+  -e /tmp/rebase-event.json \
+  --secret GITHUB_TOKEN="$(gh auth token)" \
+  --secret COPILOT_PAT="$(gh auth token)" \
+  -W .github/workflows/pr-rebase-squash.yml \
+  --job rebase-squash \
+  -P ubuntu-latest=catthehacker/ubuntu:act-22.04
+```
+
+> **Tip:** The `workflow_dispatch` approach is preferred for end-to-end
+> testing because it uses the real GitHub API and avoids the Docker overhead.
+> Use `act` when you need to iterate on workflow logic without consuming
+> GitHub Actions minutes.
 
 ## Tips
 
@@ -186,13 +309,15 @@ The repository's GitHub Actions workflows are tested at three levels:
 
 ### Manual Smoke Tests (workflow_dispatch)
 
-The `PR Rebase & Squash` and `Self-Healing CI` workflows support `workflow_dispatch` triggers for manual testing:
+The `PR Rebase & Squash`, `Self-Healing CI`, and `Plan Phase Continuation` workflows
+support `workflow_dispatch` triggers for manual testing:
 
 1. Go to **Actions** → select the workflow → **Run workflow**.
 2. For `PR Rebase & Squash`: enter a PR number and select the command (`rebase`, `squash`, or `rebase squash`).
 3. For `Self-Healing CI`: enter a workflow run ID to inspect.
-4. Verify the expected comment is posted on the PR.
-5. **Cleanup:** If the operation modified the PR branch (rebase/squash), restore it with `git reflog` and `git push --force-with-lease`.
+4. For `Plan Phase Continuation`: enter the plan file path (e.g. `docs/plans/udt-support.md`) and optionally the completed phase number.
+5. Verify the expected comment is posted on the PR.
+6. **Cleanup:** If the operation modified the PR branch (rebase/squash), restore it with `git reflog` and `git push --force-with-lease`.
 
 ## Making a new release
 

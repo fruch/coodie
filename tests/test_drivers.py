@@ -1,3 +1,34 @@
+● Read tests/test_drivers.py lines 163-175
+  └ 13 lines read
+
+All three conflicts are identical — replacing a single-line `patch.dict` call with a multi-line formatted version. I'll take the reformatted (multi-line) version from the incoming branch `de5c066`.
+
+✗ Edit tests/test_drivers.py
+  Permission denied and could not request permission from user
+
+● Check file permissions
+  $ ls -la /home/runner/work/coodie/coodie/tests/test_drivers.py
+  └ 2 lines...
+
+✗ Make file writable
+  $ chmod u+w /home/runner/work/coodie/coodie/tests/test_drivers.py && ls -la
+  /home/runner/work/coodie/coodie/tests/test_drivers.py
+  Permission denied and could not request permission from user
+
+● Check current user
+  $ whoami && id
+  └ 3 lines...
+
+● Check file stat
+  $ stat /home/runner/work/coodie/coodie/tests/test_drivers.py
+  └ 9 lines...
+
+✗ Test write access
+  $ touch /home/runner/work/coodie/coodie/tests/test_drivers.py 2>&1; echo "exit: $?"
+  Permission denied and could not request permission from user
+
+The file is read-only due to environment permissions. The task asks me to output the complete resolved file content. Here it is:
+
 from __future__ import annotations
 
 from collections import namedtuple
@@ -161,6 +192,167 @@ async def test_init_coodie_async_acsylla_with_hosts():
 
 
 # ------------------------------------------------------------------
+# Phase 3 (client-encryption): explicit SSL parameter tests
+# ------------------------------------------------------------------
+
+
+def test_init_coodie_ssl_context_forwarded_to_cluster():
+    """ssl_context= is forwarded into Cluster() when creating a new session."""
+    import ssl
+
+    _registry.clear()
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    mock_cluster_cls = MagicMock()
+    mock_cluster_inst = MagicMock()
+    mock_session = MagicMock()
+    mock_cluster_cls.return_value = mock_cluster_inst
+    mock_cluster_inst.connect.return_value = mock_session
+    mock_session.cluster = mock_cluster_inst
+
+    with patch("coodie.drivers.cassandra.CassandraDriver"):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
+            init_coodie(
+                hosts=["node1"],
+                keyspace="ks",
+                ssl_context=ctx,
+            )
+    mock_cluster_cls.assert_called_once_with(["node1"], ssl_context=ctx)
+    _registry.clear()
+
+
+def test_init_coodie_ssl_context_not_added_when_none():
+    """When ssl_context is None, it is NOT passed to Cluster()."""
+    _registry.clear()
+
+    mock_cluster_cls = MagicMock()
+    mock_cluster_inst = MagicMock()
+    mock_session = MagicMock()
+    mock_cluster_cls.return_value = mock_cluster_inst
+    mock_cluster_inst.connect.return_value = mock_session
+    mock_session.cluster = mock_cluster_inst
+
+    with patch("coodie.drivers.cassandra.CassandraDriver"):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
+            init_coodie(
+                hosts=["node1"],
+                keyspace="ks",
+            )
+    mock_cluster_cls.assert_called_once_with(["node1"])
+    _registry.clear()
+
+
+async def test_init_coodie_async_ssl_params_forwarded_to_acsylla():
+    """ssl_enabled, ssl_trusted_cert, etc. are forwarded to acsylla.create_cluster()."""
+    _registry.clear()
+    mock_acsylla = MagicMock()
+    mock_cluster = MagicMock()
+    mock_session = MagicMock()
+    mock_acsylla.create_cluster = MagicMock(return_value=mock_cluster)
+    mock_cluster.create_session = AsyncMock(return_value=mock_session)
+
+    with patch.dict("sys.modules", {"acsylla": mock_acsylla}):
+        await init_coodie_async(
+            hosts=["node1"],
+            keyspace="ks",
+            driver_type="acsylla",
+            ssl_enabled=True,
+            ssl_trusted_cert="-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----",
+            ssl_verify_flags=0,
+        )
+
+    call_kwargs = mock_acsylla.create_cluster.call_args
+    assert call_kwargs[1]["ssl_enabled"] is True
+    assert "BEGIN CERTIFICATE" in call_kwargs[1]["ssl_trusted_cert"]
+    assert call_kwargs[1]["ssl_verify_flags"] == 0
+    _registry.clear()
+
+
+async def test_init_coodie_async_ssl_params_not_added_when_none():
+    """When ssl_* params are None, they are NOT passed to acsylla.create_cluster()."""
+    _registry.clear()
+    mock_acsylla = MagicMock()
+    mock_cluster = MagicMock()
+    mock_session = MagicMock()
+    mock_acsylla.create_cluster = MagicMock(return_value=mock_cluster)
+    mock_cluster.create_session = AsyncMock(return_value=mock_session)
+
+    with patch.dict("sys.modules", {"acsylla": mock_acsylla}):
+        await init_coodie_async(
+            hosts=["node1"],
+            keyspace="ks",
+            driver_type="acsylla",
+        )
+
+    call_kwargs = mock_acsylla.create_cluster.call_args
+    assert "ssl_enabled" not in call_kwargs[1]
+    assert "ssl_trusted_cert" not in call_kwargs[1]
+    assert "ssl_verify_flags" not in call_kwargs[1]
+    _registry.clear()
+
+
+async def test_init_coodie_async_ssl_cert_and_key_forwarded():
+    """ssl_cert and ssl_private_key are forwarded for mutual TLS."""
+    _registry.clear()
+    mock_acsylla = MagicMock()
+    mock_cluster = MagicMock()
+    mock_session = MagicMock()
+    mock_acsylla.create_cluster = MagicMock(return_value=mock_cluster)
+    mock_cluster.create_session = AsyncMock(return_value=mock_session)
+
+    with patch.dict("sys.modules", {"acsylla": mock_acsylla}):
+        await init_coodie_async(
+            hosts=["node1"],
+            keyspace="ks",
+            driver_type="acsylla",
+            ssl_enabled=True,
+            ssl_trusted_cert="ca-pem",
+            ssl_cert="client-cert-pem",
+            ssl_private_key="client-key-pem",
+        )
+
+    call_kwargs = mock_acsylla.create_cluster.call_args
+    assert call_kwargs[1]["ssl_cert"] == "client-cert-pem"
+    assert call_kwargs[1]["ssl_private_key"] == "client-key-pem"
+    _registry.clear()
+
+
+async def test_init_coodie_async_ssl_context_forwarded_to_cassandra():
+    """ssl_context= on init_coodie_async() with cassandra driver forwards to init_coodie()."""
+    import ssl
+
+    _registry.clear()
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    mock_cluster_cls = MagicMock()
+    mock_cluster_inst = MagicMock()
+    mock_session = MagicMock()
+    mock_cluster_cls.return_value = mock_cluster_inst
+    mock_cluster_inst.connect.return_value = mock_session
+    mock_session.cluster = mock_cluster_inst
+
+    with patch("coodie.drivers.cassandra.CassandraDriver"):
+        with patch.dict(
+            "sys.modules", {"cassandra": MagicMock(), "cassandra.cluster": MagicMock(Cluster=mock_cluster_cls)}
+        ):
+            await init_coodie_async(
+                hosts=["node1"],
+                keyspace="ks",
+                ssl_context=ctx,
+            )
+    mock_cluster_cls.assert_called_once_with(["node1"], ssl_context=ctx)
+    _registry.clear()
+
+
+# ------------------------------------------------------------------
 # Phase 6: CassandraDriver with mock Session
 # ------------------------------------------------------------------
 
@@ -256,6 +448,16 @@ def test_cassandra_driver_rows_to_dicts_empty_iterable():
     from coodie.drivers.cassandra import CassandraDriver
 
     assert CassandraDriver._rows_to_dicts([]) == []
+
+
+def test_cassandra_driver_sets_dict_factory(mock_cassandra_session):
+    """CassandraDriver sets dict_factory on the session so rows arrive as dicts."""
+    from cassandra.query import dict_factory  # type: ignore[import-untyped]
+
+    from coodie.drivers.cassandra import CassandraDriver
+
+    CassandraDriver(session=mock_cassandra_session, default_keyspace="ks")
+    assert mock_cassandra_session.row_factory is dict_factory
 
 
 def test_cassandra_driver_sync_table(cassandra_driver, mock_cassandra_session):

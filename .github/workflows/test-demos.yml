@@ -1,0 +1,45 @@
+name: Demo Apps
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    paths:
+      - "demos/**"
+      - "src/**"
+
+concurrency:
+  group: demos-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  validate-demo:
+    strategy:
+      fail-fast: false
+      matrix:
+        demo:
+          - name: fastapi-catalog
+            dir: demos/fastapi-catalog
+          - name: flask-blog
+            dir: demos/flask-blog
+    runs-on: ubuntu-latest
+    name: ${{ matrix.demo.name }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ${{ matrix.demo.dir }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Syntax check (py_compile)
+        run: |
+          find . -name '*.py' -print -exec uv run python -m py_compile {} \;

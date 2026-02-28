@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__version__ = "0.1.0"
+
 import os
 from datetime import datetime
 from pathlib import Path

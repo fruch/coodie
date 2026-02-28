@@ -323,3 +323,10 @@ def test_batch_importable_from_top_level():
 
     assert BQ is BatchQuery
     assert ABQ is AsyncBatchQuery
+
+
+def test_batch_query_has_slots():
+    """BatchQuery should use __slots__ for memory efficiency."""
+    batch = BatchQuery()
+    assert hasattr(BatchQuery, "__slots__")
+    assert not hasattr(batch, "__dict__")

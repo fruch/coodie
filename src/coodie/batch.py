@@ -19,6 +19,8 @@ class BatchQuery:
             Product(name="B").save(batch=batch)
     """
 
+    __slots__ = ("_logged", "_batch_type", "_statements")
+
     def __init__(
         self,
         logged: bool = True,

@@ -106,33 +106,9 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          CHANGED_PLANS: ${{ steps.changed-plans.outputs.files }}
         run: |
-          # Try PR body first: "Plan: docs/plans/<name>.md" (case-insensitive)
-          PLAN_FILE=$(echo "$PR_BODY" \
-            | grep -ioP '(?<=Plan:\s)docs/plans/[a-z0-9._-]+\.md' | head -1 || true)
-
-          # Fallback: branch name "plan/<name>/phase-N"
-          if [ -z "$PLAN_FILE" ]; then
-            PLAN_NAME=$(echo "$PR_BRANCH" \
-              | grep -oP '(?<=^plan/)[a-z0-9-]+(?=/phase-)' || true)
-            if [ -n "$PLAN_NAME" ]; then
-              PLAN_FILE="docs/plans/${PLAN_NAME}.md"
-            fi
-          fi
-
-          # Extract completed phase number if present in PR body or branch name
-          PHASE=$(echo "$PR_BODY" | grep -ioP '(?<=Phase:\s)(\d+|[A-Za-z])' | head -1 || true)
-          if [ -z "$PHASE" ]; then
-            PHASE=$(echo "$PR_BRANCH" | grep -oP '(?<=phase-)(\d+|[A-Za-z])' || true)
-          fi
-
-          # Merge: combine PR body/branch plan with changed-files plans,
-          # deduplicate, and remove empty lines
-          CHANGED_PLANS="${{ steps.changed-plans.outputs.files }}"
-          ALL_PLANS=$(printf '%s\n%s\n' "$PLAN_FILE" "$CHANGED_PLANS" \
-            | grep -v '^$' | sort -u || true)
-
-          HAS_PLAN=$( [ -n "$ALL_PLANS" ] && echo true || echo false )
+          source .github/scripts/extract-plan-ref.sh
           {
             echo "plan_file=${PLAN_FILE}"
             echo "phase=${PHASE}"
@@ -265,17 +241,9 @@ jobs:
           # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
           npm install -g @github/copilot 2>/dev/null || true
 
-          # Construct the delegation prompt
-          PROMPT="Continue to phase ${PHASE} of plan ${PLAN_FILE}.
-          Phase title: ${TITLE}.
-
-          ## Tasks
-
-          ${PHASE_CONTENT}
-
-          ---
-          Read the full plan at ${PLAN_FILE} for context.
-          Implement all tasks listed above for Phase ${PHASE}."
+          # Construct the delegation prompt via extracted script
+          export PLAN_FILE PHASE TITLE PHASE_CONTENT
+          source .github/scripts/build-delegation-prompt.sh
 
           # Delegate via Copilot CLI — capture exit code explicitly
           EXIT_CODE=0

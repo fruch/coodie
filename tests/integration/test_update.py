@@ -84,25 +84,23 @@ class TestPartialUpdate:
         """update(ttl=N) applies a TTL — the updated column expires."""
         await _maybe_await(Product.sync_table)
         pid = uuid4()
-        p = Product(id=pid, name="TTLUpdate", brand="TTLBrand")
+        p = Product(id=pid, name="TTLUpdate", description="permanent")
         await _maybe_await(p.save)
 
-        await _maybe_await(p.update, ttl=2, name="WillExpire")
+        # Update the Optional description field with a short TTL
+        await _maybe_await(p.update, ttl=2, description="temporary")
 
         fetched = await _maybe_await(Product.get, id=pid)
-        assert fetched.name == "WillExpire"
+        assert fetched.description == "temporary"
 
         # Wait for TTL to expire — the updated column reverts to null
         await asyncio.sleep(3)
         fetched2 = await _maybe_await(Product.find_one, id=pid)
-        # After TTL the name column should be null (expired)
-        # but the row may still exist because the PK was set via INSERT
-        if fetched2 is not None:
-            assert fetched2.name is None or fetched2.name == "WillExpire"
+        assert fetched2 is not None
+        # After TTL the description column should be null (expired)
+        assert fetched2.description is None
 
-        # Cleanup — delete if row still exists
-        if fetched2 is not None:
-            await _maybe_await(Product(id=pid, name="").delete)
+        await _maybe_await(Product(id=pid, name="").delete)
 
     # ------------------------------------------------------------------
     # UPDATE with IF conditions (LWT)

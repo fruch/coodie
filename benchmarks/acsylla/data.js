@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772390542010,
+  "lastUpdate": 1772392023907,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -8923,6 +8923,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.138901292353871e-7",
             "extra": "mean: 5.390179902373278 usec\nrounds: 7782"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "1552eaf606cf506506d3393faf746b116f2dd54d",
+          "message": "refactor(ci): extract plan-continuation bash logic into testable scripts\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T21:06:26+02:00",
+          "tree_id": "8495b7609bea4fb98affea10d3cad69ae2c7797e",
+          "url": "https://github.com/fruch/coodie/commit/1552eaf606cf506506d3393faf746b116f2dd54d"
+        },
+        "date": 1772392023229,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53073.62613094477,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016588478994382209",
+            "extra": "mean: 18.841750091331072 usec\nrounds: 8211"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 580598.1070081921,
+            "unit": "iter/sec",
+            "range": "stddev: 4.204077939362872e-7",
+            "extra": "mean: 1.7223617988576914 usec\nrounds: 47941"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 622434.0023313776,
+            "unit": "iter/sec",
+            "range": "stddev: 3.878435412855785e-7",
+            "extra": "mean: 1.60659603468708 usec\nrounds: 36617"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 858881.0187186268,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2649055699565103e-7",
+            "extra": "mean: 1.1643056234866034 usec\nrounds: 156202"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 861473.0925287554,
+            "unit": "iter/sec",
+            "range": "stddev: 3.96662403457456e-7",
+            "extra": "mean: 1.1608023612955976 usec\nrounds: 85970"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 758306.4751470898,
+            "unit": "iter/sec",
+            "range": "stddev: 3.307823997628483e-7",
+            "extra": "mean: 1.3187280245840292 usec\nrounds: 87177"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188447.8757991667,
+            "unit": "iter/sec",
+            "range": "stddev: 9.406202647087353e-7",
+            "extra": "mean: 5.306507148245721 usec\nrounds: 7974"
           }
         ]
       }

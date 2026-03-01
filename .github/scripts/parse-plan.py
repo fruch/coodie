@@ -185,7 +185,9 @@ def find_next_phase(phases: list[dict], completed_phase: str) -> dict | None:
             # Phase number not found; fall back to numeric comparison so that
             # a completed_phase value beyond the last phase returns None.
             min_number = int(completed_phase) + 1
-            candidates = [p for p in phases if isinstance(p["number"], int) and p["number"] >= min_number and not p["complete"]]
+            candidates = [
+                p for p in phases if isinstance(p["number"], int) and p["number"] >= min_number and not p["complete"]
+            ]
         else:
             # Letter phase not found → treat as past the end of the plan.
             candidates = []

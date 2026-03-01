@@ -54,6 +54,9 @@ pytest benchmarks/ -v --benchmark-enable --driver-type=cassandra
 
 # coodie uses AcsyllaDriver (async-native, pip install acsylla)
 pytest benchmarks/ -v --benchmark-enable --driver-type=acsylla
+
+# coodie uses PythonRsDriver (Rust-based, build from source)
+pytest benchmarks/ -v --benchmark-enable --driver-type=python-rs
 ```
 
 To compare drivers, save a baseline from each and compare:
@@ -65,8 +68,11 @@ pytest benchmarks/ --benchmark-enable --driver-type=scylla --benchmark-save=scyl
 # Save acsylla baseline
 pytest benchmarks/ --benchmark-enable --driver-type=acsylla --benchmark-save=acsylla
 
+# Save python-rs baseline
+pytest benchmarks/ --benchmark-enable --driver-type=python-rs --benchmark-save=python-rs
+
 # Compare
-pytest-benchmark compare 0001_scylla 0002_acsylla --group-by=group
+pytest-benchmark compare 0001_scylla 0002_acsylla 0003_python-rs --group-by=group
 ```
 
 ## Benchmark Files
@@ -82,6 +88,7 @@ pytest-benchmark compare 0001_scylla 0002_acsylla --group-by=group
 | `bench_collections.py` | Collection field write/read/round-trip (list\<str\>) |
 | `bench_udt.py` | UDT serialization, instantiation, nested UDT, DDL generation |
 | `bench_serialization.py` | Model instantiation and serialization (no DB) |
+| `bench_argus.py` | Argus-inspired real-world patterns (get-or-create, notification feed, status update, etc.) |
 
 ## Interpreting Results
 

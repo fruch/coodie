@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772387406395,
+  "lastUpdate": 1772387656358,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -8485,6 +8485,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.544122730685813e-7",
             "extra": "mean: 5.212793916219716 usec\nrounds: 7594"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "02b04c757b7eb331f1331eca1531d9ab7fe9dfd2",
+          "message": "docs(writing-plans): add pr-body-must-link-plan principle and AGENTS.md PR body convention\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T19:53:40+02:00",
+          "tree_id": "ae0dab9e25ba3231efb6a8e1083704018b7329bd",
+          "url": "https://github.com/fruch/coodie/commit/02b04c757b7eb331f1331eca1531d9ab7fe9dfd2"
+        },
+        "date": 1772387655714,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52573.316757791676,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015163297334242478",
+            "extra": "mean: 19.021055958996424 usec\nrounds: 8399"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 571407.4168208455,
+            "unit": "iter/sec",
+            "range": "stddev: 4.398349584853489e-7",
+            "extra": "mean: 1.7500647883846632 usec\nrounds: 47987"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 618973.3215115191,
+            "unit": "iter/sec",
+            "range": "stddev: 3.8868810516938195e-7",
+            "extra": "mean: 1.6155785156588367 usec\nrounds: 56199"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 836176.071252091,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5153005108562545e-7",
+            "extra": "mean: 1.1959203741654543 usec\nrounds: 160463"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 965380.504233107,
+            "unit": "iter/sec",
+            "range": "stddev: 3.030849084418016e-7",
+            "extra": "mean: 1.0358609849847698 usec\nrounds: 89199"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 745610.1348274685,
+            "unit": "iter/sec",
+            "range": "stddev: 3.655159281433399e-7",
+            "extra": "mean: 1.3411834862349294 usec\nrounds: 122625"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 189775.88833142855,
+            "unit": "iter/sec",
+            "range": "stddev: 8.523334204552649e-7",
+            "extra": "mean: 5.269373305493789 usec\nrounds: 6713"
           }
         ]
       }

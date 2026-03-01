@@ -9,6 +9,7 @@
 #
 # Optional environment variables:
 #   MAX_ROUNDS          — maximum rebase-continue cycles (default: 10)
+#   COPILOT_TIMEOUT     — seconds to wait for a single Copilot CLI call (default: 120)
 #
 # Outputs written to GITHUB_OUTPUT:
 #   status=clean        — all conflicts resolved; rebase completed
@@ -22,6 +23,7 @@ set -euo pipefail
 : "${GITHUB_OUTPUT:=/dev/null}"
 : "${GITHUB_STEP_SUMMARY:=/dev/null}"
 : "${MAX_ROUNDS:=10}"
+: "${COPILOT_TIMEOUT:=120}"
 
 ROUND=0
 RESOLVED_FILES=""
@@ -53,11 +55,20 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
     while IFS= read -r FILE; do
         [ -z "$FILE" ] && continue
         CONFLICT_CONTENT=$(cat "$FILE")
-        RESOLVED=$(copilot -p \
+        FILE_SIZE=$(wc -c < "$FILE")
+        MARKER_COUNT=$(grep -c '^<<<<<<<' "$FILE" || true)
+        echo "Attempting to resolve: $FILE (${FILE_SIZE} bytes, ${MARKER_COUNT} conflict marker(s))"
+
+        COPILOT_RC=0
+        RESOLVED=$(timeout "$COPILOT_TIMEOUT" copilot -p \
             "Resolve ALL git conflict markers (<<<<<<<, =======, >>>>>>>) in the file \
              below. Output ONLY the complete resolved file content — no markdown fences, \
              no explanations, no preamble. File: $FILE --- Content: $CONFLICT_CONTENT" \
-            2>/dev/null) || true
+            2>/dev/null) || COPILOT_RC=$?
+
+        if [ "$COPILOT_RC" -eq 124 ]; then
+            echo "Copilot timed out after ${COPILOT_TIMEOUT}s for file: $FILE"
+        fi
 
         # Strip fenced code blocks if Copilot wrapped the output in ``` markers
         if [ -n "$RESOLVED" ] && echo "$RESOLVED" | grep -q '^```'; then
@@ -72,6 +83,14 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
         else
             ALL_RESOLVED=false
             echo "Copilot could not resolve conflicts in: $FILE"
+            if [ -z "$RESOLVED" ]; then
+                echo "  (Copilot returned empty output)"
+            else
+                RESOLVED_LINES=$(echo "$RESOLVED" | wc -l)
+                echo "  (Copilot output: ${RESOLVED_LINES} lines; still contains conflict markers)"
+                echo "  First 5 lines of Copilot output:"
+                echo "$RESOLVED" | head -5 | sed 's/^/    /'
+            fi
         fi
     done <<< "$CONFLICTS"
 

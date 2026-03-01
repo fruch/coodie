@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# resolve-conflicts.sh — Attempt to resolve git rebase merge conflicts using
+# resolve-conflicts.sh — Attempt to resolve git merge/rebase conflicts using
 # Copilot CLI.  Called by the "Resolve conflicts with Copilot CLI" step in
-# .github/workflows/pr-rebase-squash.yml after a failed `git rebase`.
+# .github/workflows/pr-rebase-squash.yml (rebase mode) and
+# .github/workflows/pr-solve-command.yml (merge mode).
 #
 # Required environment variables (set by the calling workflow step):
 #   GITHUB_OUTPUT       — path to GitHub Actions output file
 #   GITHUB_STEP_SUMMARY — path to GitHub Actions step summary file
 #
 # Optional environment variables:
+#   RESOLVE_MODE        — "rebase" (default) or "merge"
 #   MAX_ROUNDS          — maximum rebase-continue cycles (default: 10)
 #   COPILOT_TIMEOUT     — seconds to wait for a single Copilot CLI call (default: 120)
 #
@@ -22,6 +24,7 @@ set -euo pipefail
 
 : "${GITHUB_OUTPUT:=/dev/null}"
 : "${GITHUB_STEP_SUMMARY:=/dev/null}"
+: "${RESOLVE_MODE:=rebase}"
 : "${MAX_ROUNDS:=10}"
 : "${COPILOT_TIMEOUT:=120}"
 
@@ -99,13 +102,23 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
         exit 0
     fi
 
-    # All conflicts in this round resolved — advance the rebase
-    if GIT_EDITOR=true git rebase --continue; then
-        echo "status=clean" >> "$GITHUB_OUTPUT"
-        _write_summary
-        exit 0
+    # All conflicts in this round resolved — advance the operation
+    if [ "$RESOLVE_MODE" = "merge" ]; then
+        # Merge mode: commit the merge and we are done
+        if git commit --no-edit; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+            _write_summary
+            exit 0
+        fi
+    else
+        # Rebase mode: continue the rebase (may surface next commit's conflicts)
+        if GIT_EDITOR=true git rebase --continue; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+            _write_summary
+            exit 0
+        fi
+        # git rebase --continue stopped at the next commit's conflicts — loop again
     fi
-    # git rebase --continue stopped at the next commit's conflicts — loop again
 done
 
 # Reached MAX_ROUNDS without completing

@@ -373,3 +373,133 @@ EOF
     [[ "$output" == *"bytes"* ]]
     [[ "$output" == *"conflict marker"* ]]
 }
+
+# ---------------------------------------------------------------------------
+# Merge mode tests
+# ---------------------------------------------------------------------------
+
+_mock_git_merge_conflicts() {
+    local conflict_list="$1"
+    cat > "$MOCK_BIN/git" << EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "diff" ]]; then
+    printf '%s\n' "$conflict_list"
+elif [[ "\$1" == "add" ]]; then
+    exit 0
+elif [[ "\$1" == "commit" ]]; then
+    exit 0
+fi
+EOF
+    chmod +x "$MOCK_BIN/git"
+}
+
+@test "merge mode: Copilot resolves file → git commit --no-edit → status=clean" {
+    export RESOLVE_MODE=merge
+
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+
+    local call_count_file="${BATS_TEST_TMPDIR}/git_calls"
+    echo 0 > "$call_count_file"
+    cat > "$MOCK_BIN/git" << EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "diff" ]]; then
+    count=\$(cat "$call_count_file")
+    count=\$((count + 1))
+    echo "\$count" > "$call_count_file"
+    if [ "\$count" -eq 1 ]; then
+        echo "foo.py"
+    fi
+elif [[ "\$1" == "add" ]]; then
+    exit 0
+elif [[ "\$1" == "commit" ]]; then
+    exit 0
+fi
+EOF
+    chmod +x "$MOCK_BIN/git"
+
+    _mock_copilot "x = 2"
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=clean$" "$GITHUB_OUTPUT"
+}
+
+@test "merge mode: no conflicts → status=clean" {
+    export RESOLVE_MODE=merge
+
+    _mock_git_no_conflicts
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=clean$" "$GITHUB_OUTPUT"
+}
+
+@test "merge mode: Copilot returns empty → status=unresolved" {
+    export RESOLVE_MODE=merge
+
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+    _mock_git_merge_conflicts "foo.py"
+    _mock_copilot ""
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
+}
+
+@test "merge mode: git commit fails → loops up to MAX_ROUNDS" {
+    export RESOLVE_MODE=merge
+    export MAX_ROUNDS=2
+
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+
+    # git diff always returns conflicts; git commit always fails
+    cat > "$MOCK_BIN/git" << 'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "diff" ]]; then
+    echo "foo.py"
+elif [[ "$1" == "add" ]]; then
+    exit 0
+elif [[ "$1" == "commit" ]]; then
+    exit 1
+fi
+EOF
+    chmod +x "$MOCK_BIN/git"
+    _mock_copilot "resolved content"
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
+}
+
+@test "merge mode: step summary written on success" {
+    export RESOLVE_MODE=merge
+
+    _mock_git_no_conflicts
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "Copilot resolved" "$GITHUB_STEP_SUMMARY"
+}

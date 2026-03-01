@@ -1,0 +1,207 @@
+# NOTE: The `issue_comment` trigger runs the workflow from the **default branch**,
+# not the PR branch. This workflow YAML must be merged to the default branch
+# before it will respond to comments. This is a GitHub Actions platform
+# constraint, not a bug.
+#
+# Slash-command (via PR comment):
+#   /solve — Merge the base branch into the PR branch; if conflicts arise,
+#            resolve them with Copilot CLI and push the merge commit.
+#
+# Manual testing (via Actions tab → "Run workflow"):
+#   Provide the PR number.
+#
+# See docs/plans/pr-conflict-detection-solve.md Phase 2 for design details.
+
+name: PR Solve Conflicts
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number to operate on'
+        required: true
+        type: number
+
+concurrency:
+  group: pr-solve-${{ github.event.issue.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  solve:
+    name: Solve Conflicts
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '/solve')
+      )
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      # ── 0. Normalize inputs across triggers ──────────────────
+      - name: Normalize inputs
+        id: ctx
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ACTOR_ID=$(gh api "users/${{ github.actor }}" --jq '.id')
+            {
+              echo "pr_number=${{ inputs.pr_number }}"
+              echo "actor=${{ github.actor }}"
+              echo "actor_id=$ACTOR_ID"
+              echo "has_comment=false"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "pr_number=${{ github.event.issue.number }}"
+              echo "actor=${{ github.event.comment.user.login }}"
+              echo "actor_id=${{ github.event.comment.user.id }}"
+              echo "has_comment=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 1. Permission check ──────────────────────────────────
+      - name: Check collaborator permission
+        id: permission
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PERM=$(gh api "repos/${{ github.repository }}/collaborators/${{ steps.ctx.outputs.actor }}/permission" \
+            --jq '.permission')
+          if [[ "$PERM" != "admin" && "$PERM" != "write" && "$PERM" != "maintain" ]]; then
+            echo "User ${{ steps.ctx.outputs.actor }} lacks write access (has: $PERM)"
+            exit 1
+          fi
+
+      # ── 2. Acknowledge ───────────────────────────────────────
+      - name: React to comment
+        if: steps.ctx.outputs.has_comment == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='eyes' --silent
+
+      # ── 3. Checkout PR ───────────────────────────────────────
+      - name: Get PR metadata
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_JSON=$(gh api "repos/${{ github.repository }}/pulls/${{ steps.ctx.outputs.pr_number }}")
+          {
+            echo "head_ref=$(echo "$PR_JSON" | jq -r '.head.ref')"
+            echo "head_sha=$(echo "$PR_JSON" | jq -r '.head.sha')"
+            echo "base_ref=$(echo "$PR_JSON" | jq -r '.base.ref')"
+            echo "state=$(echo "$PR_JSON" | jq -r '.state')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Abort if PR is not open
+        if: steps.pr.outputs.state != 'open'
+        run: |
+          echo "PR #${{ steps.ctx.outputs.pr_number }} is ${{ steps.pr.outputs.state }}, not open."
+          exit 1
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.WORKFLOW_PUSH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "${{ steps.ctx.outputs.actor }}"
+          git config user.email "${{ steps.ctx.outputs.actor_id }}+${{ steps.ctx.outputs.actor }}@users.noreply.github.com"
+
+      # ── 4. Merge base branch ─────────────────────────────────
+      - name: Merge base branch
+        id: merge
+        run: |
+          BASE="${{ steps.pr.outputs.base_ref }}"
+          git fetch origin "$BASE"
+
+          if git merge "origin/$BASE" --no-edit; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 5. Push clean merge ──────────────────────────────────
+      - name: Push clean merge
+        if: steps.merge.outputs.status == 'clean'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push
+          gh pr edit "${{ steps.ctx.outputs.pr_number }}" --remove-label "conflict" || true
+
+      # ── 6. Resolve conflicts with Copilot CLI ────────────────
+      - name: Resolve conflicts with Copilot CLI
+        id: resolve
+        if: steps.merge.outputs.status == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          COPILOT_TIMEOUT: '120'
+          RESOLVE_MODE: merge
+        run: |
+          npm install -g @github/copilot 2>/dev/null || true
+          timeout 600 bash .github/scripts/resolve-conflicts.sh || {
+            EXIT_CODE=$?
+            if [ "$EXIT_CODE" -eq 124 ]; then
+              echo "status=unresolved" >> "$GITHUB_OUTPUT"
+              echo "### ⚠️ Conflict resolution exceeded the 10-minute time limit" >> "$GITHUB_STEP_SUMMARY"
+            else
+              exit "$EXIT_CODE"
+            fi
+          }
+
+      - name: Push resolved merge
+        if: steps.merge.outputs.status == 'conflict' && steps.resolve.outputs.status == 'clean'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push
+          gh pr edit "${{ steps.ctx.outputs.pr_number }}" --remove-label "conflict" || true
+
+      - name: Abort on unresolved conflicts
+        if: steps.merge.outputs.status == 'conflict' && steps.resolve.outputs.status != 'clean'
+        run: |
+          git merge --abort || true
+          echo "Merge failed: Copilot could not resolve all conflicts automatically. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      # ── 7. Summary comment ──────────────────────────────────
+      - name: Post summary comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATUS="${{ job.status }}"
+          PR_NUMBER="${{ steps.ctx.outputs.pr_number }}"
+
+          # Add reaction to original comment (only for issue_comment trigger)
+          if [ "${{ steps.ctx.outputs.has_comment }}" = "true" ]; then
+            REACTION="rocket"
+            if [ "$STATUS" != "success" ]; then
+              REACTION="confused"
+            fi
+            gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+              -f content="$REACTION" --silent || true
+          fi
+
+          # Post summary
+          if [ "$STATUS" = "success" ]; then
+            BODY="✅ **Done!** Merge conflicts resolved successfully. See the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          else
+            BODY="❌ **Failed.** Could not resolve merge conflicts automatically. Please resolve manually. See the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+          fi
+
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "$BODY"

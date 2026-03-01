@@ -95,4 +95,6 @@ __all__ = [
     "LWTResult",
     "PagedResult",
     "UserType",
+    "Vector",
+    "VectorIndex",
 ]

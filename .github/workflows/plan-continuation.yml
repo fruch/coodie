@@ -121,9 +121,9 @@ jobs:
           fi
 
           # Extract completed phase number if present in PR body or branch name
-          PHASE=$(echo "$PR_BODY" | grep -ioP '(?<=Phase:\s)\d+' | head -1 || true)
+          PHASE=$(echo "$PR_BODY" | grep -ioP '(?<=Phase:\s)(\d+|[A-Za-z])' | head -1 || true)
           if [ -z "$PHASE" ]; then
-            PHASE=$(echo "$PR_BRANCH" | grep -oP '(?<=phase-)\d+' || true)
+            PHASE=$(echo "$PR_BRANCH" | grep -oP '(?<=phase-)(\d+|[A-Za-z])' || true)
           fi
 
           # Merge: combine PR body/branch plan with changed-files plans,

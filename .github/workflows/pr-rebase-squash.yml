@@ -180,9 +180,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          COPILOT_TIMEOUT: '120'
         run: |
           npm install -g @github/copilot 2>/dev/null || true
-          bash .github/scripts/resolve-conflicts.sh
+          timeout 600 bash .github/scripts/resolve-conflicts.sh || {
+            EXIT_CODE=$?
+            if [ "$EXIT_CODE" -eq 124 ]; then
+              echo "status=unresolved" >> "$GITHUB_OUTPUT"
+              echo "### ⚠️ Conflict resolution exceeded the 10-minute time limit" >> "$GITHUB_STEP_SUMMARY"
+            else
+              exit "$EXIT_CODE"
+            fi
+          }
 
       - name: Abort on rebase conflicts
         if: steps.rebase.outputs.status == 'conflict' && steps.resolve.outputs.status != 'clean'

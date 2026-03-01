@@ -1,0 +1,26 @@
+{% if filter_value %}
+  {% if results %}
+    <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.5rem;letter-spacing:0.05em;">
+      🔒 <strong style="color:var(--silver);">{{ results|length }}</strong> result{{ "s" if results|length != 1 }} from
+      <code style="color:var(--accent);">{{ view_name }}</code>
+      — The Oracle Has Spoken
+    </div>
+    {% for item in results %}
+    <div class="product-item">
+      <div>
+        <div class="product-name">{{ item.name }}</div>
+        <div class="product-meta">
+          {% if item.category is defined %}<span class="view-badge">{{ item.category }}</span> · {% endif %}
+          {% if item.brand is defined %}{{ item.brand }} · {% endif %}
+          <span class="readonly-badge">🔒 read-only</span>
+        </div>
+      </div>
+      <span class="product-price">${{ "%.2f"|format(item.price) }}</span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">No results — The Oracle sees nothing for "{{ filter_value }}"</div>
+  {% endif %}
+{% else %}
+  <div class="empty">Enter a value to query the materialized view</div>
+{% endif %}

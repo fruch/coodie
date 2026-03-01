@@ -46,6 +46,8 @@ from coodie.fields import (
     TimeUUID,
     TinyInt,
     VarInt,
+    Vector,
+    VectorIndex,
 )
 from coodie.lazy import LazyDocument
 from coodie.results import LWTResult, PagedResult
@@ -87,4 +89,6 @@ __all__ = [
     "LWTResult",
     "PagedResult",
     "UserType",
+    "Vector",
+    "VectorIndex",
 ]

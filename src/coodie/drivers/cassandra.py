@@ -105,6 +105,7 @@ class CassandraDriver(AbstractDriver):
         from coodie.cql_builder import (
             build_create_table,
             build_create_index,
+            build_create_vector_index,
             build_drop_index,
             build_alter_table_options,
         )
@@ -163,6 +164,13 @@ class CassandraDriver(AbstractDriver):
                 idx_name = col.index_name or f"{table}_{col.name}_idx"
                 model_indexes[idx_name] = col
                 index_cql = build_create_index(table, keyspace, col)
+                planned.append(index_cql)
+                if not dry_run:
+                    self._session.execute(index_cql)
+            elif getattr(col, "vector_index", False):
+                idx_name = f"{table}_{col.name}_idx"
+                model_indexes[idx_name] = col
+                index_cql = build_create_vector_index(table, keyspace, col)
                 planned.append(index_cql)
                 if not dry_run:
                     self._session.execute(index_cql)
@@ -313,6 +321,7 @@ class CassandraDriver(AbstractDriver):
         from coodie.cql_builder import (
             build_create_table,
             build_create_index,
+            build_create_vector_index,
             build_drop_index,
             build_alter_table_options,
         )
@@ -371,6 +380,13 @@ class CassandraDriver(AbstractDriver):
                 idx_name = col.index_name or f"{table}_{col.name}_idx"
                 model_indexes[idx_name] = col
                 index_cql = build_create_index(table, keyspace, col)
+                planned.append(index_cql)
+                if not dry_run:
+                    await self._execute_cql_async(index_cql)
+            elif getattr(col, "vector_index", False):
+                idx_name = f"{table}_{col.name}_idx"
+                model_indexes[idx_name] = col
+                index_cql = build_create_vector_index(table, keyspace, col)
                 planned.append(index_cql)
                 if not dry_run:
                     await self._execute_cql_async(index_cql)

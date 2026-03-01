@@ -69,7 +69,10 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "📋 Manual dispatch: plan=${{ inputs.plan_file }}, phase=${{ inputs.phase }}"
 
-      # ── 1. Detect plan files from PR changed files (bootstrap trigger) ────
+      # ── 1. Checkout repo (needed early so sourced scripts are available) ───
+      - uses: actions/checkout@v6
+
+      # ── 2. Detect plan files from PR changed files (bootstrap trigger) ────
       - name: Detect plan files in PR changed files
         if: github.event_name != 'workflow_dispatch'
         id: changed-plans
@@ -99,7 +102,7 @@ jobs:
             echo "$CHANGED_PLANS"
           fi
 
-      # ── 2. Extract plan reference from PR body / branch name ──────────────
+      # ── 3. Extract plan reference from PR body / branch name ──────────────
       - name: Extract plan reference from PR
         if: github.event_name != 'workflow_dispatch'
         id: plan-ref
@@ -118,18 +121,12 @@ jobs:
             echo "has_plan=${HAS_PLAN}"
           } >> "$GITHUB_OUTPUT"
 
-      # ── 3. Exit silently if no plan reference found ────────────────────────
+      # ── 4. Exit silently if no plan reference found ────────────────────────
       - name: Skip if no plan reference
         if: >-
           steps.dispatch.outputs.has_plan != 'true' &&
           steps.plan-ref.outputs.has_plan != 'true'
         run: echo "No plan reference found in PR — skipping."
-
-      # ── 4. Checkout repo ───────────────────────────────────────────────────
-      - uses: actions/checkout@v6
-        if: >-
-          steps.dispatch.outputs.has_plan == 'true' ||
-          steps.plan-ref.outputs.has_plan == 'true'
 
       # ── 5. Set up Python ───────────────────────────────────────────────────
       - uses: actions/setup-python@v6

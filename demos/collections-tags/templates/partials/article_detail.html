@@ -1,0 +1,100 @@
+<div class="card">
+  <h2>🏷️ {{ article.title }}</h2>
+
+  {% if flash is defined and flash %}
+  <div class="flash-success">✅ {{ flash }}</div>
+  {% endif %}
+
+  <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem;">
+    ✍️ <span style="color:var(--tag-2);font-weight:600;">{{ article.author }}</span>
+    · Created {{ article.created_at.strftime('%Y-%m-%d %H:%M') if article.created_at else '—' }}
+  </div>
+  <div style="font-size:0.6rem;color:var(--dim);word-break:break-all;padding:0.4rem;background:rgba(0,0,0,0.3);border-radius:var(--radius);margin-bottom:1rem;">
+    article_id: {{ article.article_id }}
+  </div>
+
+  <!-- ═══════ TAGS — set<text> ═══════ -->
+  <div class="section-header">
+    🏷️ Tags <span class="type-badge type-set">set&lt;text&gt;</span>
+  </div>
+  <div class="tag-cloud">
+    {% for tag in article.tags|sort %}
+    <span class="tag">
+      {{ tag }}
+      <form style="display:inline;margin:0;padding:0;"
+            hx-post="/ui/articles/{{ article.article_id }}/tags/remove"
+            hx-target="#detail-panel" hx-swap="innerHTML">
+        <input type="hidden" name="tag" value="{{ tag }}">
+        <span class="tag-remove" onclick="this.parentElement.requestSubmit();" title="remove__ tag">✕</span>
+      </form>
+    </span>
+    {% endfor %}
+  </div>
+  <form class="inline-form" style="margin-top:0.5rem;"
+        hx-post="/ui/articles/{{ article.article_id }}/tags/add"
+        hx-target="#detail-panel" hx-swap="innerHTML">
+    <input name="tag" placeholder="new tag (comma-separated)" required style="font-size:0.75rem;padding:0.35rem 0.6rem;">
+    <button class="btn btn-add btn-sm" type="submit">+ add__</button>
+  </form>
+
+  <!-- ═══════ METADATA — map<text, text> ═══════ -->
+  <div class="section-header">
+    🗂️ Metadata <span class="type-badge type-map">map&lt;text, text&gt;</span>
+  </div>
+  {% if article.metadata %}
+  <table class="meta-table">
+    <thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+    <tbody>
+    {% for k, v in article.metadata.items()|sort %}
+    <tr>
+      <td class="meta-key">{{ k }}</td>
+      <td class="meta-val">{{ v }}</td>
+      <td>
+        <form style="display:inline;margin:0;"
+              hx-post="/ui/articles/{{ article.article_id }}/metadata/remove"
+              hx-target="#detail-panel" hx-swap="innerHTML">
+          <input type="hidden" name="meta_key" value="{{ k }}">
+          <button class="btn btn-remove btn-sm" type="submit" title="remove__ key">✕</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="font-size:0.75rem;color:var(--dim);padding:0.5rem;">No metadata entries</div>
+  {% endif %}
+  <form class="inline-form" style="margin-top:0.5rem;"
+        hx-post="/ui/articles/{{ article.article_id }}/metadata/add"
+        hx-target="#detail-panel" hx-swap="innerHTML">
+    <input name="meta_key" placeholder="key" required style="font-size:0.75rem;padding:0.35rem 0.6rem;flex:0.4;">
+    <input name="meta_value" placeholder="value" required style="font-size:0.75rem;padding:0.35rem 0.6rem;flex:0.6;">
+    <button class="btn btn-add btn-sm" type="submit">+ add__</button>
+  </form>
+
+  <!-- ═══════ REVISIONS — list<text> ═══════ -->
+  <div class="section-header">
+    📝 Revisions <span class="type-badge type-list">list&lt;text&gt;</span>
+  </div>
+  {% if article.revisions %}
+  <ul class="revision-list">
+    {% for rev in article.revisions %}
+    <li><span class="rev-index">[{{ loop.index0 }}]</span> {{ rev }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div style="font-size:0.75rem;color:var(--dim);padding:0.5rem;">No revisions recorded</div>
+  {% endif %}
+  <form class="inline-form" style="margin-top:0.5rem;"
+        hx-post="/ui/articles/{{ article.article_id }}/revisions/append"
+        hx-target="#detail-panel" hx-swap="innerHTML">
+    <input name="revision" placeholder="append revision note..." required style="font-size:0.75rem;padding:0.35rem 0.6rem;">
+    <button class="btn btn-add btn-sm" type="submit">+ append__</button>
+  </form>
+  <form class="inline-form" style="margin-top:0.3rem;"
+        hx-post="/ui/articles/{{ article.article_id }}/revisions/prepend"
+        hx-target="#detail-panel" hx-swap="innerHTML">
+    <input name="revision" placeholder="prepend revision note..." required style="font-size:0.75rem;padding:0.35rem 0.6rem;">
+    <button class="btn btn-add btn-sm" type="submit">+ prepend__</button>
+  </form>
+</div>

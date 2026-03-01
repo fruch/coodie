@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Story lore panel -->
+<div class="lore-panel">
+  <div class="lore-title">📚 Mission Briefing — Dimension-8</div>
+  In Dimension-8, <em>SCYLLA-9</em>'s fragment became <strong>TagMind</strong>,
+  an AI librarian that categorizes everything in existence using CQL collections.
+  Every atom has a <code>set&lt;text&gt;</code> of tags, every molecule has a
+  <code>map&lt;text, text&gt;</code> of properties, and every organism has a
+  <code>list&lt;text&gt;</code> of ancestors. Use <em>add__</em>, <em>remove__</em>,
+  <em>append__</em>, and <em>prepend__</em> to manage the taxonomy before reality
+  folds in on itself.
+</div>
+
+<div class="grid">
+  <!-- LEFT: create form + article list -->
+  <div>
+    <div class="card" style="margin-bottom:1.25rem;">
+      <h2>📝 New Article</h2>
+      <form hx-post="/ui/articles" hx-target="#article-list-container" hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful) this.reset();">
+        <label for="title">Title</label>
+        <input id="title" name="title" required placeholder="On the Quantum Nature of Particles">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+          <div>
+            <label for="author">Author</label>
+            <input id="author" name="author" required placeholder="Dr. Helix">
+          </div>
+          <div>
+            <label for="tags">Tags <span style="color:var(--dim)">(comma-separated)</span></label>
+            <input id="tags" name="tags" placeholder="quantum, stellar, neural">
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">📚 Classify Article</button>
+      </form>
+    </div>
+
+    <!-- Article list -->
+    <div class="card">
+      <h2>📋 Article Taxonomy
+        <span style="font-size:0.6rem;color:var(--muted);font-weight:400;letter-spacing:0.05em;">
+          {{ articles|length }} total
+        </span>
+      </h2>
+      <div id="article-list-container"
+           hx-get="/ui/articles" hx-trigger="load" hx-swap="innerHTML">
+        <div class="empty">Scanning taxonomy index…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: article detail + collection mutation panels -->
+  <div id="detail-panel">
+    <div class="card">
+      <div class="empty">Select an article to view tags, metadata &amp; revision history</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -9,6 +9,7 @@ Use ``--driver-type`` to choose the coodie driver backend:
 - ``scylla``   (default) — CassandraDriver backed by scylla-driver
 - ``cassandra`` — CassandraDriver backed by cassandra-driver
 - ``acsylla``  — AcsyllaDriver backed by the async-native acsylla library
+- ``python-rs`` — PythonRsDriver backed by the Rust-based python-rs-driver
 
 The **cqlengine** side always uses cassandra-driver / scylla-driver regardless
 of ``--driver-type`` (cqlengine has no acsylla backend).
@@ -22,7 +23,7 @@ from uuid import uuid4
 
 import pytest
 
-from tests.conftest_scylla import create_acsylla_session, create_cql_session  # noqa: F401
+from tests.conftest_scylla import create_acsylla_session, create_cql_session, create_python_rs_session  # noqa: F401
 from tests.conftest_scylla import scylla_container  # noqa: F401
 
 
@@ -35,7 +36,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--driver-type",
         default="scylla",
-        choices=["scylla", "cassandra", "acsylla"],
+        choices=["scylla", "cassandra", "acsylla", "python-rs"],
         help="Coodie driver backend for benchmarks (default: scylla)",
     )
 
@@ -111,6 +112,7 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
 
     * ``scylla`` / ``cassandra`` — CassandraDriver sharing the cql_session
     * ``acsylla`` — AcsyllaDriver with its own async-native session
+    * ``python-rs`` — PythonRsDriver with a Rust-backed async session
     """
     from coodie.drivers import _registry, init_coodie, register_driver
 
@@ -127,6 +129,18 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
         loop = asyncio.new_event_loop()
         session = loop.run_until_complete(create_acsylla_session(scylla_container, "bench_ks"))
         driver = AcsyllaDriver(session=session, default_keyspace="bench_ks", loop=loop)
+        register_driver("default", driver, default=True)
+    elif driver_type == "python-rs":
+        try:
+            import scylla  # type: ignore[import-untyped] # noqa: F401
+        except ImportError:
+            pytest.skip("python-rs-driver is not installed")
+
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        loop = asyncio.new_event_loop()
+        session = loop.run_until_complete(create_python_rs_session(scylla_container, "bench_ks"))
+        driver = PythonRsDriver(session=session, default_keyspace="bench_ks", loop=loop)
         register_driver("default", driver, default=True)
     else:
         driver = init_coodie(session=cql_session, keyspace="bench_ks", driver_type=driver_type)

@@ -206,20 +206,15 @@ def _run_logged_phase(entries: list[dict], batch_size: int) -> int:
             "[bold orange1]📦 Overall",
             total=len(entries),
         )
-        batch_tasks = [
-            progress.add_task(
-                f"[orange1]  LOGGED  #{i + 1:03d}[/]",
-                total=len(b),
-            )
-            for i, b in enumerate(batches)
-        ]
 
-        for batch, task_id in zip(batches, batch_tasks):
+        for i, batch in enumerate(batches, start=1):
             with BatchQuery(logged=True) as bq:
                 for row in batch:
                     CargoEntry(**row).save(batch=bq)
-                    progress.advance(task_id)
-                    progress.advance(overall)
+            progress.advance(overall, len(batch))
+            progress.console.print(
+                f"  [orange1]✓ LOGGED  batch #{i:03d}[/] — {len(batch)} entries committed"
+            )
 
     return len(entries)
 
@@ -244,20 +239,15 @@ def _run_unlogged_phase(log_entries: list[dict], batch_size: int) -> int:
             "[bold steel_blue1]📋 Overall",
             total=len(log_entries),
         )
-        batch_tasks = [
-            progress.add_task(
-                f"[steel_blue1]  UNLOGGED #{i + 1:03d}[/]",
-                total=len(b),
-            )
-            for i, b in enumerate(batches)
-        ]
 
-        for batch, task_id in zip(batches, batch_tasks):
+        for i, batch in enumerate(batches, start=1):
             with BatchQuery(logged=False) as bq:
                 for row in batch:
                     ShipmentLog(**row).save(batch=bq)
-                    progress.advance(task_id)
-                    progress.advance(overall)
+            progress.advance(overall, len(batch))
+            progress.console.print(
+                f"  [steel_blue1]✓ UNLOGGED batch #{i:03d}[/] — {len(batch)} entries committed"
+            )
 
     return len(log_entries)
 

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772393382242,
+  "lastUpdate": 1772393423512,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9142,6 +9142,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.667506198313833e-7",
             "extra": "mean: 5.203201266063577 usec\nrounds: 6792"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "1f4965710f30cd51a0d6b1dac52ac2bee155a37c",
+          "message": "fix(test): use Optional field for TTL expiry test to ensure deterministic assertion\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T21:29:51+02:00",
+          "tree_id": "c3d8ec5edb2dbb4759546e8e99dccf26824d8199",
+          "url": "https://github.com/fruch/coodie/commit/1f4965710f30cd51a0d6b1dac52ac2bee155a37c"
+        },
+        "date": 1772393422957,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52863.13320751823,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016626120759484038",
+            "extra": "mean: 18.91677506277247 usec\nrounds: 8798"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 558218.930899193,
+            "unit": "iter/sec",
+            "range": "stddev: 5.66406712681293e-7",
+            "extra": "mean: 1.7914118361933284 usec\nrounds: 44423"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 614579.0886664797,
+            "unit": "iter/sec",
+            "range": "stddev: 4.896792215774791e-7",
+            "extra": "mean: 1.6271298819649245 usec\nrounds: 52925"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 813437.1505541544,
+            "unit": "iter/sec",
+            "range": "stddev: 3.776458655049957e-7",
+            "extra": "mean: 1.2293512772544868 usec\nrounds: 149187"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 959472.5038313883,
+            "unit": "iter/sec",
+            "range": "stddev: 3.069995301903644e-7",
+            "extra": "mean: 1.0422393513172876 usec\nrounds: 96256"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 755330.0899278978,
+            "unit": "iter/sec",
+            "range": "stddev: 3.2652053405842e-7",
+            "extra": "mean: 1.323924484585882 usec\nrounds: 96722"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190196.86096103344,
+            "unit": "iter/sec",
+            "range": "stddev: 7.708282428883849e-7",
+            "extra": "mean: 5.257710326801213 usec\nrounds: 8047"
           }
         ]
       }

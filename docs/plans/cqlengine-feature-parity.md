@@ -217,7 +217,7 @@ Use `frozen<>` collections or separate tables as a workaround.
 | `connection.set_default_connection(name)` | default driver in registry | ✅ |
 | Per-model `__connection__` | `Settings.connection` routes to named driver | ✅ |
 | Multiple named connections in same app | Driver registry supports named drivers | ✅ |
-| Lazy connection (connect on first use) | — | ❌ |
+| Lazy connection (connect on first use) | `init_coodie(..., lazy=True)` | ✅ |
 | Connection pooling options | Delegated to underlying driver | ✅ (passthrough) |
 
 ### 1.8 Advanced Features
@@ -238,7 +238,7 @@ Use `frozen<>` collections or separate tables as a workaround.
 | SASI / SAI index support | ✅ | `__like` filter operator |
 | Counter increment/decrement API | ✅ | `CounterDocument.increment()` / `decrement()` |
 | Static columns | ✅ | `Annotated[T, Static()]` marker |
-| Column-level delete | 🔧 `build_delete(columns=[...])` exists | Not exposed on Document |
+| Column-level delete | ✅ | `Document.delete_columns(*column_names)` (sync + async) |
 
 ---
 

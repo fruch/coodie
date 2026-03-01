@@ -248,6 +248,9 @@ acsylla = [
 cassandra = [
     { name = "cassandra-driver" },
 ]
+python-rs = [
+    { name = "scylla" },
+]
 scylla = [
     { name = "scylla-driver" },
 ]
@@ -273,9 +276,10 @@ requires-dist = [
     { name = "acsylla", marker = "extra == 'acsylla'", specifier = ">=0.1.0" },
     { name = "cassandra-driver", marker = "extra == 'cassandra'", specifier = ">=3.25.0" },
     { name = "pydantic", specifier = ">=2.0" },
+    { name = "scylla", marker = "extra == 'python-rs'", git = "https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver" },
     { name = "scylla-driver", marker = "extra == 'scylla'", specifier = ">=3.25.4" },
 ]
-provides-extras = ["acsylla", "cassandra", "scylla"]
+provides-extras = ["acsylla", "cassandra", "python-rs", "scylla"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1064,6 +1068,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/ae/f9/41dc953bbeb056c17
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/54/6f679c435d28e0a568d8e8a7c0a93a09010818634c3c3907fc98d8983770/roman_numerals-4.1.0-py3-none-any.whl", hash = "sha256:647ba99caddc2cc1e55a51e4360689115551bf4476d90e8162cf8c345fe233c7", size = 7676, upload-time = "2025-12-17T18:25:33.098Z" },
 ]
+
+[[package]]
+name = "scylla"
+version = "0.1.0"
+source = { git = "https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver#beecb579e2647b4625f35140cd044ec5f7f38c9d" }
 
 [[package]]
 name = "scylla-driver"

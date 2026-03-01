@@ -32,9 +32,21 @@ if [ -n "$BODY" ] && echo "$BODY" | grep -q '^```'; then
 fi
 
 # Strip any remaining copilot agent step-output lines
-# (● action headers, $ shell commands, └ result summaries)
+# (● action headers, $ shell commands, └ result summaries,
+#  ✗/✓ check markers and their indented detail lines)
 if [ -n "$BODY" ]; then
-  BODY=$(echo "$BODY" | grep -vE '^\s*(●|└|\$ )') || true
+  BODY=$(echo "$BODY" | grep -vE '^\s*(●|└|\$ |✗ |✓ )') || true
+fi
+
+# Strip lines that are clearly shell artifacts or Copilot CLI noise
+# (redirections like 2>/dev/null, permission errors from the agent)
+if [ -n "$BODY" ]; then
+  BODY=$(echo "$BODY" | grep -vE '(^\s*[0-9]*>/dev/null|Permission denied|could not request permission)') || true
+fi
+
+# Trim leading blank lines left after filtering
+if [ -n "$BODY" ]; then
+  BODY=$(echo "$BODY" | sed '/[^[:space:]]/,$!d')
 fi
 
 # Reject output that looks like error messages rather than real content

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, ClassVar, TYPE_CHECKING
 
 from pydantic import BaseModel
@@ -215,6 +216,47 @@ class Document(BaseModel):
             batch.add(cql, params)
         else:
             await cls._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
+
+    async def delete_columns(
+        self,
+        *column_names: str,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+        batch: AsyncBatchQuery | None = None,
+    ) -> None:
+        """Set one or more non-primary-key columns to null for this document.
+
+        Generates ``DELETE col1, col2 FROM table WHERE pk = ?``.
+
+        .. warning::
+            This operation nullifies column values in-place and bypasses the
+            schema-migration system.  If you are removing or renaming a column,
+            use coodie's migration tools instead:
+            ``Document.sync_table()`` for development environments, or
+            ``coodie migrate`` (the CLI) for production deployments.
+        """
+        warnings.warn(
+            "delete_columns() nullifies individual column values in-place and bypasses "
+            "schema migrations. If you are removing or renaming a column, use "
+            "Document.sync_table() for development or `coodie migrate` for production "
+            "instead.",
+            UserWarning,
+            stacklevel=2,
+        )
+        pk_names = _pk_columns(self.__class__)
+        where = [(c, "=", getattr(self, c)) for c in pk_names]
+        cql, params = build_delete(
+            self.__class__._get_table(),
+            self.__class__._get_keyspace(),
+            where,
+            columns=list(column_names),
+            timestamp=timestamp,
+        )
+        if batch is not None:
+            batch.add(cql, params)
+        else:
+            await self.__class__._get_driver().execute_async(cql, params, consistency=consistency, timeout=timeout)
 
     async def delete(
         self,

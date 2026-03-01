@@ -109,3 +109,29 @@ async def create_acsylla_session(scylla_container: Any, keyspace: str) -> Any:
     )
     await session.close()
     return await cluster.create_session(keyspace=keyspace)
+
+
+async def create_python_rs_session(scylla_container: Any, keyspace: str) -> Any:
+    """Create a python-rs-driver session connected to the given keyspace.
+
+    Creates the keyspace if it doesn't exist via a temporary session,
+    then returns a new session.  Uses the container's internal IP since
+    python-rs-driver does not need an address translator.
+    """
+    from scylla.session_builder import SessionBuilder  # type: ignore[import-untyped]
+
+    container_info = scylla_container.get_wrapped_container()
+    container_info.reload()
+    networks = container_info.attrs["NetworkSettings"]["Networks"]
+    container_ip = next(iter(networks.values()))["IPAddress"]
+
+    builder = SessionBuilder(contact_points=[container_ip], port=9042)
+    session = await builder.connect()
+
+    # Create keyspace via raw CQL (USE keyspace is not supported)
+    await session.execute(
+        f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
+        "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}",
+        None,
+    )
+    return session

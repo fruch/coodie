@@ -27,11 +27,14 @@ jobs:
           - scylla
           - cassandra
           - acsylla
+          - python-rs
         exclude:
           - python-version: "3.12"
             driver-type: scylla
           - python-version: "3.12"
             driver-type: acsylla
+          - python-version: "3.12"
+            driver-type: python-rs
           - python-version: "3.14"
             driver-type: cassandra
     runs-on: ubuntu-latest

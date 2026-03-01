@@ -29,6 +29,9 @@ cassandra = [
 acsylla = [
     "acsylla>=0.1.0",
 ]
+python-rs = [
+    "scylla>=0.1.0",
+]
 
 [project.scripts]
 coodie = "coodie.migrations.cli:main"
@@ -78,6 +81,11 @@ conflicts = [
         { extra = "cassandra" },
     ],
 ]
+
+[tool.uv.sources]
+# python-rs-driver is not published on PyPI — uv builds it from source via Git.
+# Requires a Rust toolchain and maturin.
+scylla = { git = "https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver" }
 
 [tool.ruff]
 line-length = 120

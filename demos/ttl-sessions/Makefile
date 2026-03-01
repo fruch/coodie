@@ -25,15 +25,15 @@ db-down:                        ## Stop ScyllaDB
 	$(COMPOSE) down
 	@echo "  ✓ EPHEMERA has been disconnected"
 
-seed: db-up                     ## Seed session tokens (default TTL: 300s)
+seed: db-up                     ## Seed session tokens (randomized TTL: 20–120s)
 	@echo "  👻 Deploying memory harvest protocol..."
 	@echo ""
-	uv run python seed.py --count 20 --ttl 300
+	uv run python seed.py --count 20
 
-seed-short: db-up               ## Seed short-lived tokens (TTL: 30s) to watch them expire
-	@echo "  👻 Seeding volatile memories — they dissolve in 30 seconds..."
+seed-short: db-up               ## Seed volatile tokens (TTL: 5–30s) to watch them expire fast
+	@echo "  👻 Seeding volatile memories — they dissolve in 5–30 seconds..."
 	@echo ""
-	uv run python seed.py --count 10 --ttl 30
+	uv run python seed.py --count 10 --min-ttl 5 --ttl 30
 
 run: seed                       ## Install deps, seed, and start the app
 	@echo ""

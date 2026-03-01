@@ -1,9 +1,10 @@
 """Seed the ephemeral memory vault with stolen memories.
 
 Usage:
-    python seed.py              # 20 session tokens (default TTL: 300s)
-    python seed.py --count 10   # 10 session tokens
-    python seed.py --ttl 30     # 30 session tokens expiring in 30 seconds
+    python seed.py                          # 20 tokens, random TTL 20–120s
+    python seed.py --count 10               # 10 tokens, random TTL 20–120s
+    python seed.py --ttl 60                 # max TTL 60s (range: 20–60s)
+    python seed.py --min-ttl 5 --ttl 30    # range 5–30s
 """
 
 from __future__ import annotations
@@ -74,7 +75,7 @@ MEMORY_FRAGMENTS = [
 ]
 
 
-def _print_briefing(count: int, ttl: int) -> None:
+def _print_briefing(count: int, min_ttl: int, max_ttl: int) -> None:
     """Print the mission briefing story panel."""
     story = Text()
     story.append("DIMENSION-4", style="bold cyan")
@@ -82,9 +83,12 @@ def _print_briefing(count: int, ttl: int) -> None:
     story.append("EPHEMERA", style="bold red")
     story.append(", SCYLLA-9's most dangerous fragment, harvests\n")
     story.append("memories from sleeping agents and stores them as session tokens.\n")
-    story.append("After ")
-    story.append(f"{ttl} seconds", style="bold yellow")
-    story.append(", the memory dissolves forever — sold back\n")
+    story.append("Each token lives between ")
+    story.append(f"{min_ttl}s", style="bold yellow")
+    story.append(" and ")
+    story.append(f"{max_ttl}s", style="bold yellow")
+    story.append(" — a random countdown,\n")
+    story.append("then the memory dissolves forever — sold back\n")
     story.append("to the highest bidder before expiry.\n\n")
     story.append("The ", style="dim")
     story.append("Coodie Corps", style="bold cyan")
@@ -104,9 +108,9 @@ def _print_briefing(count: int, ttl: int) -> None:
     console.print()
 
 
-async def _seed(count: int, ttl: int) -> None:
-    """Connect to ScyllaDB, sync tables, and insert session tokens with TTL."""
-    _print_briefing(count, ttl)
+async def _seed(count: int, min_ttl: int, max_ttl: int) -> None:
+    """Connect to ScyllaDB, sync tables, and insert session tokens with randomized TTL."""
+    _print_briefing(count, min_ttl, max_ttl)
 
     hosts = os.getenv("SCYLLA_HOSTS", "127.0.0.1").split(",")
     keyspace = os.getenv("SCYLLA_KEYSPACE", "ephemera")
@@ -127,22 +131,23 @@ async def _seed(count: int, ttl: int) -> None:
 
     for i, victim in track(
         list(enumerate(victims, 1)),
-        description=f"[cyan]👻 EPHEMERA  Stealing memories... TTL: {ttl}s ⏳[/]",
+        description=f"[cyan]👻 EPHEMERA  Stealing memories... TTL: {min_ttl}–{max_ttl}s ⏳[/]",
         console=console,
     ):
         memory = random.choice(MEMORY_FRAGMENTS)
+        item_ttl = random.randint(min_ttl, max_ttl)
         session = Session(
             user_name=victim,
             memory_fragment=memory,
-            ttl_seconds=ttl,
+            ttl_seconds=item_ttl,
         )
         # Demonstrate per-record TTL override via save(ttl=...)
-        await session.save(ttl=ttl)
+        await session.save(ttl=item_ttl)
         sessions.append(session)
         console.print(
             f"  [dim cyan]  Memory #{i:02d} stolen from [bold]{victim}[/bold]"
             f" — token [yellow]{str(session.token)[:8]}...[/yellow]"
-            f" expires in {ttl}s[/]"
+            f" expires in {item_ttl}s[/]"
         )
 
     # --- Summary table ---
@@ -156,22 +161,23 @@ async def _seed(count: int, ttl: int) -> None:
     table.add_column("Value", justify="right", style="green")
     table.add_column("Note", style="dim")
     table.add_row("Memories Stolen", str(len(sessions)), "✓ Stored with TTL")
-    table.add_row("TTL (seconds)", str(ttl), f"✓ Rows expire in {ttl}s")
+    table.add_row("TTL range (seconds)", f"{min_ttl}–{max_ttl}", "✓ Randomized per row")
     table.add_row("Default TTL (model)", "300s", "✓ Settings.__default_ttl__")
     table.add_row("Victims", str(len(set(s.user_name for s in sessions))), "✓ Cataloged")
     console.print(table)
     console.print()
-    console.print(f"[bold cyan]👻 {len(sessions)} memories harvested. They dissolve in {ttl} seconds.[/]")
+    console.print(f"[bold cyan]👻 {len(sessions)} memories harvested. They dissolve in {min_ttl}–{max_ttl} seconds.[/]")
     console.print("[dim]   Launch the app with: uv run uvicorn main:app --reload[/]")
     console.print()
 
 
 @click.command()
 @click.option("--count", default=20, help="Number of session tokens to generate")
-@click.option("--ttl", default=300, help="TTL in seconds for each session token")
-def seed(count: int, ttl: int) -> None:
-    """Seed the Memory Vault with stolen memories (TTL sessions)."""
-    asyncio.run(_seed(count, ttl))
+@click.option("--min-ttl", "min_ttl", default=20, help="Minimum TTL in seconds (per-token lower bound)")
+@click.option("--ttl", "max_ttl", default=120, help="Maximum TTL in seconds (per-token upper bound)")
+def seed(count: int, min_ttl: int, max_ttl: int) -> None:
+    """Seed the Memory Vault with stolen memories (randomized TTL sessions)."""
+    asyncio.run(_seed(count, min_ttl, max_ttl))
 
 
 if __name__ == "__main__":

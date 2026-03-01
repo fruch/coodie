@@ -94,6 +94,34 @@ def build_create_index(
     return f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
 
 
+def build_create_vector_index(
+    table: str,
+    keyspace: str,
+    col: ColumnDefinition,
+) -> str:
+    """Build a ``CREATE CUSTOM INDEX`` for a vector similarity index.
+
+    Emits::
+
+        CREATE CUSTOM INDEX IF NOT EXISTS <name> ON <ks>.<table> (<col>)
+        USING 'StorageAttachedIndex';
+
+    With ``OPTIONS`` when *col.vector_index_options* is set (e.g.
+    ``{'similarity_function': 'COSINE'}``).
+    """
+    index_name = f"{table}_{col.name}_idx"
+    options = col.vector_index_options or {}
+    cql = (
+        f'CREATE CUSTOM INDEX IF NOT EXISTS {index_name} '
+        f'ON {keyspace}.{table} ("{col.name}") '
+        f"USING 'StorageAttachedIndex'"
+    )
+    if options:
+        opts_str = ", ".join(f"'{k}': '{v}'" for k, v in options.items())
+        cql += f" WITH OPTIONS = {{{opts_str}}}"
+    return cql
+
+
 def build_drop_index(index_name: str, keyspace: str) -> str:
     """Build a ``DROP INDEX IF EXISTS`` CQL statement."""
     return f"DROP INDEX IF EXISTS {keyspace}.{index_name}"
@@ -255,11 +283,15 @@ def build_select(
     order_by: list[str] | None = None,
     allow_filtering: bool = False,
     per_partition_limit: int | None = None,
+    ann_of: tuple[str, list[float]] | None = None,
 ) -> tuple[str, list[Any]]:
     # Build the cache key from the query *shape* (excludes actual values).
     where_shape: tuple = ()
     if where:
         where_shape = tuple((col, op, len(value)) if op == "IN" else (col, op) for col, op, value in where)
+    ann_shape: tuple = ()
+    if ann_of is not None:
+        ann_shape = (ann_of[0], len(ann_of[1]))
     cache_key = (
         table,
         keyspace,
@@ -269,6 +301,7 @@ def build_select(
         tuple(order_by) if order_by else None,
         allow_filtering,
         per_partition_limit,
+        ann_shape,
     )
 
     # Extract params (always needed regardless of cache hit).
@@ -282,6 +315,8 @@ def build_select(
 
     cached_cql = _select_cql_cache.get(cache_key)
     if cached_cql is not None:
+        if ann_of is not None:
+            params.append(ann_of[1])
         return cached_cql, params
 
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else "*"
@@ -292,7 +327,11 @@ def build_select(
         if clause:
             cql += " " + clause
 
-    if order_by:
+    if ann_of is not None:
+        ann_field, ann_vector = ann_of
+        cql += f' ORDER BY "{ann_field}" ANN OF ?'
+        params.append(ann_vector)
+    elif order_by:
         order_parts = []
         for col in order_by:
             if col.startswith("-"):

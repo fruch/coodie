@@ -1,0 +1,17 @@
+[project]
+name = "coodie-vector-search-demo"
+version = "0.1.0"
+description = "FastAPI vector search demo showcasing coodie's ANN query support"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.22",
+    "coodie[scylla]",
+    "click>=8.0",
+    "rich>=13.0",
+]
+
+[tool.uv.sources]
+coodie = { path = "../..", editable = true }

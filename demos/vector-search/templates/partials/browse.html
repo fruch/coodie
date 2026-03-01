@@ -1,0 +1,44 @@
+<p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.78rem; letter-spacing: 0.05em;">
+    📦 &nbsp; FULL CATALOG &nbsp;·&nbsp;
+    <strong style="color: var(--accent);">{{ products|length }}</strong> products with embeddings
+</p>
+
+{% set categories = products | map(attribute='category') | list | unique | list %}
+{% for cat in categories | sort %}
+<div style="margin-bottom: 1.25rem;">
+    <div style="
+        font-size: 0.65rem; font-weight: 700; letter-spacing: 0.18em;
+        text-transform: uppercase; color: var(--accent);
+        margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;
+    ">
+        {{ cat }}
+        <span style="flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent);"></span>
+    </div>
+    {% for p in products if p.category == cat %}
+    <div style="
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.6rem 1rem;
+        margin-bottom: 0.4rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.82rem;
+    ">
+        <div style="font-weight: 600; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            {{ p.name }}
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+            <span style="color: var(--dim); font-size: 0.68rem;">
+                ⬡ {{ p.embedding | length }}d
+            </span>
+            <span style="color: var(--success); font-weight: 700;">
+                ${{ "%.2f"|format(p.price) }}
+            </span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}

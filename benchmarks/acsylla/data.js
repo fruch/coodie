@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772390187991,
+  "lastUpdate": 1772390302475,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -8777,6 +8777,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 4.964109121141446e-7",
             "extra": "mean: 5.203628044748621 usec\nrounds: 7759"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "9ca957e9cb5fae7c423943b8b91f71ecbcec50c8",
+          "message": "ci: replace workflow_run with workflow_call to enable self-healing on bot PRs\n\nGitHub requires manual approval for workflow_run triggers initiated by bots (e.g., copilot-swe-agent).\nThis prevents the self-healing workflow from automatically commenting on failures in bot-authored PRs.\n\nSwitch to workflow_call pattern where each CI workflow directly invokes self-healing-ci.yml on failure.\nThis bypasses the approval requirement and enables automated failure analysis on all PRs regardless of author.\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T20:37:11+02:00",
+          "tree_id": "dee798867b4f0dab00e29b3468c3828bbd8fd63b",
+          "url": "https://github.com/fruch/coodie/commit/9ca957e9cb5fae7c423943b8b91f71ecbcec50c8"
+        },
+        "date": 1772390301389,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 51848.995529407075,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014423728428060329",
+            "extra": "mean: 19.286776721312417 usec\nrounds: 8729"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 580904.6886515421,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1285044716979895e-7",
+            "extra": "mean: 1.7214527951587149 usec\nrounds: 51107"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 607872.8329289614,
+            "unit": "iter/sec",
+            "range": "stddev: 3.9090087081435433e-7",
+            "extra": "mean: 1.6450809212539104 usec\nrounds: 54275"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 845865.2917401114,
+            "unit": "iter/sec",
+            "range": "stddev: 3.0148845442597577e-7",
+            "extra": "mean: 1.1822213415836027 usec\nrounds: 156446"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 931942.9151260456,
+            "unit": "iter/sec",
+            "range": "stddev: 2.7921093130686856e-7",
+            "extra": "mean: 1.073027096155079 usec\nrounds: 89127"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 749495.0212457273,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7793068296068405e-7",
+            "extra": "mean: 1.3342316782010255 usec\nrounds: 91735"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 186415.258977644,
+            "unit": "iter/sec",
+            "range": "stddev: 7.837505295402452e-7",
+            "extra": "mean: 5.364367731935109 usec\nrounds: 7636"
           }
         ]
       }

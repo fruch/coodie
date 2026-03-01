@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from pydantic import BaseModel
+
 from coodie.drivers.base import AbstractDriver
 
 _DDL_PREFIXES = ("CREATE ", "ALTER ", "DROP ", "TRUNCATE ")
@@ -83,6 +85,22 @@ class PythonRsDriver(AbstractDriver):
         return self._prepared[cql]
 
     @staticmethod
+    def _serialize_params(params: list[Any]) -> list[Any]:
+        """Serialize Pydantic model instances (UserType) to dicts.
+
+        python-rs-driver requires UDT values to be plain dicts, not Pydantic
+        model instances.  This converts any ``BaseModel`` in the params list
+        to its ``model_dump()`` dict representation, recursively.
+        """
+        result = []
+        for p in params:
+            if isinstance(p, BaseModel):
+                result.append(p.model_dump())
+            else:
+                result.append(p)
+        return result
+
+    @staticmethod
     def _rows_to_dicts(result: Any) -> list[dict[str, Any]]:
         """Convert a ``RequestResult`` to a list of dicts.
 
@@ -118,7 +136,7 @@ class PythonRsDriver(AbstractDriver):
             return self._rows_to_dicts(result)
 
         prepared = await self._prepare(stmt)
-        result = await self._session.execute(prepared, params or None)
+        result = await self._session.execute(prepared, self._serialize_params(params) or None)
         self._last_paging_state = None
         return self._rows_to_dicts(result)
 

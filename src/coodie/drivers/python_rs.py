@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from pydantic import BaseModel
+
 from coodie.drivers.base import AbstractDriver
 
 _DDL_PREFIXES = ("CREATE ", "ALTER ", "DROP ", "TRUNCATE ")
@@ -83,6 +85,38 @@ class PythonRsDriver(AbstractDriver):
         return self._prepared[cql]
 
     @staticmethod
+    def _serialize_param(p: Any) -> Any:
+        """Recursively serialize a single param value for python-rs-driver.
+
+        python-rs-driver requires UDT values to be plain dicts, not Pydantic
+        model instances.  Pydantic's ``model_dump()`` handles nested models
+        recursively, so a top-level conversion is sufficient for UDTs.
+        Collection types (lists, sets, tuples) are iterated so that any
+        model instances within them are also converted.
+        """
+        if isinstance(p, BaseModel):
+            return p.model_dump()
+        if isinstance(p, list):
+            return [PythonRsDriver._serialize_param(x) for x in p]
+        if isinstance(p, tuple):
+            return tuple(PythonRsDriver._serialize_param(x) for x in p)
+        if isinstance(p, set):
+            return {PythonRsDriver._serialize_param(x) for x in p}
+        if isinstance(p, dict):
+            return {k: PythonRsDriver._serialize_param(v) for k, v in p.items()}
+        return p
+
+    @staticmethod
+    def _serialize_params(params: list[Any]) -> list[Any]:
+        """Serialize all params for python-rs-driver, converting BaseModel instances.
+
+        python-rs-driver requires UDT values to be plain dicts.  This converts
+        any ``BaseModel`` in the params list (including inside collection types)
+        to its ``model_dump()`` dict representation.
+        """
+        return [PythonRsDriver._serialize_param(p) for p in params]
+
+    @staticmethod
     def _rows_to_dicts(result: Any) -> list[dict[str, Any]]:
         """Convert a ``RequestResult`` to a list of dicts.
 
@@ -118,7 +152,7 @@ class PythonRsDriver(AbstractDriver):
             return self._rows_to_dicts(result)
 
         prepared = await self._prepare(stmt)
-        result = await self._session.execute(prepared, params or None)
+        result = await self._session.execute(prepared, self._serialize_params(params) if params else None)
         self._last_paging_state = None
         return self._rows_to_dicts(result)
 

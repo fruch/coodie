@@ -39,9 +39,10 @@ if [ -n "$BODY" ]; then
 fi
 
 # Strip lines that are clearly shell artifacts or Copilot CLI noise
-# (redirections like 2>/dev/null, permission errors from the agent)
+# (redirections like 2>/dev/null, standalone pipes like | head -5,
+#  permission errors from the agent)
 if [ -n "$BODY" ]; then
-  BODY=$(echo "$BODY" | grep -vE '(^\s*[0-9]*>/dev/null|Permission denied|could not request permission)') || true
+  BODY=$(echo "$BODY" | grep -vE '(^\s*[0-9]*>/dev/null|^\s*\|\s*(head|tail|wc|grep|sed|awk|sort|cat|cut|tr|tee|xargs|less|more|uniq)\b|Permission denied|could not request permission)') || true
 fi
 
 # Trim leading blank lines left after filtering

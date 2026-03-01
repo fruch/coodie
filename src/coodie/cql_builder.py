@@ -192,6 +192,7 @@ def parse_filter_kwargs(
         "contains": "CONTAINS",
         "contains_key": "CONTAINS KEY",
         "like": "LIKE",
+        "ne": "!=",
     }
     token_operators = {
         "token__gt": "TOKEN >",

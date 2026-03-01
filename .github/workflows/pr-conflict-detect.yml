@@ -2,7 +2,7 @@ name: PR Conflict Detection
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       # ── Push to default branch: check all open PRs ──────────
       - name: Check all open PRs for conflicts
@@ -26,20 +24,28 @@ jobs:
         run: |
           pr_numbers=$(gh pr list --state open --json number -q '.[].number')
           for pr_number in $pr_numbers; do
-            git fetch origin "pull/${pr_number}/head:refs/pr/${pr_number}" || continue
+            MERGEABLE=""
+            for i in $(seq 1 5); do
+              MERGEABLE=$(gh api "/repos/${{ github.repository }}/pulls/${pr_number}" --jq '.mergeable // empty')
+              echo "PR #${pr_number}: attempt $i/5, mergeable=$MERGEABLE"
+              if [ -n "$MERGEABLE" ]; then
+                break
+              fi
+              sleep 2
+            done
 
-            git checkout -f "${{ github.ref_name }}"
-            git reset --hard "origin/${{ github.ref_name }}"
+            if [ -z "$MERGEABLE" ]; then
+              echo "PR #${pr_number}: mergeability unknown after retries, skipping"
+              continue
+            fi
 
-            if git merge --no-commit --no-ff "refs/pr/${pr_number}" >/dev/null 2>&1; then
+            if [ "$MERGEABLE" = "true" ]; then
               echo "PR #${pr_number}: clean"
               gh pr edit "$pr_number" --remove-label "conflict" || true
             else
-              echo "PR #${pr_number}: conflict"
+              echo "PR #${pr_number}: conflict (mergeable=$MERGEABLE)"
               gh pr edit "$pr_number" --add-label "conflict" || true
             fi
-            git merge --abort 2>/dev/null || true
-            git reset --hard "origin/${{ github.ref_name }}"
           done
 
       # ── Pull request event: check the triggering PR ─────────
@@ -49,17 +55,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
-          BASE_REF="${{ github.event.pull_request.base.ref }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
 
-          git fetch origin "$BASE_REF"
-          git checkout -f "origin/$BASE_REF"
+          MERGEABLE=""
+          for i in $(seq 1 5); do
+            MERGEABLE=$(gh api "/repos/${{ github.repository }}/pulls/${PR_NUMBER}" --jq '.mergeable // empty')
+            echo "PR #${PR_NUMBER}: attempt $i/5, mergeable=$MERGEABLE"
+            if [ -n "$MERGEABLE" ]; then
+              break
+            fi
+            sleep 2
+          done
 
-          if git merge --no-commit --no-ff "$HEAD_SHA" >/dev/null 2>&1; then
+          if [ -z "$MERGEABLE" ]; then
+            echo "PR #${PR_NUMBER}: mergeability unknown after retries, skipping"
+            exit 0
+          fi
+
+          if [ "$MERGEABLE" = "true" ]; then
             echo "PR #${PR_NUMBER}: clean"
             gh pr edit "$PR_NUMBER" --remove-label "conflict" || true
           else
-            echo "PR #${PR_NUMBER}: conflict"
+            echo "PR #${PR_NUMBER}: conflict (mergeable=$MERGEABLE)"
             gh pr edit "$PR_NUMBER" --add-label "conflict" || true
           fi
-          git merge --abort 2>/dev/null || true

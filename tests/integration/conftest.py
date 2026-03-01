@@ -32,11 +32,13 @@ from coodie.fields import (
     BigInt,
     ClusteringKey,
     Counter,
+    Discriminator,
     Double,
     Frozen,
     Indexed,
     PrimaryKey,
     SmallInt,
+    Static,
     TimeUUID,
     TinyInt,
     VarInt,
@@ -692,11 +694,81 @@ def PhaseADryRun(variant):
 
 
 # ---------------------------------------------------------------------------
-# Counter document models & fixtures
+# Container mutation models
+# ---------------------------------------------------------------------------
+
+
+class SyncContainerDoc(SyncDocument):
+    """Document with list, set, and map columns for collection mutation tests."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    items: List[str] = Field(default_factory=list)
+    tags: Set[str] = Field(default_factory=set)
+    meta: Dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _coerce_items(cls, v: object) -> object:
+        return v if v is not None else []
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, v: object) -> object:
+        return v if v is not None else set()
+
+    @field_validator("meta", mode="before")
+    @classmethod
+    def _coerce_meta(cls, v: object) -> object:
+        return v if v is not None else {}
+
+    class Settings:
+        name = "it_sync_container_doc"
+        keyspace = "test_ks"
+
+
+class AsyncContainerDoc(AsyncDocument):
+    """Async counterpart of SyncContainerDoc."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    items: List[str] = Field(default_factory=list)
+    tags: Set[str] = Field(default_factory=set)
+    meta: Dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _coerce_items(cls, v: object) -> object:
+        return v if v is not None else []
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_tags(cls, v: object) -> object:
+        return v if v is not None else set()
+
+    @field_validator("meta", mode="before")
+    @classmethod
+    def _coerce_meta(cls, v: object) -> object:
+        return v if v is not None else {}
+
+    class Settings:
+        name = "it_async_container_doc"
+        keyspace = "test_ks"
+
+
+@pytest.fixture
+def ContainerDoc(variant):
+    if variant == "sync":
+        return SyncContainerDoc
+    return AsyncContainerDoc
+
+
+# ---------------------------------------------------------------------------
+# Counter column models
 # ---------------------------------------------------------------------------
 
 
 class SyncPageView(SyncCounterDocument):
+    """Sync counter document for integration tests."""
+
     url: Annotated[str, PrimaryKey()]
     view_count: Annotated[int, Counter()] = 0
     unique_visitors: Annotated[int, Counter()] = 0
@@ -712,6 +784,8 @@ class SyncPageView(SyncCounterDocument):
 
 
 class AsyncPageView(AsyncCounterDocument):
+    """Async counter document for integration tests."""
+
     url: Annotated[str, PrimaryKey()]
     view_count: Annotated[int, Counter()] = 0
     unique_visitors: Annotated[int, Counter()] = 0
@@ -731,3 +805,111 @@ def PageView(variant):
     if variant == "sync":
         return SyncPageView
     return AsyncPageView
+
+
+# ---------------------------------------------------------------------------
+# Static column models
+# ---------------------------------------------------------------------------
+
+
+class SyncSensorReading(SyncDocument):
+    """Document with a static column for sharing data across clustering rows."""
+
+    sensor_id: Annotated[str, PrimaryKey()]
+    reading_time: Annotated[str, ClusteringKey()]
+    sensor_name: Annotated[str, Static()] = ""
+    value: float = 0.0
+
+    class Settings:
+        name = "it_sync_sensor_readings"
+        keyspace = "test_ks"
+
+
+class AsyncSensorReading(AsyncDocument):
+    """Async counterpart of SyncSensorReading."""
+
+    sensor_id: Annotated[str, PrimaryKey()]
+    reading_time: Annotated[str, ClusteringKey()]
+    sensor_name: Annotated[str, Static()] = ""
+    value: float = 0.0
+
+    class Settings:
+        name = "it_async_sensor_readings"
+        keyspace = "test_ks"
+
+
+@pytest.fixture
+def SensorReading(variant):
+    if variant == "sync":
+        return SyncSensorReading
+    return AsyncSensorReading
+
+
+# ---------------------------------------------------------------------------
+# Polymorphic models
+# ---------------------------------------------------------------------------
+
+
+class SyncAnimal(SyncDocument):
+    """Base polymorphic document using a discriminator column."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    animal_type: Annotated[str, Discriminator()] = ""
+
+    class Settings:
+        name = "it_sync_animals"
+        keyspace = "test_ks"
+
+
+class SyncCat(SyncAnimal):
+    class Settings:
+        __discriminator_value__ = "cat"
+
+
+class SyncDog(SyncAnimal):
+    class Settings:
+        __discriminator_value__ = "dog"
+
+
+class AsyncAnimal(AsyncDocument):
+    """Async base polymorphic document."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    animal_type: Annotated[str, Discriminator()] = ""
+
+    class Settings:
+        name = "it_async_animals"
+        keyspace = "test_ks"
+
+
+class AsyncCat(AsyncAnimal):
+    class Settings:
+        __discriminator_value__ = "cat"
+
+
+class AsyncDog(AsyncAnimal):
+    class Settings:
+        __discriminator_value__ = "dog"
+
+
+@pytest.fixture
+def Animal(variant):
+    if variant == "sync":
+        return SyncAnimal
+    return AsyncAnimal
+
+
+@pytest.fixture
+def Cat(variant):
+    if variant == "sync":
+        return SyncCat
+    return AsyncCat
+
+
+@pytest.fixture
+def Dog(variant):
+    if variant == "sync":
+        return SyncDog
+    return AsyncDog

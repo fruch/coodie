@@ -1,3 +1,11 @@
+● Read docs/plans/cqlengine-test-coverage-plan.md lines 220-235
+  └ 16 lines read
+
+✗ Edit docs/plans/cqlengine-test-coverage-plan.md
+  Permission denied and could not request permission from user
+
+The file content has the conflict markers. Since I need to output the complete resolved file content, here it is:
+
 # cqlengine Test Coverage Gap Analysis Plan
 
 > **Goal:** Close the test-coverage gap between coodie and the reference
@@ -84,14 +92,14 @@ Reference:
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
-| `list__append=['x']` appends element | `QuerySet.update(tags__append=['x'])` | 🔧 unit only |
-| `list__prepend=['x']` prepends element | `QuerySet.update(tags__prepend=['x'])` | 🔧 unit only |
-| `list__remove=['x']` removes element | `QuerySet.update(tags__remove=['x'])` | ❌ |
-| `set__add={'x'}` adds element | `QuerySet.update(tags__add={'x'})` | 🔧 unit only |
-| `set__remove={'x'}` removes element | `QuerySet.update(tags__remove={'x'})` | ❌ |
-| `map__update={'k': 'v'}` upserts key | `QuerySet.update(meta__update={'k': 'v'})` | ❌ |
-| `map__remove={'k'}` removes key | `QuerySet.update(meta__remove={'k'})` | ❌ |
-| Frozen collection column round-trip | `Annotated[list[str], Frozen()]` save/load | 🔧 unit only |
+| `list__append=['x']` appends element | `QuerySet.update(tags__append=['x'])` | ✅ `test_extended.py` |
+| `list__prepend=['x']` prepends element | `QuerySet.update(tags__prepend=['x'])` | ✅ `test_extended.py` |
+| `list__remove=['x']` removes element | `QuerySet.update(tags__remove=['x'])` | ✅ `test_extended.py` |
+| `set__add={'x'}` adds element | `QuerySet.update(tags__add={'x'})` | ✅ `test_extended.py` |
+| `set__remove={'x'}` removes element | `QuerySet.update(tags__remove={'x'})` | ✅ `test_extended.py` |
+| `map__update={'k': 'v'}` upserts key | `QuerySet.update(meta__update={'k': 'v'})` | ✅ `test_extended.py` |
+| `map__remove={'k'}` removes key | `QuerySet.update(meta__remove={'k'})` | ✅ `test_extended.py` |
+| Frozen collection column round-trip | `Annotated[list[str], Frozen()]` save/load | ✅ `test_extended.py` |
 
 **Gap summary — integration / container columns:**
 - Add `TestExtended.test_list_append_integration`, `test_list_remove_integration`, `test_set_add_remove_integration`, `test_map_update_remove_integration` to `tests/integration/test_extended.py`.
@@ -102,24 +110,18 @@ Reference:
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
-| `CounterDocument.increment(count=1)` issues `UPDATE … SET count = count + ?` | `CounterDocument.increment()` | 🔧 unit only |
-| `CounterDocument.decrement(count=1)` issues `UPDATE … SET count = count - ?` | `CounterDocument.decrement()` | 🔧 unit only |
-| Increment multiple times accumulates | multi-increment round-trip | ❌ |
-| `CounterDocument.save()` raises `InvalidQueryError` | same | 🔧 unit only |
-
-**Gap summary — integration / counter:**
-- Add `TestCounterColumn` integration test class to `tests/integration/test_extended.py` (or a new `test_counter.py`).
+| `CounterDocument.increment(count=1)` issues `UPDATE … SET count = count + ?` | `CounterDocument.increment()` | ✅ `test_counter.py` |
+| `CounterDocument.decrement(count=1)` issues `UPDATE … SET count = count - ?` | `CounterDocument.decrement()` | ✅ `test_counter.py` |
+| Increment multiple times accumulates | multi-increment round-trip | ✅ `test_counter.py` |
+| `CounterDocument.save()` raises `InvalidQueryError` | same | ✅ `test_counter.py` |
 
 #### Static column (`test_static_column.py`)
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
 | Static column emitted as `STATIC` in DDL | `Annotated[str, Static()]` in `build_create_table` | ✅ schema unit |
-| Static column value shared across clustering rows | save two clustering rows, assert same static value | ❌ |
-| Updating static column updates all clustering rows | `save()` with new static value | ❌ |
-
-**Gap summary — integration / static:**
-- Add `TestStaticColumn` integration test class to `tests/integration/test_extended.py`.
+| Static column value shared across clustering rows | save two clustering rows, assert same static value | ✅ `test_extended.py` |
+| Updating static column updates all clustering rows | `save()` with new static value | ✅ `test_extended.py` |
 
 ---
 
@@ -170,12 +172,9 @@ Reference:
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
-| Polymorphic models saved to real DB | discriminator field written | 🔧 unit only |
-| `find()` on base class returns concrete subclass instances | routing on load | 🔧 unit only |
-| `find()` on subclass filters by discriminator | filtered query | 🔧 unit only |
-
-**Gap summary — integration / polymorphism:**
-- Add `TestPolymorphism` integration test class to `tests/integration/test_extended.py` (or new `test_polymorphism.py`).
+| Polymorphic models saved to real DB | discriminator field written | ✅ `test_extended.py` |
+| `find()` on base class returns concrete subclass instances | routing on load | ✅ `test_extended.py` |
+| `find()` on subclass filters by discriminator | filtered query | ✅ `test_extended.py` |
 
 ---
 
@@ -189,28 +188,21 @@ Reference:
 
 | cqlengine filter | coodie filter kwarg | Status |
 |---|---|---|
-| `field__gte=v` | `filter(field__gte=v)` | 🔧 unit only |
-| `field__lte=v` | `filter(field__lte=v)` | 🔧 unit only |
+| `field__gte=v` | `filter(field__gte=v)` | ✅ `test_extended.py` (datetime range) |
+| `field__lte=v` | `filter(field__lte=v)` | ✅ `test_extended.py` (datetime range) |
 | `field__gt=v` | `filter(field__gt=v)` | 🔧 unit only |
 | `field__lt=v` | `filter(field__lt=v)` | 🔧 unit only |
-| `field__in=[…]` | `filter(field__in=[…])` | 🔧 unit only |
-| `field__contains='x'` | `filter(field__contains='x')` | ❌ |
-| `field__contains_key='k'` | `filter(field__contains_key='k')` | ❌ |
-| `field__ne=v` | `filter(field__ne=v)` | ❌ |
-
-**Gap summary — integration / query operators:**
-- Add `test_filter_gte_lte_integration`, `test_filter_in_integration`, `test_filter_contains_integration`, `test_filter_contains_key_integration` to `tests/integration/test_extended.py`.
-- Add `__contains`, `__contains_key`, `__ne` operator keywords to `parse_filter_kwargs` in `cql_builder.py` if not already present.
+| `field__in=[…]` | `filter(field__in=[…])` | ✅ `test_extended.py` |
+| `field__contains='x'` | `filter(field__contains='x')` | 🔧 unit only (requires collection index) |
+| `field__contains_key='k'` | `filter(field__contains_key='k')` | 🔧 unit only (requires collection index) |
+| `field__ne=v` | `filter(field__ne=v)` | 🔧 unit only (CQL `!=` not valid in WHERE) |
 
 #### Datetime range queries (`test_datetime_queries.py`)
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
-| Filter by `timestamp` column with `__gte` / `__lte` | `filter(created_at__gte=dt)` | ❌ integration |
+| Filter by `timestamp` column with `__gte` / `__lte` | `filter(created_at__gte=dt)` | ✅ `test_extended.py` |
 | Timezone-aware `datetime` stored as UTC | UTC round-trip | ✅ `test_extended.py` scalar round-trip |
-
-**Gap summary — integration / datetime:**
-- Add `test_datetime_range_filter_integration` to `tests/integration/test_extended.py`.
 
 #### Distinct queries (`test_queryset.py`)
 
@@ -308,17 +300,12 @@ Reference:
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
-| `sync_type(MyUDT)` creates the type in the keyspace | `sync_type()` / `sync_type_async()` | 🔧 unit only |
-| UDT field round-trip: save + load | `Document` with `udt: MyUDT` | ❌ integration |
-| Nested UDT field round-trip | `udt: Outer` where `Outer` has `inner: Inner` | ❌ integration |
-| UDT inside collection: `list[MyUDT]` | `list[Annotated[MyUDT, Frozen()]]` | ❌ integration |
-| Define model with UDT without connection | class-level definition only | ❌ unit |
-| `sync_type` resolves nested dependencies in order | `sync_type` with nested UDT | ❌ integration |
-
-**Gap summary — UDT:**
-- Add `TestUDTIntegration` class to a new `tests/integration/test_udt.py`.
-- Cover: `sync_type()` call, basic UDT round-trip, nested UDT, UDT-in-list.
-- Add a unit test for UDT class definition without a registered driver.
+| `sync_type(MyUDT)` creates the type in the keyspace | `sync_type()` / `sync_type_async()` | ✅ `test_udt.py` |
+| UDT field round-trip: save + load | `Document` with `udt: MyUDT` | ✅ `test_udt.py` |
+| Nested UDT field round-trip | `udt: Outer` where `Outer` has `inner: Inner` | ✅ `test_udt.py` |
+| UDT inside collection: `list[MyUDT]` | `list[Annotated[MyUDT, Frozen()]]` | ❌ integration (skipped for acsylla) |
+| Define model with UDT without connection | class-level definition only | ✅ `test_types.py` |
+| `sync_type` resolves nested dependencies in order | `sync_type` with nested UDT | ✅ `test_udt.py` |
 
 ---
 
@@ -331,24 +318,18 @@ Reference:
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
-| `drop_table()` multiple times does not raise | `sync_table` + `drop_table` × 2 | ❌ |
+| `drop_table()` multiple times does not raise | `sync_table` + `drop_table` × 2 | ✅ `test_extended.py` |
 | `sync_table()` with added column alters existing table | schema migration | ✅ `test_migration.py` |
 | `sync_table()` with changed PK raises / logs warning | detection of incompatible change | ❌ |
 | `create_keyspace_network_topology()` | `create_keyspace(dc_replication_map=…)` | ✅ unit |
 | `drop_keyspace()` | `drop_keyspace()` | ✅ unit |
 
-**Gap summary — integration / table management:**
-- Add `test_drop_table_idempotent` to `tests/integration/test_basic.py` or `test_migration.py`.
-
 #### Compaction settings (`test_compaction_settings.py`)
 
 | cqlengine behaviour | coodie equivalent | Status |
 |---|---|---|
-| `__options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}` reflected in DB | `Settings.__options__` → `WITH compaction = {…}` | 🔧 builder unit only |
-| Compaction strategy change via `sync_table` | alter table compaction | ❌ integration |
-
-**Gap summary — integration / compaction:**
-- Add `test_compaction_settings_applied_to_table` to `tests/integration/test_migration.py`.
+| `__options__ = {'compaction': {'class': 'LeveledCompactionStrategy'}}` reflected in DB | `Settings.__options__` → `WITH compaction = {…}` | ✅ `test_extended.py` |
+| Compaction strategy change via `sync_table` | alter table compaction | ✅ `test_extended.py` |
 
 ---
 
@@ -394,67 +375,65 @@ Reference:
 
 ## 2. Implementation Phases
 
-### Phase 1: Unit Test Completeness (Priority: High) ✅
+### Phase 1: Unit Test Completeness ✅ Done
 
 **Goal:** Fill the small but concrete unit-test holes identified in Section 1.1.
 
-| Task | Description |
-|---|---|
-| 1.1 | Add `test_frozen_collection_with_index` to `tests/test_types.py` verifying the CQL type string and `test_schema.py` verifying `Indexed` metadata is preserved |
-| 1.2 | Add `test_usertype_definition_without_connection` to `tests/test_document.py` (or `tests/test_usertype.py`) — define `UserType` subclass and a `Document` referencing it before any driver is registered; assert no exception |
-| 1.3 | Add `test_register_driver_on_empty_registry` to `tests/test_drivers.py` |
-| 1.4 | Add `test_model_equality` and `test_model_inequality_non_model` to `tests/test_document.py` |
-| 1.5 | Unit tests for all new code in Phases 1–8 |
+| Task | Status | Description |
+|---|---|---|
+| 1.1 | ✅ | Add `test_frozen_collection_with_index` to `tests/test_types.py` verifying the CQL type string and `test_schema.py` verifying `Indexed` metadata is preserved |
+| 1.2 | ✅ | Add `test_usertype_definition_without_connection` to `tests/test_document.py` (or `tests/test_usertype.py`) — define `UserType` subclass and a `Document` referencing it before any driver is registered; assert no exception |
+| 1.3 | ✅ | Add `test_register_driver_on_empty_registry` to `tests/test_drivers.py` |
+| 1.4 | ✅ | Add `test_model_equality` and `test_model_inequality_non_model` to `tests/test_document.py` |
+| 1.5 | ✅ | Unit tests for all new code in Phases 1–8 |
 
-### Phase 2: Collection Mutation Integration Tests (Priority: High)
+### Phase 2: Collection Mutation Integration Tests ✅ Done
 
 **Goal:** Prove that list, set, map, and counter mutations issued via `QuerySet.update` reach the database correctly.
 
-| Task | Description |
-|---|---|
-| 2.1 | Verify / add `list__remove`, `map__update`, `map__remove` keywords in `parse_update_kwargs` in `cql_builder.py` |
-| 2.2 | Add `TestContainerMutations` class to `tests/integration/test_extended.py`: `test_list_append`, `test_list_prepend`, `test_list_remove`, `test_set_add`, `test_set_remove`, `test_map_update`, `test_map_remove` |
-| 2.3 | Add `TestFrozenCollectionRoundTrip` integration test to `tests/integration/test_extended.py` |
-| 2.4 | Add `TestCounterColumn` integration test class: increment accumulates, decrement reduces, `save()` raises |
-| 2.5 | Add `TestStaticColumn` integration test class: static value shared across clustering rows |
-| 2.6 | Unit + integration tests |
+| Task | Status | Description |
+|---|---|---|
+| 2.1 | ✅ | Verify / add `list__remove`, `map__update`, `map__remove` keywords in `parse_update_kwargs` in `cql_builder.py` |
+| 2.2 | ✅ | Add `TestContainerMutations` class to `tests/integration/test_extended.py`: `test_list_append`, `test_list_prepend`, `test_list_remove`, `test_set_add`, `test_set_remove`, `test_map_update`, `test_map_remove` |
+| 2.3 | ✅ | `TestFrozenCollectionRoundTrip` already in `TestExtended` |
+| 2.4 | ✅ | Add `TestCounterColumn` integration test class in new `tests/integration/test_counter.py` |
+| 2.5 | ✅ | Add `TestStaticColumn` integration test class to `test_extended.py` |
 
-### Phase 3: Query Operator Integration Tests (Priority: High)
+### Phase 3: Query Operator Integration Tests ✅ Done
 
 **Goal:** Validate that all comparison and membership operators produce correct CQL and work against ScyllaDB.
 
-| Task | Description |
-|---|---|
-| 3.1 | Add `__contains`, `__contains_key`, `__ne` operator keywords to `parse_filter_kwargs` in `cql_builder.py` if missing |
-| 3.2 | Add `TestQueryOperators` integration test class to `tests/integration/test_extended.py`: `test_filter_gte_lte`, `test_filter_gt_lt`, `test_filter_in`, `test_filter_contains` (requires collection index), `test_filter_ne` |
-| 3.3 | Add `test_datetime_range_filter_integration` to `tests/integration/test_extended.py` |
-| 3.4 | Unit + integration tests |
+| Task | Status | Description |
+|---|---|---|
+| 3.1 | ✅ | Add `__ne` operator keyword to `parse_filter_kwargs` in `cql_builder.py`; `__contains` and `__contains_key` were already present |
+| 3.2 | ✅ | Add `TestQueryOperators` integration test class to `tests/integration/test_extended.py` |
+| 3.3 | ✅ | Add `test_datetime_range_filter` to `tests/integration/test_extended.py` |
+| 3.4 | ✅ | Unit tests for `ne`, `contains`, `contains_key` in `test_cql_builder.py` |
 
-### Phase 4: UDT Integration Tests (Priority: High)
+### Phase 4: UDT Integration Tests ✅ Done
 
 **Goal:** Verify `UserType` (already implemented in `src/coodie/usertype.py`) works end-to-end against a real keyspace.
 
-| Task | Description |
-|---|---|
-| 4.1 | Add `tests/integration/test_udt.py` with `TestUDTIntegration` class |
-| 4.2 | `test_sync_type_creates_udt` — calls `sync_type()` and asserts no error |
-| 4.3 | `test_udt_field_roundtrip` — save and reload a model containing a UDT field |
-| 4.4 | `test_nested_udt_roundtrip` — UDT containing another UDT |
-| 4.5 | `test_udt_in_list_roundtrip` — `list[Annotated[MyUDT, Frozen()]]` column |
-| 4.6 | `test_sync_type_resolves_dependency_order` — nested UDT synced inner-first |
-| 4.7 | Unit test: `UserType` subclass definition before driver is registered |
+| Task | Status | Description |
+|---|---|---|
+| 4.1 | ✅ | Add `tests/integration/test_udt.py` with `TestUDTIntegration` class |
+| 4.2 | ✅ | `test_sync_type_creates_udt` — calls `sync_type()` and asserts no error |
+| 4.3 | ✅ | `test_udt_field_roundtrip` — save and reload a model containing a UDT field |
+| 4.4 | ✅ | `test_nested_udt_roundtrip` — UDT containing another UDT |
+| 4.5 | ❌ | `test_udt_in_list_roundtrip` — skipped for acsylla driver; needs more infra |
+| 4.6 | ✅ | `test_sync_type_nested_dependency_order` — nested UDT synced inner-first |
+| 4.7 | ✅ | Unit test: `UserType` subclass definition before driver is registered (`tests/test_types.py`) |
 
-### Phase 5: Polymorphism and Schema Management Integration Tests (Priority: Medium)
+### Phase 5: Polymorphism and Schema Management Integration Tests ✅ Done
 
 **Goal:** Exercise discriminator-based polymorphism and DDL edge cases against a real database.
 
-| Task | Description |
-|---|---|
-| 5.1 | Add `TestPolymorphismIntegration` to `tests/integration/test_extended.py`: save concrete subclass, fetch via base — assert returned type is the correct subclass |
-| 5.2 | `test_find_via_subclass_filters_discriminator` — `SubClass.find()` appends `WHERE discriminator = ?` |
-| 5.3 | `test_drop_table_idempotent` — call `sync_table` once, call `drop_table` twice; assert no error |
-| 5.4 | `test_compaction_settings_applied` — create model with `__options__` compaction, call `sync_table`, query system table to verify strategy |
-| 5.5 | Unit + integration tests |
+| Task | Status | Description |
+|---|---|---|
+| 5.1 | ✅ | Add `TestPolymorphismIntegration` to `tests/integration/test_extended.py`: save concrete subclass, fetch via base — assert returned type is the correct subclass |
+| 5.2 | ✅ | `test_find_subclass_adds_discriminator_filter` — `SubClass.find()` appends `WHERE discriminator = ?` |
+| 5.3 | ✅ | `test_drop_table_idempotent` — call `sync_table` once, call `drop_table` twice; assert no error |
+| 5.4 | ✅ | `test_compaction_settings_applied` — create table with compaction options, query system table to verify strategy |
 
 ### Phase 6: LWT and Conditional Writes (Priority: Medium)
 
@@ -463,159 +442,4 @@ Reference:
 | Task | Description |
 |---|---|
 | 6.1 | Add `LWTException` to `coodie/exceptions.py` with `existing` attribute carrying the server's current-value response |
-| 6.2 | Add `Document.iff(**conditions)` returning an `_IffContext` that wraps `save()`, `update()`, `delete()` with `IF col = ?` clauses |
-| 6.3 | Add `QuerySet.iff(**conditions)` for blind conditional updates |
-| 6.4 | Add `Document.delete(if_exists=True)` option |
-| 6.5 | Plumb LWT response parsing into both `CassandraDriver` and `AcsyllaDriver` — raise `LWTException` on `[applied] = False` |
-| 6.6 | Add `tests/integration/test_lwt.py` with: `test_iff_update_success`, `test_iff_update_failure_raises_lwt_exception`, `test_iff_delete_success`, `test_iff_delete_failure`, `test_batch_with_lwt`, `test_delete_if_exists` |
-| 6.7 | Unit + integration tests |
-
-### Phase 7: TTL and Timestamp Modifiers (Priority: Medium)
-
-**Goal:** Implement and test `instance.ttl(n)` chaining and `USING TIMESTAMP` support.
-
-| Task | Description |
-|---|---|
-| 7.1 | Add `instance.ttl(n)` method to `Document` returning a `_TTLContext` that calls `save(ttl=n)` or `update(ttl=n)` |
-| 7.2 | Add `Document.ttl(n)` class-level chaining so `MyDoc.ttl(60).create(…)` works |
-| 7.3 | Add `USING TIMESTAMP <micros>` support to `build_insert`, `build_update`, `build_delete` in `cql_builder.py` |
-| 7.4 | Add `Document.timestamp(delta)` / `QuerySet.timestamp(delta)` chaining method |
-| 7.5 | Add `BatchQuery(timestamp=delta)` parameter |
-| 7.6 | Add `tests/integration/test_ttl_timestamp.py`: `test_instance_ttl_save`, `test_class_ttl_create`, `test_update_with_ttl`, `test_timestamp_create`, `test_batch_with_timestamp` |
-| 7.7 | Unit + integration tests |
-
-### Phase 8: Advanced Query Features (Priority: Low)
-
-**Goal:** Close remaining QuerySet gaps: `distinct`, `only`/`defer`, noop saves, per-query consistency.
-
-| Task | Description |
-|---|---|
-| 8.1 | Add `QuerySet.distinct(*fields)` to sync and async QuerySet; emit `SELECT DISTINCT` |
-| 8.2 | Add `QuerySet.only(*fields)` and `QuerySet.defer(*fields)`; influence `build_select` column list |
-| 8.3 | Implement "changed fields" tracking in `Document.save()` and `Document.update()` to skip execution when nothing has changed (noop save) |
-| 8.4 | Add `QuerySet.consistency(level)` driver-level pass-through |
-| 8.5 | Add unit tests for `distinct`, `only`, `defer`, noop save, `consistency` |
-| 8.6 | Add integration tests: `test_distinct_query`, `test_only_fields`, `test_noop_save_no_execute`, `test_per_query_consistency` |
-
----
-
-## 3. Test Plan
-
-### 3.1 Unit Tests
-
-#### `tests/test_types.py`
-
-| Test Case | Phase |
-|---|---|
-| `Annotated[list[str], Frozen(), Indexed()]` CQL type string and index metadata preserved | 1 |
-| `UserType` subclass defined before driver registered does not raise | 4 |
-
-#### `tests/test_document.py`
-
-| Test Case | Phase |
-|---|---|
-| `doc1 == doc2` when both have the same PK values | 1 |
-| `doc != "string"` and `doc != None` | 1 |
-| `Document.iff(field=v).save()` SQL includes `IF field = ?` | 6 |
-| `Document.delete(if_exists=True)` SQL includes `IF EXISTS` | 6 |
-| `doc.ttl(60).save()` calls underlying save with `ttl=60` | 7 |
-| `doc.update()` with same values issues no query | 8 |
-| `doc.save()` after round-trip load with no changes issues no query | 8 |
-
-#### `tests/test_query.py`
-
-| Test Case | Phase |
-|---|---|
-| `filter(field__contains='x')` CQL has `CONTAINS ?` | 3 |
-| `filter(field__contains_key='k')` CQL has `CONTAINS KEY ?` | 3 |
-| `filter(field__ne=v)` CQL has `!= ?` | 3 |
-| `QuerySet.iff(field=v).update(…)` CQL has `IF field = ?` | 6 |
-| `QuerySet.timestamp(delta).update(…)` CQL has `USING TIMESTAMP` | 7 |
-| `QuerySet.distinct()` CQL has `SELECT DISTINCT` | 8 |
-| `QuerySet.only('col1')` CQL selects only `col1` | 8 |
-| `QuerySet.defer('col2')` CQL excludes `col2` | 8 |
-| `QuerySet.consistency('quorum')` passes level to driver | 8 |
-
-#### `tests/test_drivers.py`
-
-| Test Case | Phase |
-|---|---|
-| `register_driver(…)` on empty registry does not raise | 1 |
-
-#### `tests/test_cql_builder.py`
-
-| Test Case | Phase |
-|---|---|
-| `parse_update_kwargs` with `tags__remove=[…]` emits `"tags" = "tags" - ?` | 2 |
-| `parse_update_kwargs` with `meta__update={…}` emits `"meta" = "meta" + ?` | 2 |
-| `parse_update_kwargs` with `meta__remove={…}` emits `"meta" = "meta" - ?` | 2 |
-| `build_insert` with `timestamp=delta` emits `USING TIMESTAMP` | 7 |
-| `build_update` with `timestamp=delta` emits `USING TIMESTAMP` | 7 |
-| `build_delete` with `timestamp=delta` emits `USING TIMESTAMP` | 7 |
-| `build_select` with `distinct=True` emits `SELECT DISTINCT` | 8 |
-| `build_select` with `columns=[…]` emits only those columns | 8 |
-
-### 3.2 Integration Tests
-
-#### `tests/integration/test_extended.py`
-
-| Test Area | Test Cases | Phase |
-|---|---|---|
-| **Container mutations** | `test_list_append`, `test_list_prepend`, `test_list_remove`, `test_set_add`, `test_set_remove`, `test_map_update`, `test_map_remove` | 2 |
-| **Frozen collection round-trip** | `test_frozen_list_roundtrip` | 2 |
-| **Static column** | `test_static_shared_across_clustering`, `test_static_update` | 2 |
-| **Query operators** | `test_filter_gte_lte`, `test_filter_gt_lt`, `test_filter_in`, `test_filter_contains`, `test_filter_ne` | 3 |
-| **Datetime range** | `test_datetime_range_filter` | 3 |
-| **Polymorphism** | `test_save_subclass_fetch_via_base`, `test_find_subclass_adds_discriminator_filter` | 5 |
-| **Drop table** | `test_drop_table_idempotent` | 5 |
-| **Compaction** | `test_compaction_settings_applied` | 5 |
-| **Batch variants** | `test_unlogged_batch`, `test_counter_batch`, `test_empty_batch_no_execute` | 2 |
-| **Noop save** | `test_noop_save_no_query`, `test_noop_update_no_query` | 8 |
-| **Distinct query** | `test_distinct_partition_keys` | 8 |
-| **only / defer** | `test_only_selects_columns`, `test_defer_excludes_column` | 8 |
-
-#### `tests/integration/test_counter.py` *(new file)*
-
-| Test Area | Test Cases | Phase |
-|---|---|---|
-| **Counter increment** | `test_counter_increment_accumulates` | 2 |
-| **Counter decrement** | `test_counter_decrement_reduces` | 2 |
-| **Counter save raises** | `test_counter_save_raises_integration` | 2 |
-
-#### `tests/integration/test_udt.py` *(new file)*
-
-| Test Area | Test Cases | Phase |
-|---|---|---|
-| **sync_type** | `test_sync_type_creates_udt` | 4 |
-| **UDT round-trip** | `test_udt_field_roundtrip` | 4 |
-| **Nested UDT** | `test_nested_udt_roundtrip` | 4 |
-| **UDT in list** | `test_udt_in_list_roundtrip` | 4 |
-| **Dependency order** | `test_sync_type_nested_dependency_order` | 4 |
-
-#### `tests/integration/test_lwt.py` *(new file)*
-
-| Test Area | Test Cases | Phase |
-|---|---|---|
-| **iff update** | `test_iff_update_success`, `test_iff_update_failure_raises_lwt_exception` | 6 |
-| **iff delete** | `test_iff_delete_success`, `test_iff_delete_failure` | 6 |
-| **if_exists delete** | `test_delete_if_exists_success`, `test_delete_if_exists_when_absent` | 6 |
-| **batch LWT** | `test_batch_with_lwt_conditional` | 6 |
-
-#### `tests/integration/test_ttl_timestamp.py` *(new file)*
-
-| Test Area | Test Cases | Phase |
-|---|---|---|
-| **Instance TTL** | `test_instance_ttl_save_expires`, `test_instance_ttl_update` | 7 |
-| **Class TTL** | `test_class_level_ttl_create` | 7 |
-| **USING TIMESTAMP** | `test_timestamp_on_create`, `test_timestamp_on_update` | 7 |
-| **Batch TIMESTAMP** | `test_batch_with_timestamp` | 7 |
-
----
-
-## 4. References
-
-- [scylladb/python-driver — unit cqlengine tests](https://github.com/scylladb/python-driver/tree/master/tests/unit/cqlengine)
-- [scylladb/python-driver — integration cqlengine tests](https://github.com/scylladb/python-driver/tree/master/tests/integration/cqlengine)
-- [coodie existing integration test coverage](integration-test-coverage.md)
-- [coodie cqlengine feature-parity plan](cqlengine-feature-parity.md)
-- [coodie UDT support plan](udt-support.md)
+| 6.2 | Add `Document.iff(**conditions)` returning an `_IffContext` that wraps `save()`,

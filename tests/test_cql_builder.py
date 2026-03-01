@@ -123,6 +123,9 @@ def test_drop_table():
         pytest.param({"price__lt": 100}, ("price", "<", 100), id="lt"),
         pytest.param({"id__in": [1, 2, 3]}, ("id", "IN", [1, 2, 3]), id="in"),
         pytest.param({"name__like": "Al%"}, ("name", "LIKE", "Al%"), id="like"),
+        pytest.param({"status__ne": "deleted"}, ("status", "!=", "deleted"), id="ne"),
+        pytest.param({"tags__contains": "x"}, ("tags", "CONTAINS", "x"), id="contains"),
+        pytest.param({"meta__contains_key": "k"}, ("meta", "CONTAINS KEY", "k"), id="contains_key"),
     ],
 )
 def test_parse_filter_kwargs(kwargs, expected_triple):

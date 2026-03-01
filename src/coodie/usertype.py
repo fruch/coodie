@@ -23,7 +23,7 @@ import re
 import typing
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 def _snake_case(name: str) -> str:
@@ -46,6 +46,19 @@ class UserType(BaseModel):
     class Settings:
         __type_name__: str = ""
         keyspace: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_namedtuple(cls, v: Any) -> Any:
+        """Convert a cassandra-driver namedtuple UDT value to a dict.
+
+        When reading UDT columns back from the database, the cassandra-driver
+        returns namedtuples rather than model instances.  This validator
+        converts them to plain dicts so Pydantic can validate them normally.
+        """
+        if hasattr(v, "_asdict"):
+            return v._asdict()
+        return v
 
     @classmethod
     def type_name(cls) -> str:

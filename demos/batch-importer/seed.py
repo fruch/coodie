@@ -212,9 +212,7 @@ def _run_logged_phase(entries: list[dict], batch_size: int) -> int:
                 for row in batch:
                     CargoEntry(**row).save(batch=bq)
             progress.advance(overall, len(batch))
-            progress.console.print(
-                f"  [orange1]✓ LOGGED  batch #{i:03d}[/] — {len(batch)} entries committed"
-            )
+            progress.console.print(f"  [orange1]✓ LOGGED  batch #{i:03d}[/] — {len(batch)} entries committed")
 
     return len(entries)
 
@@ -245,9 +243,7 @@ def _run_unlogged_phase(log_entries: list[dict], batch_size: int) -> int:
                 for row in batch:
                     ShipmentLog(**row).save(batch=bq)
             progress.advance(overall, len(batch))
-            progress.console.print(
-                f"  [steel_blue1]✓ UNLOGGED batch #{i:03d}[/] — {len(batch)} entries committed"
-            )
+            progress.console.print(f"  [steel_blue1]✓ UNLOGGED batch #{i:03d}[/] — {len(batch)} entries committed")
 
     return len(log_entries)
 

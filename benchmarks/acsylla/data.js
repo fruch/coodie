@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772388823849,
+  "lastUpdate": 1772390187991,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -8704,6 +8704,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.857691436972651e-7",
             "extra": "mean: 5.498373989891955 usec\nrounds: 7797"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "63b7b70b779cb7cfef6758a455d96b9e8f27de25",
+          "message": "fix(ci): filter standalone pipe commands from squash commit messages\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T20:35:54+02:00",
+          "tree_id": "51d2ac2e4c441f423fb80504e95d27ec1b307713",
+          "url": "https://github.com/fruch/coodie/commit/63b7b70b779cb7cfef6758a455d96b9e8f27de25"
+        },
+        "date": 1772390187289,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 80300.55220094579,
+            "unit": "iter/sec",
+            "range": "stddev: 8.229188484426411e-7",
+            "extra": "mean: 12.453214487212728 usec\nrounds: 9222"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 588006.2735551555,
+            "unit": "iter/sec",
+            "range": "stddev: 2.5519843133264803e-7",
+            "extra": "mean: 1.7006621272148708 usec\nrounds: 40166"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 684105.2719045905,
+            "unit": "iter/sec",
+            "range": "stddev: 2.4807646647115014e-7",
+            "extra": "mean: 1.4617633295178962 usec\nrounds: 45088"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 954297.937943658,
+            "unit": "iter/sec",
+            "range": "stddev: 2.231169746807841e-7",
+            "extra": "mean: 1.0478907689508603 usec\nrounds: 112880"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 1004176.1115574939,
+            "unit": "iter/sec",
+            "range": "stddev: 2.465253370152107e-7",
+            "extra": "mean: 995.841255822132 nsec\nrounds: 92627"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 843522.4692337747,
+            "unit": "iter/sec",
+            "range": "stddev: 2.533702020480044e-7",
+            "extra": "mean: 1.1855048756535957 usec\nrounds: 97628"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 192173.6126026872,
+            "unit": "iter/sec",
+            "range": "stddev: 4.964109121141446e-7",
+            "extra": "mean: 5.203628044748621 usec\nrounds: 7759"
           }
         ]
       }

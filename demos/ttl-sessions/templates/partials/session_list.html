@@ -1,0 +1,66 @@
+{% if sessions %}
+  {% for session in sessions %}
+    {# Determine TTL state for visual indicator.
+       We store ttl_seconds in the row itself as an informational field.
+       The actual remaining time is approximated from created_at + ttl_seconds. #}
+    {% set elapsed = (now - session.created_at.replace(tzinfo=None)).total_seconds() | int %}
+    {% set remaining = [session.ttl_seconds - elapsed, 0] | max %}
+    {% set pct = ((remaining / session.ttl_seconds) * 100) | int if session.ttl_seconds > 0 else 0 %}
+
+    {# Choose styling based on remaining TTL #}
+    {% if remaining <= 5 %}
+      {% set state = "crit" %}
+      {% set item_class = "ttl-critical" %}
+    {% elif remaining <= 30 %}
+      {% set state = "warn" %}
+      {% set item_class = "ttl-warning" %}
+    {% else %}
+      {% set state = "ok" %}
+      {% set item_class = "" %}
+    {% endif %}
+
+    <div class="session-item {{ item_class }}">
+      <div class="session-header">
+        <div>
+          <div class="session-user">{{ session.user_name }}</div>
+          <div class="session-token">TOKEN: {{ session.token }}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <span class="ttl-badge {{ state }}">
+            {% if remaining <= 0 %}
+              💀 EXPIRED
+            {% elif remaining <= 5 %}
+              ⚠ {{ remaining }}s
+            {% else %}
+              ⏳ {{ remaining }}s
+            {% endif %}
+          </span>
+          <button
+            class="btn btn-danger"
+            hx-delete="/ui/sessions/{{ session.token }}"
+            hx-target="#session-list"
+            hx-swap="innerHTML"
+            hx-confirm="Permanently delete this memory token?"
+          >✕</button>
+        </div>
+      </div>
+
+      <div class="session-memory">{{ session.memory_fragment }}</div>
+
+      <div class="ttl-bar-wrap">
+        <div class="ttl-bar {{ state }}" style="width: {{ pct }}%;"></div>
+      </div>
+
+      <div style="font-size:0.6rem; color:var(--dim); margin-top:0.4rem; display:flex; justify-content:space-between;">
+        <span>Stored: {{ session.created_at.strftime('%H:%M:%S') if session.created_at else '—' }}</span>
+        <span>TTL: {{ session.ttl_seconds }}s ({{ pct }}% remaining)</span>
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="empty">
+    <span class="empty-icon">👻</span>
+    <p>No active memory tokens — all memories have dissolved.</p>
+    <p style="margin-top:0.5rem; font-size:0.75rem;">Seed new tokens with <code style="color:var(--accent)">make seed</code></p>
+  </div>
+{% endif %}

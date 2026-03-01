@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772377437452,
+  "lastUpdate": 1772377706198,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -8120,6 +8120,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.952133552983288e-7",
             "extra": "mean: 5.231775730044588 usec\nrounds: 7433"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "86c46d3557a6537693f9860b5252907622d32a5b",
+          "message": "docs(perf): address code review feedback on Phase 8 plan\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T17:07:50+02:00",
+          "tree_id": "755724341dfb83e75406bab03fb0cb2b47f24085",
+          "url": "https://github.com/fruch/coodie/commit/86c46d3557a6537693f9860b5252907622d32a5b"
+        },
+        "date": 1772377705602,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52255.14938465924,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001520399497910884",
+            "extra": "mean: 19.136869988425946 usec\nrounds: 12122"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 581291.7923614106,
+            "unit": "iter/sec",
+            "range": "stddev: 4.453526851122246e-7",
+            "extra": "mean: 1.7203064160559542 usec\nrounds: 52618"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 633371.4864631675,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0459207400051924e-7",
+            "extra": "mean: 1.5788522555445872 usec\nrounds: 60828"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 848513.2511111319,
+            "unit": "iter/sec",
+            "range": "stddev: 3.2917063129023106e-7",
+            "extra": "mean: 1.1785319777746495 usec\nrounds: 160721"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 943477.7684108982,
+            "unit": "iter/sec",
+            "range": "stddev: 3.236004796838037e-7",
+            "extra": "mean: 1.0599083873320114 usec\nrounds: 111895"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 732351.1210290306,
+            "unit": "iter/sec",
+            "range": "stddev: 3.661903635818382e-7",
+            "extra": "mean: 1.3654652410375157 usec\nrounds: 146135"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 175896.59276116957,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000019347662624785676",
+            "extra": "mean: 5.68515844623431 usec\nrounds: 7826"
           }
         ]
       }

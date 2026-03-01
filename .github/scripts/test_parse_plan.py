@@ -115,6 +115,68 @@ def test_multiple_phases_first_complete_second_not():
 
 
 # ---------------------------------------------------------------------------
+# Letter-based phase header parsing (e.g., Phase A, Phase B)
+# ---------------------------------------------------------------------------
+
+
+def test_letter_phase_parsed_correctly():
+    text = "### Phase A: Foundation (Tier 1)\n\nSome content."
+    phases = parse_phases(text)
+    assert len(phases) == 1
+    assert phases[0]["number"] == "A"
+    assert phases[0]["title"] == "Foundation (Tier 1)"
+    assert phases[0]["complete"] is False
+
+
+def test_letter_phase_with_checkmark_is_complete():
+    text = "### Phase B: Core Framework ✅\n\nSome content."
+    phases = parse_phases(text)
+    assert len(phases) == 1
+    assert phases[0]["number"] == "B"
+    assert phases[0]["title"] == "Core Framework"
+    assert phases[0]["complete"] is True
+
+
+def test_letter_phases_multiple_with_status_table():
+    text = textwrap.dedent("""\
+        ### Phase A: Enhanced sync_table (Tier 1)
+
+        | Task | Description | Status |
+        |---|---|---|
+        | A.1 | Dry-run mode | ✅ Done |
+        | A.2 | Drift warnings | ✅ Done |
+
+        ### Phase B: Migration Core (Tier 2)
+
+        | Task | Description | Status |
+        |---|---|---|
+        | B.1 | Migration base class | ✅ Done |
+        | B.2 | File discovery | ✅ Done |
+
+        ### Phase C: Auto-Generation
+
+        | Task | Description | Priority |
+        |---|---|---|
+        | C.1 | Schema introspection | High |
+        | C.2 | Diff engine | High |
+    """)
+    phases = parse_phases(text)
+    assert len(phases) == 3
+    assert phases[0]["number"] == "A"
+    assert phases[0]["complete"] is True
+    assert phases[1]["number"] == "B"
+    assert phases[1]["complete"] is True
+    assert phases[2]["number"] == "C"
+    assert phases[2]["complete"] is False
+
+
+def test_letter_phases_lowercase_normalized_to_uppercase():
+    text = "### Phase a: Some Phase ✅\n\nContent."
+    phases = parse_phases(text)
+    assert phases[0]["number"] == "A"
+
+
+# ---------------------------------------------------------------------------
 # Task table completion detection
 # ---------------------------------------------------------------------------
 
@@ -231,6 +293,10 @@ def _make_phases(statuses: list[bool]) -> list[dict]:
     return [{"number": i + 1, "title": f"Phase {i + 1}", "complete": s} for i, s in enumerate(statuses)]
 
 
+def _make_letter_phases(labels: list[str], statuses: list[bool]) -> list[dict]:
+    return [{"number": lbl.upper(), "title": f"Phase {lbl}", "complete": s} for lbl, s in zip(labels, statuses)]
+
+
 def test_find_next_phase_auto_returns_first_incomplete():
     phases = _make_phases([True, True, False, False])
     result = find_next_phase(phases, "auto")
@@ -259,6 +325,33 @@ def test_find_next_phase_completed_phase_beyond_all_returns_none():
     phases = _make_phases([True, False])
     # completed_phase=5 means skip all phases ≤5; no phases > 5 exist
     result = find_next_phase(phases, "5")
+    assert result is None
+
+
+def test_find_next_phase_letter_completed_skips_before():
+    phases = _make_letter_phases(["A", "B", "C"], [True, False, False])
+    result = find_next_phase(phases, "A")
+    assert result is not None
+    assert result["number"] == "B"
+
+
+def test_find_next_phase_letter_completed_returns_next_incomplete():
+    phases = _make_letter_phases(["A", "B", "C", "D"], [True, True, False, False])
+    result = find_next_phase(phases, "B")
+    assert result is not None
+    assert result["number"] == "C"
+
+
+def test_find_next_phase_letter_beyond_all_returns_none():
+    phases = _make_letter_phases(["A", "B"], [True, True])
+    result = find_next_phase(phases, "B")
+    assert result is None
+
+
+def test_find_next_phase_unknown_letter_returns_none():
+    phases = _make_letter_phases(["A", "B", "C"], [True, False, False])
+    # Phase "Z" is not in the list → treated as past the end
+    result = find_next_phase(phases, "Z")
     assert result is None
 
 
@@ -352,7 +445,7 @@ def test_real_plan_udt_support_has_incomplete_phases():
 
     data = run_parser(str(plan_file))
     assert data["next_phase"] is not None
-    assert data["next_phase"]["number"] == 1
+    assert data["next_phase"]["number"] == 5
     assert len(data["phases"]) == 7
 
 
@@ -391,6 +484,38 @@ def test_completed_phase_argument_skips_phases():
         pytest.skip("udt-support.md not found")
 
     data = run_parser(str(plan_file), completed_phase="2")
-    # Phase 1 and 2 are "completed" by the caller; next should be Phase 3
+    # Phases 1–2 are skipped by caller; phases 3 and 4 are marked ✅ in the
+    # plan, so the first incomplete phase after phase 2 is phase 5.
     assert data["next_phase"] is not None
-    assert data["next_phase"]["number"] == 3
+    assert data["next_phase"]["number"] == 5
+
+
+def test_real_plan_migration_strategy_letter_phases():
+    plan_file = PLANS_DIR / "migration-strategy.md"
+    if not plan_file.exists():
+        pytest.skip("migration-strategy.md not found")
+
+    data = run_parser(str(plan_file))
+    # Phases A and B have all Status=✅ Done rows → detected as complete
+    assert len(data["phases"]) == 4
+    assert data["phases"][0]["number"] == "A"
+    assert data["phases"][0]["complete"] is True
+    assert data["phases"][1]["number"] == "B"
+    assert data["phases"][1]["complete"] is True
+    assert data["phases"][2]["number"] == "C"
+    assert data["phases"][2]["complete"] is False
+    # Next phase to delegate is Phase C
+    assert data["next_phase"] is not None
+    assert data["next_phase"]["number"] == "C"
+    assert data["all_complete"] is False
+
+
+def test_real_plan_migration_strategy_letter_completed_phase_arg():
+    plan_file = PLANS_DIR / "migration-strategy.md"
+    if not plan_file.exists():
+        pytest.skip("migration-strategy.md not found")
+
+    data = run_parser(str(plan_file), completed_phase="C")
+    # Caller says Phase C is done; next incomplete phase should be D
+    assert data["next_phase"] is not None
+    assert data["next_phase"]["number"] == "D"

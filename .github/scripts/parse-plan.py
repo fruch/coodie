@@ -34,9 +34,10 @@ import sys
 from pathlib import Path
 
 # Matches: ### Phase N: Title, ### Phase N — Title, ### Phase N – Title
+# Also matches letter phases: ### Phase A: Title, ### Phase B — Title, etc.
 # The title may contain ✅ at the end if the phase is marked complete.
 PHASE_HEADER_RE = re.compile(
-    r"^### Phase (\d+)\s*(?:[:\u2014\u2013\-]\s*)?(.+?)\s*$",
+    r"^### Phase (\d+|[A-Za-z])\s*(?:[:\u2014\u2013\-]\s*)?(.+?)\s*$",
     re.MULTILINE,
 )
 
@@ -136,7 +137,8 @@ def parse_phases(text: str) -> list[dict]:
     matches = list(PHASE_HEADER_RE.finditer(stripped))
 
     for i, match in enumerate(matches):
-        number = int(match.group(1))
+        raw_number = match.group(1)
+        number: int | str = int(raw_number) if raw_number.isdigit() else raw_number.upper()
         raw_title = match.group(2).strip()
         # Remove status markers from the title for display
         clean_title = raw_title.replace(CHECKMARK, "").strip()
@@ -165,13 +167,30 @@ def parse_phases(text: str) -> list[dict]:
 def find_next_phase(phases: list[dict], completed_phase: str) -> dict | None:
     """Find the next incomplete phase.
 
-    If completed_phase is a digit string, skip all phases up to and including
-    that phase number and return the first incomplete phase after it.
-    Otherwise ("auto" or empty), return the first incomplete phase overall.
+    If completed_phase is a digit string or a single letter, find that phase
+    in the list by its number/label and return the first incomplete phase after
+    it.  If the completed phase is not found and completed_phase is a digit,
+    fall back to numeric comparison (p["number"] > completed_phase_int) so that
+    specifying a phase number higher than any in the list returns None.
+    If completed_phase is "auto" or empty, return the first incomplete phase
+    overall.
     """
-    if completed_phase and completed_phase.isdigit():
-        min_number = int(completed_phase) + 1
-        candidates = [p for p in phases if p["number"] >= min_number and not p["complete"]]
+    if completed_phase and completed_phase != "auto":
+        comp_val: int | str = int(completed_phase) if completed_phase.isdigit() else completed_phase.upper()
+        comp_idx = next((i for i, p in enumerate(phases) if p["number"] == comp_val), -1)
+        if comp_idx >= 0:
+            # Found the completed phase: look for incomplete phases after it.
+            candidates = [p for p in phases[comp_idx + 1 :] if not p["complete"]]
+        elif completed_phase.isdigit():
+            # Phase number not found; fall back to numeric comparison so that
+            # a completed_phase value beyond the last phase returns None.
+            min_number = int(completed_phase) + 1
+            candidates = [
+                p for p in phases if isinstance(p["number"], int) and p["number"] >= min_number and not p["complete"]
+            ]
+        else:
+            # Letter phase not found → treat as past the end of the plan.
+            candidates = []
     else:
         candidates = [p for p in phases if not p["complete"]]
     return candidates[0] if candidates else None
@@ -199,7 +218,10 @@ def main() -> None:
 
     # Determine the output completed_phase value
     if args.completed_phase.isdigit():
-        completed_phase_out: int = int(args.completed_phase)
+        completed_phase_out: int | str = int(args.completed_phase)
+    elif args.completed_phase != "auto":
+        # Letter-based completed phase (e.g. "A", "B")
+        completed_phase_out = args.completed_phase.upper()
     elif phases:
         completed_phase_nums = [p["number"] for p in phases if p["complete"]]
         completed_phase_out = max(completed_phase_nums) if completed_phase_nums else 0

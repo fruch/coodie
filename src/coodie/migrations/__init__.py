@@ -10,12 +10,32 @@ Provides:
 
 from __future__ import annotations
 
+from coodie.migrations.autogen import (
+    DbColumnInfo,
+    SchemaDiff,
+    ColumnChange,
+    IndexChange,
+    diff_schema,
+    format_diff,
+    introspect_table,
+    next_migration_filename,
+    render_migration,
+)
 from coodie.migrations.base import Migration, MigrationContext
 from coodie.migrations.runner import MigrationRunner, discover_migrations
 
 __all__ = [
+    "ColumnChange",
+    "DbColumnInfo",
+    "IndexChange",
     "Migration",
     "MigrationContext",
     "MigrationRunner",
+    "SchemaDiff",
+    "diff_schema",
     "discover_migrations",
+    "format_diff",
+    "introspect_table",
+    "next_migration_filename",
+    "render_migration",
 ]

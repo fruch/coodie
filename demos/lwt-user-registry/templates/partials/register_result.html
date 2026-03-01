@@ -1,0 +1,26 @@
+{% if applied %}
+<div class="lwt-success">
+  ✅ <strong>Identity registered!</strong>
+  <code>INSERT INTO user_registrations (username, …) IF NOT EXISTS</code>
+  — applied. Welcome, <em>{{ username }}</em>.
+</div>
+{% else %}
+<div class="lwt-conflict">
+  <div class="conflict-title">
+    🚫 <strong>Username taken!</strong> Doppel-9 already controls this identity.
+  </div>
+  <div style="font-size:0.75rem;margin-bottom:0.4rem;">
+    <code>IF NOT EXISTS</code> rejected — <em>{{ username }}</em> is already registered:
+  </div>
+  {% if existing %}
+  <dl class="conflict-data">
+    {% for k, v in existing.items() %}
+    <dt>{{ k }}</dt><dd>{{ v }}</dd>
+    {% endfor %}
+  </dl>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Refresh the user list after registration attempt -->
+<div hx-get="/ui/users" hx-trigger="load" hx-target="#user-list-container" hx-swap="innerHTML"></div>

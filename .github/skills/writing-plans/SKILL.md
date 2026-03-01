@@ -45,6 +45,19 @@ Unnumbered or unstructured phases cause implementers to miss dependencies and wo
 Plans are living documents. Completed phases (✅) stay in the plan as a record. If scope changes, add an "Amendments" section at the end rather than rewriting history. This preserves context for anyone reading the plan later.
 </principle>
 
+<principle name="pr-body-must-link-plan">
+**Every PR that implements a plan phase must include `Plan:` and `Phase:` lines in its body.**
+
+When creating a PR that implements one or more phases of a plan in `docs/plans/`, always add:
+
+```
+Plan: docs/plans/<plan-name>.md
+Phase: N
+```
+
+The Plan Phase Continuation workflow reads these lines on merge to automatically delegate the next phase to Copilot. Without them the workflow silently skips the PR and no follow-up phase is triggered. Letter phases (e.g. `Phase: C`) are also supported.
+</principle>
+
 </essential_principles>
 
 ## When to Use

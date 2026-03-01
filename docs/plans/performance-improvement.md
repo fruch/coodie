@@ -112,7 +112,7 @@ column.
 
 ## 3. Improvement Plan
 
-### Phase 1 — Quick wins (estimated 30-50% improvement on reads)
+### Phase 1 — Quick wins (estimated 30-50% improvement on reads) ✅
 
 #### 3.1 Optimize `_rows_to_dicts()` by type-checking once
 
@@ -163,7 +163,7 @@ Replace function-level imports of `get_driver` with a module-level import
 
 **Estimated impact**: Marginal per-call (~1-5%), but compounds across all operations.
 
-### Phase 2 — `sync_table` optimization (target: ≤ 2× cqlengine)
+### Phase 2 — `sync_table` optimization (target: ≤ 2× cqlengine) ✅
 
 #### 3.4 Add table metadata cache to `CassandraDriver`
 
@@ -191,7 +191,7 @@ If the `CREATE TABLE` succeeds (table was just created), skip the
 
 **Estimated impact**: Reduces first-run `sync_table` from 3 queries to 1.
 
-### Phase 3 — Query path optimization (target: ≤ 1.5× cqlengine for reads)
+### Phase 3 — Query path optimization (target: ≤ 1.5× cqlengine for reads) ✅
 
 #### 3.6 Build CQL for `model_dump()` directly, skipping intermediate dict
 
@@ -238,7 +238,7 @@ class QuerySet:
 **Estimated impact**: Eliminates f-string CQL construction on repeat queries.
 ~5-10% faster for repeated query patterns.
 
-### Phase 4 — Filter path optimization (target: ≤ 2× for filtered queries)
+### Phase 4 — Filter path optimization (target: ≤ 2× for filtered queries) ✅
 
 #### 3.9 Optimize `parse_filter_kwargs()` string splitting
 
@@ -253,7 +253,7 @@ mutates in place until a terminal method is called.
 
 **Estimated impact**: ~10-15% faster for complex chained queries.
 
-### Phase 5 — Async optimization
+### Phase 5 — Async optimization ✅
 
 #### 3.11 Eliminate `run_in_executor` for CassandraDriver async path
 

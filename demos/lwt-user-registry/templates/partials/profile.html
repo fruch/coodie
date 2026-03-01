@@ -1,0 +1,99 @@
+<div class="card">
+  <h2>🪪 Identity Profile — {{ reg.username }}</h2>
+
+  {% if applied is defined %}
+    {% if applied %}
+    <div class="lwt-success" style="margin-bottom:1rem;">
+      ✅ Profile updated — <code>UPDATE IF version = {{ (profile.version - 1) if profile else 0 }}</code> applied.
+      Current version: <span class="version-tag">v{{ profile.version if profile else 1 }}</span>
+    </div>
+    {% elif conflict_existing %}
+    <div class="lwt-conflict" style="margin-bottom:1rem;">
+      <div class="conflict-title">
+        ⚡ Version conflict! <code>IF version = ...</code> rejected — stale read.
+      </div>
+      <div style="font-size:0.75rem;margin-bottom:0.3rem;">
+        Another agent updated the profile first. Current state from DB:
+      </div>
+      <dl class="conflict-data">
+        {% for k, v in conflict_existing.items() %}
+        <dt>{{ k }}</dt><dd>{{ v }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  <!-- Registration details -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:1rem;">
+    <div class="profile-field">
+      <div class="profile-label">Display Name</div>
+      <div class="profile-value">{{ reg.display_name }}</div>
+    </div>
+    <div class="profile-field">
+      <div class="profile-label">Dimension</div>
+      <div class="profile-value user-dim">🌀 {{ reg.dimension }}</div>
+    </div>
+    <div class="profile-field">
+      <div class="profile-label">Email</div>
+      <div class="profile-value" style="font-size:0.75rem;">{{ reg.email }}</div>
+    </div>
+    <div class="profile-field">
+      <div class="profile-label">Registered At</div>
+      <div class="profile-value" style="font-size:0.75rem;">{{ reg.registered_at.strftime('%Y-%m-%d %H:%M') if reg.registered_at else '—' }}</div>
+    </div>
+  </div>
+  <div class="profile-field" style="font-size:0.65rem;color:var(--dim);word-break:break-all;padding:0.4rem;background:rgba(0,0,0,0.3);border-radius:var(--radius);">
+    user_id: {{ reg.user_id }}
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">
+
+  <!-- Profile editor with optimistic locking -->
+  <h2 style="margin-bottom:0.75rem;">⚙️ Profile
+    {% if profile %}
+    <span class="version-tag">v{{ profile.version }}</span>
+    {% endif %}
+  </h2>
+
+  {% if profile %}
+  <div class="profile-field">
+    <div class="profile-label">Status</div>
+    <div class="profile-value">
+      <span class="status-badge status-{{ profile.status }}">{{ profile.status }}</span>
+    </div>
+  </div>
+  <div class="profile-field">
+    <div class="profile-label">Bio</div>
+    <div class="profile-value" style="font-size:0.8rem;color:var(--muted);">{{ profile.bio or '—' }}</div>
+  </div>
+  {% endif %}
+
+  <form hx-post="/ui/users/{{ reg.username }}/update-profile"
+        hx-target="#detail-panel" hx-swap="innerHTML"
+        style="margin-top:0.75rem;">
+    <label for="prof-bio">Bio</label>
+    <textarea id="prof-bio" name="bio" placeholder="Field operative specializing in…"
+              style="min-height:50px;">{{ profile.bio if profile and profile.bio else '' }}</textarea>
+    <label for="prof-status">Status</label>
+    <select id="prof-status" name="status">
+      <option value="active" {{ 'selected' if profile and profile.status == 'active' }}>active</option>
+      <option value="inactive" {{ 'selected' if profile and profile.status == 'inactive' }}>inactive</option>
+      <option value="suspended" {{ 'selected' if profile and profile.status == 'suspended' }}>suspended</option>
+    </select>
+    <input type="hidden" name="expected_version" value="{{ profile.version if profile else 0 }}">
+    <button class="btn btn-primary" type="submit" style="width:100%;">
+      ⚡ Update Profile (IF version = {{ profile.version if profile else 0 }})
+    </button>
+  </form>
+
+  <div style="margin-top:0.75rem;text-align:center;">
+    <button class="btn btn-danger btn-sm"
+            hx-delete="/ui/users/{{ reg.username }}"
+            hx-target="#user-list-container" hx-swap="innerHTML"
+            hx-confirm="Delete '{{ reg.username }}'? Uses IF EXISTS — safe to retry."
+            hx-on::after-request="document.getElementById('detail-panel').innerHTML = '<div class=card><div class=empty>Identity deregistered.</div></div>'">
+      🗑️ Deregister (IF EXISTS)
+    </button>
+  </div>
+</div>

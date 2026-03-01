@@ -65,6 +65,39 @@ This project **disables** the default line-length limits:
 
 Commits starting with `Initial plan` are exempt from linting.
 
+## PR Body Convention for Plan Phases
+
+When a PR implements a phase of a multi-phase plan in `docs/plans/`, you **must**
+include these two lines in the PR body:
+
+```
+Plan: docs/plans/<plan-name>.md
+Phase: N
+```
+
+- **`Plan:`** — relative path to the plan file
+- **`Phase:`** — the phase number (or letter, e.g. `A`, `B`) this PR completes
+
+The [Plan Phase Continuation](../../.github/workflows/plan-continuation.yml)
+workflow reads these lines on merge and automatically delegates the next
+incomplete phase to Copilot. Without them the workflow cannot identify which
+plan to advance.
+
+**Example:**
+
+```
+Implements Phase 3 of the UDT support plan.
+
+Plan: docs/plans/udt-support.md
+Phase: 3
+```
+
+If the branch follows the naming convention `plan/<plan-name>/phase-N` the
+workflow uses the branch name as a fallback, but an explicit `Plan:`/`Phase:`
+in the PR body is always preferred and more reliable.
+
+---
+
 ## Examples
 
 ```

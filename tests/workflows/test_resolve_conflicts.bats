@@ -308,3 +308,68 @@ EOF
     [ "$status" -eq 0 ]
     grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
 }
+
+@test "Copilot times out → status=unresolved and timeout logged" {
+    export COPILOT_TIMEOUT=1
+
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+
+    _mock_git_conflicts "foo.py"
+
+    # Slow copilot that outlasts COPILOT_TIMEOUT
+    cat > "$MOCK_BIN/copilot" << 'MOCK'
+#!/usr/bin/env bash
+sleep 5
+printf 'x = 2\n'
+MOCK
+    chmod +x "$MOCK_BIN/copilot"
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
+    [[ "$output" == *"timed out"* ]]
+}
+
+@test "Copilot returns empty → empty-output diagnostic logged" {
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+    _mock_git_conflicts "foo.py"
+    _mock_copilot ""
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
+    [[ "$output" == *"empty output"* ]]
+}
+
+@test "file size and conflict marker count logged before Copilot call" {
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+    _mock_git_conflicts "foo.py"
+    _mock_copilot ""
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Attempting to resolve: foo.py"* ]]
+    [[ "$output" == *"bytes"* ]]
+    [[ "$output" == *"conflict marker"* ]]
+}

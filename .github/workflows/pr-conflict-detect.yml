@@ -1,0 +1,65 @@
+name: PR Conflict Detection
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-conflicts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # ── Push to default branch: check all open PRs ──────────
+      - name: Check all open PRs for conflicts
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_numbers=$(gh pr list --state open --json number -q '.[].number')
+          for pr_number in $pr_numbers; do
+            git fetch origin "pull/${pr_number}/head:refs/pr/${pr_number}" || continue
+
+            git checkout -f "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+
+            if git merge --no-commit --no-ff "refs/pr/${pr_number}" >/dev/null 2>&1; then
+              echo "PR #${pr_number}: clean"
+              gh pr edit "$pr_number" --remove-label "conflict" || true
+            else
+              echo "PR #${pr_number}: conflict"
+              gh pr edit "$pr_number" --add-label "conflict" || true
+            fi
+            git merge --abort 2>/dev/null || true
+            git reset --hard "origin/${{ github.ref_name }}"
+          done
+
+      # ── Pull request event: check the triggering PR ─────────
+      - name: Check PR for conflicts
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          git fetch origin "$BASE_REF"
+          git checkout -f "origin/$BASE_REF"
+
+          if git merge --no-commit --no-ff "$HEAD_SHA" >/dev/null 2>&1; then
+            echo "PR #${PR_NUMBER}: clean"
+            gh pr edit "$PR_NUMBER" --remove-label "conflict" || true
+          else
+            echo "PR #${PR_NUMBER}: conflict"
+            gh pr edit "$PR_NUMBER" --add-label "conflict" || true
+          fi
+          git merge --abort 2>/dev/null || true

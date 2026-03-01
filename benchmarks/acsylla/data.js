@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772393423512,
+  "lastUpdate": 1772393490146,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9215,6 +9215,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.708282428883849e-7",
             "extra": "mean: 5.257710326801213 usec\nrounds: 8047"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "b5932b31e932d3bec1aa59b3705394e003f9e480",
+          "message": "fix(drivers): make _serialize_params fully recursive and fix empty-list handling\n\n- Add _serialize_param() helper that recursively handles lists, sets, tuples,\n  dicts and BaseModel instances\n- Fix execute_async() to use `if params else None` instead of `or None` to\n  avoid passing None when params is explicitly an empty list\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-01T21:30:55+02:00",
+          "tree_id": "170e524c04188adfe439a09544558fa0b4b96708",
+          "url": "https://github.com/fruch/coodie/commit/b5932b31e932d3bec1aa59b3705394e003f9e480"
+        },
+        "date": 1772393489603,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52565.43738897823,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018816819355679006",
+            "extra": "mean: 19.023907146441385 usec\nrounds: 8325"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 593181.6765537666,
+            "unit": "iter/sec",
+            "range": "stddev: 4.185147262535044e-7",
+            "extra": "mean: 1.685824157296536 usec\nrounds: 43266"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 598440.8309477376,
+            "unit": "iter/sec",
+            "range": "stddev: 3.9194818414355037e-7",
+            "extra": "mean: 1.6710089758018718 usec\nrounds: 47126"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 825937.1476286541,
+            "unit": "iter/sec",
+            "range": "stddev: 3.70494772063161e-7",
+            "extra": "mean: 1.2107458816583045 usec\nrounds: 116064"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 848014.201237588,
+            "unit": "iter/sec",
+            "range": "stddev: 3.509731173482691e-7",
+            "extra": "mean: 1.179225534832559 usec\nrounds: 78285"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 729118.6781182896,
+            "unit": "iter/sec",
+            "range": "stddev: 3.8946669036761724e-7",
+            "extra": "mean: 1.3715188350143508 usec\nrounds: 87789"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190461.99173040793,
+            "unit": "iter/sec",
+            "range": "stddev: 7.993884634674112e-7",
+            "extra": "mean: 5.25039138210559 usec\nrounds: 6661"
           }
         ]
       }

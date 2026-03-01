@@ -365,9 +365,9 @@ The maturity scorecard (Task 5.6) will weigh these trade-offs.
 
 ---
 
-## 8. Phase 5 Amendment: Benchmark Results & Maturity Scorecard
+## 7. Phase 5 Amendment: Benchmark Results & Maturity Scorecard
 
-### 8.1 Benchmark Infrastructure (Task 5.1)
+### 7.1 Benchmark Infrastructure (Task 5.1)
 
 `PythonRsDriver` has been added as a fourth `--driver-type` option in
 `benchmarks/conftest.py`.  The benchmark suite now supports all three coodie
@@ -383,7 +383,7 @@ The `coodie_connection` fixture creates a python-rs-driver session via
 benchmark files (INSERT, SELECT, UPDATE, DELETE, batch, schema, collections,
 UDT, serialization, Argus patterns) run unchanged with the python-rs backend.
 
-### 8.2 CRUD Benchmark Coverage (Tasks 5.2–5.3)
+### 7.2 CRUD Benchmark Coverage (Tasks 5.2–5.3)
 
 The following benchmark files exercise all three drivers:
 
@@ -405,7 +405,7 @@ The following benchmark files exercise all three drivers:
 > with PythonRsDriver since it only requires the general `execute()` method,
 > unlike a driver-level batch API.
 
-### 8.3 Argus-Inspired Patterns (Task 5.3)
+### 7.3 Argus-Inspired Patterns (Task 5.3)
 
 The `bench_argus.py` file exercises 10 real-world patterns derived from the
 ScyllaDB Argus CI dashboard:
@@ -424,7 +424,7 @@ ScyllaDB Argus CI dashboard:
 All patterns run identically across CassandraDriver, AcsyllaDriver, and
 PythonRsDriver via the `bench_env` fixture.
 
-### 8.4 Latency & Throughput Metrics (Task 5.4)
+### 7.4 Latency & Throughput Metrics (Task 5.4)
 
 Benchmark results are collected via `pytest-benchmark` with the standard
 metrics: min, max, mean, stddev, rounds, and OPS (operations/second).
@@ -452,7 +452,7 @@ pytest-benchmark compare 0001_scylla 0002_acsylla 0003_python-rs --group-by=grou
 | Prepared stmt cache | Driver-level | Driver-level | coodie-level (`_prepared` dict) |
 | Paging support | Full | Full | No resume (no paging_state) |
 
-### 8.5 Maturity Scorecard (Task 5.6)
+### 7.5 Maturity Scorecard (Task 5.6)
 
 | Dimension | Score | Notes |
 |---|---|---|
@@ -472,7 +472,7 @@ for the detailed upstream gap tracking.
 
 ---
 
-## 7. References
+## 8. References
 
 - [python-rs-driver repository](https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver)
 - [scylla-rust-driver](https://github.com/scylladb/scylla-rust-driver) — underlying Rust driver

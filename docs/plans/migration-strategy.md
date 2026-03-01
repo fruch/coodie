@@ -519,12 +519,12 @@ communicates that it is an internal/system table.
 
 ### Phase D: Data Migrations (Tier 3)
 
-| Task | Description | Priority |
-|---|---|---|
-| D.1 | `ctx.scan_table()` — token-range batched iteration | Medium |
-| D.2 | Progress reporting and logging | Medium |
-| D.3 | Resume-from-token support for interrupted migrations | Low |
-| D.4 | Rate limiting / throttle support | Low |
+| Task | Description | Priority | Status |
+|---|---|---|---|
+| D.1 | `ctx.scan_table()` — token-range batched iteration | Medium | ✅ Done |
+| D.2 | Progress reporting and logging | Medium | ✅ Done |
+| D.3 | Resume-from-token support for interrupted migrations | Low | ✅ Done |
+| D.4 | Rate limiting / throttle support | Low | ✅ Done |
 
 ---
 

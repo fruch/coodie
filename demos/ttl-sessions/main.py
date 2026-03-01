@@ -12,7 +12,7 @@ __version__ = "0.1.0"
 
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
 from uuid import UUID
@@ -102,7 +102,7 @@ async def ui_index(request: Request) -> HTMLResponse:
 @app.get("/ui/sessions", response_class=HTMLResponse)
 async def ui_list_sessions(request: Request) -> HTMLResponse:
     sessions = await Session.find().allow_filtering().all()
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     return templates.TemplateResponse(
         "partials/session_list.html",
         {"request": request, "sessions": sessions, "now": now},
@@ -124,7 +124,7 @@ async def ui_create_session(
     )
     await session.save(ttl=ttl)
     sessions = await Session.find().allow_filtering().all()
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     return templates.TemplateResponse(
         "partials/session_list.html",
         {"request": request, "sessions": sessions, "now": now},
@@ -138,7 +138,7 @@ async def ui_delete_session(request: Request, token: UUID) -> HTMLResponse:
     if session:
         await session.delete()
     sessions = await Session.find().allow_filtering().all()
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     return templates.TemplateResponse(
         "partials/session_list.html",
         {"request": request, "sessions": sessions, "now": now},

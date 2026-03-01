@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772377307031,
+  "lastUpdate": 1772377437452,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -8047,6 +8047,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.936828873110056e-7",
             "extra": "mean: 5.37252687746314 usec\nrounds: 7683"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "f9f55c7b4a47578550e59000f1bc037dfddc98c2",
+          "message": "test(integration): add CounterDocument integration tests\n\nAdd integration tests for CounterDocument covering increment, decrement,\nand read operations using a PageView model with view_count and unique_visitors\ncounter fields.\n\nFix NULL counter column handling: ScyllaDB returns NULL for counter columns that\nhave never been incremented.\nAdd field_validator(mode=\"before\") coercions on PageView to map None to 0,\npreventing Pydantic ValidationError on first read.",
+          "timestamp": "2026-03-01T17:03:20+02:00",
+          "tree_id": "43e740713805d234d1379cc6b4e19a42d10d91e4",
+          "url": "https://github.com/fruch/coodie/commit/f9f55c7b4a47578550e59000f1bc037dfddc98c2"
+        },
+        "date": 1772377436614,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53222.0545584822,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018905164995537486",
+            "extra": "mean: 18.789203240945277 usec\nrounds: 7405"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 586360.1849221347,
+            "unit": "iter/sec",
+            "range": "stddev: 5.820199731341483e-7",
+            "extra": "mean: 1.7054363950935623 usec\nrounds: 27773"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 597214.3188027679,
+            "unit": "iter/sec",
+            "range": "stddev: 6.183481875194252e-7",
+            "extra": "mean: 1.674440763584996 usec\nrounds: 42170"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 833388.0828000807,
+            "unit": "iter/sec",
+            "range": "stddev: 3.8322563906480277e-7",
+            "extra": "mean: 1.1999211659472306 usec\nrounds: 80828"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 915878.6143309516,
+            "unit": "iter/sec",
+            "range": "stddev: 2.894440994759837e-7",
+            "extra": "mean: 1.0918477452718984 usec\nrounds: 33063"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 747382.5996869768,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7770847508978585e-7",
+            "extra": "mean: 1.3380027852117857 usec\nrounds: 85092"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 191139.69168389362,
+            "unit": "iter/sec",
+            "range": "stddev: 8.952133552983288e-7",
+            "extra": "mean: 5.231775730044588 usec\nrounds: 7433"
           }
         ]
       }

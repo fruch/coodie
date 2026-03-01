@@ -85,6 +85,15 @@ teardown() {
   [[ "$MESSAGE" != *"Permission denied"* ]]
 }
 
+@test "Copilot output has standalone pipe commands — stripped out" {
+  export TITLE="feat(demos): add ttl-sessions demo"
+  printf '  | head -5\n\nAdd a ttl-sessions demo with FastAPI.\n' > "$COPILOT_OUTPUT_FILE"
+  export PR_BODY=""
+  source "$SCRIPT_DIR/build-squash-message.sh"
+  [[ "$MESSAGE" == *"Add a ttl-sessions demo with FastAPI."* ]]
+  [[ "$MESSAGE" != *"| head"* ]]
+}
+
 @test "Copilot output has check-success markers — stripped out" {
   export TITLE="fix: typo"
   printf '✓ Verified changes\nFixed typo in README\n' > "$COPILOT_OUTPUT_FILE"

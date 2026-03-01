@@ -170,6 +170,23 @@ async def test_init_coodie_async_acsylla_with_hosts():
     assert get_driver() is driver
     mock_acsylla.create_cluster.assert_called_once()
     mock_cluster.create_session.assert_awaited_once_with(keyspace="ks")
+    # AcsyllaDriver.connect() routes session to bg loop for sync bridge
+    assert driver._bridge_to_bg_loop is True
+    _registry.clear()
+
+
+async def test_init_coodie_async_acsylla_with_session_no_bridge():
+    """Pre-created session passed to init_coodie_async keeps _bridge_to_bg_loop=False."""
+    _registry.clear()
+    mock_session = MagicMock()
+    with patch.dict("sys.modules", {"acsylla": MagicMock()}):
+        driver = await init_coodie_async(
+            session=mock_session,
+            keyspace="ks",
+            driver_type="acsylla",
+        )
+    assert get_driver() is driver
+    assert driver._bridge_to_bg_loop is False
     _registry.clear()
 
 

@@ -4,10 +4,10 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-01 (post-merge: Phase C migration autogen done,
-> LWT user-registry demo shipped, PR conflict detection workflow shipped,
-> lazy connection done, `delete_columns()` done, connection-level
-> optimizations done, python-rs Phases 1–4 done, counter tests done)
+> **Last reviewed:** 2026-03-01 (post-merge: Phase D data migrations done,
+> /solve command workflow shipped, resolve-conflicts.sh merge mode done,
+> sync-api Phase 1 done, partial UPDATE integration tests done,
+> cqlengine test Phases 2–5 done, vector search WIP in PR #150)
 
 ---
 
@@ -28,11 +28,9 @@
 
 *Source: `migration-strategy.md`*
 
-> *Phase A (enhanced `sync_table`) is ✅ Done. Phase B (migration framework core) is ✅ Done — `src/coodie/migrations/` exists with `base.py`, `runner.py`, `cli.py`, and `coodie migrate` CLI. Phase C (auto-generation) is ✅ Done — `src/coodie/migrations/autogen.py` with `coodie makemigration`, `coodie schema-diff`, checksum validation, 47 tests. Only Phase D remains.*
+> *Phase A (enhanced `sync_table`) is ✅ Done. Phase B (migration framework core) is ✅ Done. Phase C (auto-generation) is ✅ Done. Phase D (data migrations) is ✅ Done — `ctx.scan_table()` with token-range iteration, progress logging, `resume_token`, `throttle_seconds`, 15 tests. All migration phases complete.*
 
-### 1.1 Phase D — Data Migrations (Tier 3)
-
-> **Prompt:** Implement data migration support for coodie's migration framework. Add `ctx.scan_table(keyspace, table)` to `MigrationContext` that uses token-range queries to iterate over all rows in batches without loading the entire table into memory. Add progress reporting (log percentage for long-running migrations). Add resume-from-token support so a failed migration can resume where it stopped. Add optional rate limiting / throttle support. See `docs/plans/migration-strategy.md` Phase D (tasks D.1–D.4).
+*No remaining items — entire migration framework is implemented.*
 
 ---
 
@@ -108,6 +106,8 @@
 
 ### 4.6 Vector Similarity Search (Library + Demo)
 
+> **⚠️ IN PROGRESS — [PR #150](https://github.com/fruch/coodie/pull/150) (WIP/draft): Vector column support + demo. Library work (Vector, VectorIndex annotations, CQL builder, ANN queries, unit tests) is done; demo creation in progress.**
+
 > **Prompt:** Add vector column support to coodie and create a vector search demo. **Library work:** (1) Add `Vector(dimensions=N)` field annotation to `coodie/fields.py` mapping to CQL `vector<float, N>`. (2) Update `coodie/schema.py` to emit `vector<float, N>` in DDL. (3) Add `VectorIndex(similarity_function="COSINE")` annotation for `CREATE INDEX ... USING 'vector_index'`. (4) Support ANN queries via a QuerySet method that emits `ORDER BY field ANN OF [...]` CQL. (5) Validate vector dimensions on save. (6) Add unit and integration tests. **Demo work:** Create `demos/vector-search/` — semantic product search using sentence-transformer embeddings with ANN queries. See `docs/plans/demos-extension-plan.md` Phase 6.
 
 ### 4.7 Time-Series IoT Demo
@@ -136,37 +136,21 @@
 
 *Source: `cqlengine-test-coverage-plan.md`*
 
-> *Phase 1 (unit test completeness) is ✅ Done. `map__update` collection operator is ✅ Done in `cql_builder.py`. Counter integration tests are ✅ Done (`tests/integration/test_counter.py`). Phases 2–8 (remaining integration tests) still needed.*
+> *Phase 1 (unit test completeness) is ✅ Done. `map__update` collection operator is ✅ Done. Counter integration tests are ✅ Done. Phase 2 (container mutations) is ✅ Done — `test_extended.py` covers list/set/map mutations, frozen collections. Phase 3 (query operators) is ✅ Done — `__ne` operator in `cql_builder.py`, datetime range filters. Phase 4 (UDT) is ✅ Done — `test_udt.py` covers save/load, nested UDTs, optional UDT. Phase 5 (polymorphism + schema) is ✅ Done — `test_extended.py` covers discriminator hierarchy, drop_table, schema migration. Phases 6–8 remain (LWT conditionals, TTL/timestamp, advanced query features).*
 
-### 5.1 Collection Mutation Integration Tests
-
-> **Prompt:** Add integration tests for collection mutation operations against a real ScyllaDB instance. Currently only unit tests exist. Test: (1) `list__append` and `list__prepend` round-trip. (2) `set__add` and `set__remove` round-trip. (3) `map__update` and `map__remove` round-trip (`map__update` is now implemented in `cql_builder.py`). (4) Frozen collection round-trip. See `docs/plans/cqlengine-test-coverage-plan.md` Phase 2 (tasks 2.1–2.6).
-
-### 5.2 Static Column Integration Tests
-
-> **Prompt:** Add integration tests for static columns. Test: (1) Static column value shared across all clustering rows in a partition. (2) Updating a static column updates the value for all clustering rows. See `docs/plans/cqlengine-test-coverage-plan.md` §1.2.
-
-### 5.3 LWT Conditional Write Integration Tests
+### 5.1 LWT Conditional Write Integration Tests
 
 > **Prompt:** Add integration tests for `Document.update(if_conditions={...})` — UPDATE with conditional `IF col = ?` clauses. Test: successful conditional update (condition met), failed conditional update (condition not met, returns `[applied]=false`), and the LWT result type. See `docs/plans/cqlengine-test-coverage-plan.md` §1.5.
 
-### 5.4 TTL and Timestamp Modifier Integration Tests
+### 5.2 TTL and Timestamp Modifier Integration Tests
 
 > **Prompt:** Add integration tests for TTL and USING TIMESTAMP modifiers. Test: (1) `save(ttl=N)` causes row to expire. (2) `__default_ttl__` in Settings applies TTL to all saves. (3) `save(timestamp=...)` uses explicit write timestamp. (4) `QuerySet.ttl(N)` on bulk update. See `docs/plans/cqlengine-test-coverage-plan.md` §1.6.
 
-### 5.5 UDT Integration Tests
-
-> **Prompt:** Add integration tests for User-Defined Types. Test: (1) Define a model with a UDT column, `sync_type()` + `sync_table()`, INSERT, SELECT round-trip. (2) Nested UDTs. (3) UDTs inside collections (`list[MyUDT]`). (4) Optional UDT field with `None`. UDT is now implemented in `src/coodie/usertype.py`. See `docs/plans/cqlengine-test-coverage-plan.md` §1.7.
-
-### 5.6 Schema Management Integration Tests
-
-> **Prompt:** Add integration tests for schema management edge cases. Test: (1) `sync_table()` idempotency (multiple calls don't raise). (2) `sync_table()` with `drop_removed_indexes=True` drops stale indexes. (3) Table options (`compaction`, `gc_grace_seconds`) applied via `Settings.__options__`. See `docs/plans/cqlengine-test-coverage-plan.md` §1.8.
-
-### 5.7 Batch Write Integration Tests
+### 5.3 Batch Write Integration Tests
 
 > **Prompt:** Add integration tests for batch writes against a real ScyllaDB instance. Test: (1) Logged batch with multiple models. (2) Unlogged batch. (3) Counter batch. (4) Batch context manager rollback (exception during batch). See `docs/plans/cqlengine-test-coverage-plan.md` §1.9.
 
-### 5.8 Advanced Query Feature Integration Tests
+### 5.4 Advanced Query Feature Integration Tests
 
 > **Prompt:** Add integration tests for advanced query features. Test: (1) `per_partition_limit(N)` returns exactly N rows per partition. (2) Token-range queries with `__token__gt` / `__token__lt`. (3) `values_list()` returns tuples instead of Documents. (4) `only(*cols)` and `defer(*cols)` column projection. See `docs/plans/cqlengine-test-coverage-plan.md` §1.10.
 
@@ -176,17 +160,13 @@
 
 *Source: `integration-test-coverage.md`*
 
-> *These are features that exist in the codebase but lack integration test coverage. Note: pagination tests were added in `tests/integration/test_pagination.py` (✅ Done).*
+> *These are features that exist in the codebase but lack integration test coverage. Pagination tests are ✅ Done. Partial UPDATE tests are ✅ Done (`tests/integration/test_update.py` — 257 lines: partial field update, TTL, IF conditions, IF EXISTS, collection mutations).*
 
-### 6.1 Partial UPDATE Integration Tests
-
-> **Prompt:** Add integration tests for partial UPDATE operations via `Document.update(**kwargs)`. Test: updating individual fields without a full INSERT (upsert), UPDATE with TTL, UPDATE with IF conditions, and collection mutation operators (`column__add`, `column__remove`, `column__append`, `column__prepend`). See `docs/plans/integration-test-coverage.md` §"build_update".
-
-### 6.2 Custom Index Name Integration Tests
+### 6.1 Custom Index Name Integration Tests
 
 > **Prompt:** Add integration tests verifying that `Indexed(index_name="my_custom_idx")` creates a named secondary index and that the index is queryable. See `docs/plans/integration-test-coverage.md` §"Secondary index with custom index_name".
 
-### 6.3 AcsyllaDriver Integration Tests
+### 6.2 AcsyllaDriver Integration Tests
 
 > **Prompt:** Add CI workflow support and integration tests for the `AcsyllaDriver` (async native driver at `src/coodie/drivers/acsylla.py`). Currently all async integration tests run through the `CassandraDriver` asyncio bridge. Add a separate CI workflow or matrix entry targeting the `acsylla` driver. See `docs/plans/integration-test-coverage.md` §"AcsyllaDriver".
 
@@ -196,25 +176,21 @@
 
 *Source: `sync-api-support.md`*
 
-> *AcsyllaDriver's `connect()` classmethod supports sync, but `init_coodie_async()` and `init_coodie()` host-based paths do not. PythonRsDriver exists (`src/coodie/drivers/python_rs.py`) but uses `run_until_complete()` instead of the proper background-thread sync bridge. All 5 phases are pending.*
+> *Phase 1 is ✅ Done — `init_coodie_async(driver_type="acsylla", hosts=...)` now routes through `AcsyllaDriver.connect()` with `_bridge_to_bg_loop = True`. PythonRsDriver exists (`src/coodie/drivers/python_rs.py`) but uses `run_until_complete()` instead of the proper background-thread sync bridge. Phases 2–5 remain.*
 
-### 7.1 Fix AcsyllaDriver `init_coodie_async` Sync Path
-
-> **Prompt:** Fix `init_coodie_async(driver_type="acsylla", hosts=...)` so the returned driver has `_bridge_to_bg_loop = True` and sync calls work. Currently, the session is created on the caller's event loop instead of the background loop that powers the sync bridge. Replace `acsylla.create_cluster(...).create_session()` with `AcsyllaDriver.connect(session_factory=lambda: ...)` in the acsylla path of `init_coodie_async()`. See `docs/plans/sync-api-support.md` Phase 1 (tasks 1.1–1.4).
-
-### 7.2 Add sync-capable `init_coodie` for AcsyllaDriver
+### 7.1 Add sync-capable `init_coodie` for AcsyllaDriver
 
 > **Prompt:** Allow `init_coodie(driver_type="acsylla", hosts=...)` to auto-create a sync-capable session instead of raising `ConfigurationError`. Add `AcsyllaDriver.connect_sync(hosts, keyspace, **kwargs)` — a blocking classmethod that bootstraps the background loop and creates the session on it. Add a `UserWarning` when `AcsyllaDriver(session=...)` is used directly (sync calls may not work). See `docs/plans/sync-api-support.md` Phase 2 (tasks 2.1–2.5).
 
-### 7.3 Upgrade PythonRsDriver to Sync Bridge
+### 7.2 Upgrade PythonRsDriver to Sync Bridge
 
 > **Prompt:** Upgrade `src/coodie/drivers/python_rs.py` to use a proper background-thread sync bridge (same pattern as `AcsyllaDriver`) instead of `loop.run_until_complete()`. The file already exists with basic async+sync via `run_until_complete()`. Add: (1) `_bridge_to_bg_loop` flag and background event-loop thread. (2) `execute()` via `run_coroutine_threadsafe()`. (3) `PythonRsDriver.connect(session_factory, default_keyspace)` classmethod. (4) Update `init_coodie()` / `init_coodie_async()` to use `PythonRsDriver.connect()`. See `docs/plans/sync-api-support.md` Phase 3 (tasks 3.5, 3.6, 3.9, 3.10).
 
-### 7.4 Sync API Integration Tests
+### 7.3 Sync API Integration Tests
 
 > **Prompt:** Verify both AcsyllaDriver and PythonRsDriver pass the integration test suite in sync and async variants. Add `"python-rs"` to `--driver-type` choices, create `create_python_rs_session()` helper, update `coodie_driver` fixture, and add CI matrix entries for both drivers. See `docs/plans/sync-api-support.md` Phase 4 (tasks 4.1–4.5).
 
-### 7.5 Sync API Documentation
+### 7.4 Sync API Documentation
 
 > **Prompt:** Document the sync bridge pattern, supported init paths, and caveats for AcsyllaDriver and PythonRsDriver. Update class docstrings and `init_coodie()`/`init_coodie_async()` docstrings. See `docs/plans/sync-api-support.md` Phase 5 (tasks 5.1–5.3).
 
@@ -224,20 +200,12 @@
 
 *Source: `pr-conflict-detection-solve.md`*
 
-> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). Phase 1 (conflict detection workflow) is ✅ Done — `.github/workflows/pr-conflict-detect.yml` shipped. Phases 2–5 remain.*
+> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). Phase 1 (conflict detection workflow) is ✅ Done — `.github/workflows/pr-conflict-detect.yml` shipped. Phase 2 (`/solve` slash-command) is ✅ Done — `.github/workflows/pr-solve-command.yml` shipped (207 lines). Phase 3 (shared conflict-resolution script) is ✅ Done — `resolve-conflicts.sh` supports `RESOLVE_MODE=merge|rebase`. Phases 4–5 remain.*
 
-### 8.1 `/solve` Slash-Command Workflow
-
-> **Prompt:** Create `.github/workflows/pr-solve-command.yml` — a workflow triggered by `issue_comment` with `/solve` command. Checkout the PR branch, attempt `git merge origin/<base>`, and if conflicts exist, invoke Copilot CLI to resolve them (reusing logic from `resolve-conflicts.sh`). Push the merge commit. See `docs/plans/pr-conflict-detection-solve.md` Phase 2 (tasks 2.1–2.6).
-
-### 8.2 Shared Conflict-Resolution Script
-
-> **Prompt:** Extract and generalize the conflict-resolution logic from the existing `resolve-conflicts.sh` (rebase-focused) into a shared script that also supports merge-based resolution. Add a `--strategy` flag (`rebase` vs `merge`). Update both the existing `/rebase` workflow and the new `/solve` workflow to use the shared script. See `docs/plans/pr-conflict-detection-solve.md` Phase 3 (tasks 3.1–3.5).
-
-### 8.3 Safety Gates & Edge Cases
+### 8.1 Safety Gates & Edge Cases
 
 > **Prompt:** Add safety gates to the conflict detection and `/solve` workflows: draft PR skip, max file limit, protected branch checks, binary file conflict handling, concurrent run prevention. See `docs/plans/pr-conflict-detection-solve.md` Phase 4 (tasks 4.1–4.6).
 
-### 8.4 Testing & Documentation
+### 8.2 Testing & Documentation
 
 > **Prompt:** Add Bats tests for the shared conflict-resolution script, Python workflow convention tests, and update `CONTRIBUTING.md` with `/solve` command documentation. See `docs/plans/pr-conflict-detection-solve.md` Phase 5 (tasks 5.1–5.4).

@@ -35,10 +35,11 @@ make db-up
 ### 2. Run the batch import
 
 ```bash
-make seed                                    # 200 entries (default)
-uv run python seed.py --count 500            # custom count
-uv run python seed.py --batch-size 25        # smaller batches
-uv run python seed.py --feed manifest.csv    # import from CSV file
+make seed                                          # generate + import 200 entries
+uv run python seed.py --count 500                  # custom count
+uv run python seed.py --batch-size 25              # smaller batches
+make seed-csv                                      # import bundled sample_manifest.csv (100 entries)
+uv run python seed.py --feed sample_manifest.csv   # same, run directly
 ```
 
 ### 3. Clean up
@@ -60,13 +61,23 @@ make clean
 |---|---|
 | `make db-up` | Start ScyllaDB and create the `cargo` keyspace |
 | `make db-down` | Stop ScyllaDB |
-| `make seed` | Run the batch import (depends on `db-up`) |
+| `make seed` | Generate and import 200 random entries (depends on `db-up`) |
+| `make seed-csv` | Import the bundled `sample_manifest.csv` (100 entries, depends on `db-up`) |
 | `make clean` | Stop DB and remove data volumes |
 | `make test` | Run the smoke test |
 
 ## CSV Import Format
 
-When using `--feed`, provide a CSV file with the following header:
+A bundled `sample_manifest.csv` (100 rows) is included in the demo directory
+and can be imported directly:
+
+```bash
+make seed-csv
+# or
+uv run python seed.py --feed sample_manifest.csv
+```
+
+When providing your own CSV file, it must use the following header:
 
 ```
 name,origin_system,destination_system,cargo_type,mass_kg,status
@@ -80,14 +91,6 @@ name,origin_system,destination_system,cargo_type,mass_kg,status
 | `cargo_type` | string | ✓ | Type of cargo (e.g. `crystalline`) |
 | `mass_kg` | float | ✓ | Mass in kilograms |
 | `status` | string | | Import status (default: `pending`) |
-
-Example `manifest.csv`:
-
-```csv
-name,origin_system,destination_system,cargo_type,mass_kg,status
-Dilithium Crystal Cluster — Batch 001,Kepler-442b,ScyllaDB Prime,crystalline,1250.5,pending
-Quantum Flux Regulators — Batch 002,TRAPPIST-1e,Cassandra Station,mechanical,8320.0,in_transit
-```
 
 ## Batch Types Explained
 

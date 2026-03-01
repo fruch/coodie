@@ -1,7 +1,7 @@
 COMPOSE  := docker compose -f ../docker-compose.yml
 KEYSPACE := cargo
 
-.PHONY: db-up db-down seed clean test
+.PHONY: db-up db-down seed seed-csv clean test
 
 db-up:                          ## Start ScyllaDB and create keyspace
 	@echo ""
@@ -29,6 +29,11 @@ seed: db-up                     ## Run batch import (depends on db-up)
 	@echo "  📦 Deploying counter-manifest against LoadMaster..."
 	@echo ""
 	uv run python seed.py --count 200
+
+seed-csv: db-up                 ## Import the bundled sample_manifest.csv (100 entries)
+	@echo "  📂 Importing sample_manifest.csv..."
+	@echo ""
+	uv run python seed.py --feed sample_manifest.csv
 
 clean: db-down                  ## Stop DB and remove data volumes
 	$(COMPOSE) down -v

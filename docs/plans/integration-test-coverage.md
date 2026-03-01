@@ -46,6 +46,12 @@ against a real ScyllaDB instance.
 | `save()` — upsert / INSERT | All CRUD tests |
 | `insert()` — INSERT IF NOT EXISTS (LWT) | `TestSyncExtended.test_insert_if_not_exists_*`, `TestAsyncExtended.test_insert_if_not_exists` |
 | `save(ttl=N)` — TTL | `TestSyncIntegration.test_ttl_row_expires`, `TestAsyncIntegration.test_ttl_row_expires` |
+| `document.update(**kwargs)` — partial UPDATE | `TestPartialUpdate.test_update_individual_fields`, `test_update_multiple_fields`, `test_update_in_memory_model` |
+| `document.update(ttl=N)` — UPDATE with TTL | `TestPartialUpdate.test_update_with_ttl` |
+| `document.update(if_conditions={…})` — LWT | `TestPartialUpdate.test_update_if_conditions_applied`, `test_update_if_conditions_not_applied` |
+| `document.update(if_exists=True)` — LWT | `TestPartialUpdate.test_update_if_exists_applied`, `test_update_if_exists_not_applied` |
+| Collection mutation (`__add`, `__remove`) | `TestPartialUpdate.test_update_set_add`, `test_update_set_remove`, `test_update_map_add` |
+| Collection mutation (`__append`, `__prepend`) | `TestPartialUpdate.test_update_list_append`, `test_update_list_prepend` |
 | `document.delete()` — DELETE by PK | `TestSyncIntegration.test_delete`, `TestAsyncIntegration.test_delete` |
 | Batch writes (`build_batch`) | `TestSyncExtended.test_batch_insert`, `TestAsyncExtended.test_batch_insert` |
 
@@ -98,12 +104,11 @@ cover: full-table scans of >fetch_size rows, page-token hand-off, and async
 paged iteration.
 
 ### UPDATE with IF conditions (LWT)
-**Status: `build_update` in `cql_builder.py` supports `if_conditions`, but there
-is no Document-level API to trigger it.**
-`Document.save()` always generates a plain INSERT (upsert), not an UPDATE with
-a conditional `IF col = ?` clause. Until a `document.update(if_conditions={...})`
-or `QuerySet.update(set_data, if_conditions)` method is added, this cannot be
-tested end-to-end through the public API.
+**Status: covered.**
+`Document.update(if_conditions={...})` and `Document.update(if_exists=True)`
+are tested in `TestPartialUpdate` (see `tests/integration/test_update.py`).
+Partial field updates, TTL on UPDATE, and collection mutation operators are
+also covered.
 
 ### Counter columns
 **Status: partially implemented — `Counter` field marker exists in `fields.py`
@@ -116,12 +121,11 @@ an INSERT, saving a counter document would raise a server error. Tests are
 omitted until a dedicated counter API is provided.
 
 ### `build_update` (raw UPDATE statements)
-**Status: `build_update` and `build_delete` with column-list are implemented
-in `cql_builder.py` but are not exposed via the Document or QuerySet API.**
-They can be invoked directly via `driver.execute()` with a hand-crafted CQL
-string; however, the public-facing API does not yet surface UPDATE semantics
-(partial field updates, TTL on UPDATE, IF conditions). Tests will be added once
-the high-level API wraps these builders.
+**Status: covered via `Document.update(**kwargs)` API.**
+`Document.update()` wraps `build_update` and `parse_update_kwargs` from
+`cql_builder.py`. Integration tests in `tests/integration/test_update.py`
+cover partial field updates, TTL, IF conditions, IF EXISTS, and collection
+mutation operators (`__add`, `__remove`, `__append`, `__prepend`).
 
 ### `build_select` with `per_partition_limit`
 **Status: `per_partition_limit` is accepted by `build_select` in `cql_builder.py`

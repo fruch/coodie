@@ -264,7 +264,7 @@ recursively constructs nested `UserType` instances.
 
 ## 3. Implementation Phases
 
-### Phase 1: Core UserType Module (Priority: High)
+### Phase 1: Core UserType Module (Priority: High) ✅
 
 **Goal:** Create the `UserType` base class with type name resolution and Settings support.
 
@@ -277,7 +277,7 @@ recursively constructs nested `UserType` instances.
 | 1.5 | Export `UserType` from `coodie.__init__` and `coodie.usertype` |
 | 1.6 | Unit tests for `UserType` class, `type_name()`, and Settings resolution |
 
-### Phase 2: CQL Builder Support (Priority: High)
+### Phase 2: CQL Builder Support (Priority: High) ✅
 
 **Goal:** Generate `CREATE TYPE`, `DROP TYPE`, and `ALTER TYPE ADD` CQL statements.
 
@@ -288,7 +288,7 @@ recursively constructs nested `UserType` instances.
 | 2.3 | Add `build_alter_type_add(type_name, keyspace, field_name, cql_type)` to `cql_builder.py` — generates `ALTER TYPE ks.type_name ADD field_name cql_type` |
 | 2.4 | Unit tests for all three CQL builder functions |
 
-### Phase 3: Type System Integration (Priority: High)
+### Phase 3: Type System Integration (Priority: High) ✅
 
 **Goal:** Make `python_type_to_cql_type_str()` recognize `UserType` subclasses and emit correct CQL types.
 
@@ -304,7 +304,7 @@ recursively constructs nested `UserType` instances.
 | 3.8 | Add `_extract_udt_classes(doc_cls)` helper to `schema.py` — returns all `UserType` subclasses referenced by a `Document` (direct + nested, topologically sorted) |
 | 3.9 | Unit tests for all type resolution scenarios |
 
-### Phase 4: Schema Sync — `sync_type()` (Priority: High)
+### Phase 4: Schema Sync — `sync_type()` (Priority: High) ✅
 
 **Goal:** Create and update UDT schemas in the database.
 

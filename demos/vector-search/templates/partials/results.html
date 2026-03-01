@@ -1,0 +1,75 @@
+{% if not results %}
+<p style="color: var(--muted); text-align: center; padding: 2rem 0; font-size: 0.82rem;">
+    ⬡ &nbsp; No results found for "<em>{{ query }}</em>" — try rephrasing your query.
+</p>
+{% else %}
+<p style="color: var(--muted); margin-bottom: 1rem; font-size: 0.78rem; letter-spacing: 0.05em;">
+    ⬡ &nbsp; TOP <strong style="color: var(--accent);">{{ results|length }}</strong>
+    NEAREST NEIGHBORS for "<em style="color: var(--text);">{{ query }}</em>"
+    &nbsp;·&nbsp; ranked by cosine similarity
+</p>
+
+{% for item in results %}
+<div style="
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.65rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+"
+onmouseover="this.style.borderColor='var(--border-glow)'"
+onmouseout="this.style.borderColor='var(--border)'"
+>
+    <div style="
+        position: absolute; top: 0; left: 0; right: 0; height: 1px;
+        background: linear-gradient(90deg, transparent,
+            {% if item.score >= 0.8 %}rgba(52,211,153,0.4){% elif item.score >= 0.5 %}rgba(251,191,36,0.3){% else %}rgba(129,140,248,0.2){% endif %},
+            transparent);
+    "></div>
+
+    <div style="
+        min-width: 58px; text-align: center;
+        padding: 0.4rem 0.5rem;
+        background: {% if item.score >= 0.8 %}rgba(52,211,153,0.1){% elif item.score >= 0.5 %}rgba(251,191,36,0.1){% else %}rgba(129,140,248,0.08){% endif %};
+        border: 1px solid {% if item.score >= 0.8 %}rgba(52,211,153,0.4){% elif item.score >= 0.5 %}rgba(251,191,36,0.4){% else %}var(--border){% endif %};
+        border-radius: var(--radius);
+        font-weight: 700;
+        font-size: 1rem;
+        color: {% if item.score >= 0.8 %}var(--success){% elif item.score >= 0.5 %}var(--warning){% else %}var(--muted){% endif %};
+        flex-shrink: 0;
+    ">
+        {{ "%.0f"|format(item.score * 100) }}<span style="font-size:0.6rem; font-weight:400;">%</span>
+    </div>
+
+    <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: 700; color: var(--text); margin-bottom: 0.2rem; font-size: 0.9rem;">
+            {{ item.product.name }}
+        </div>
+        <div style="font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; line-height: 1.5;">
+            {{ item.product.description }}
+        </div>
+        <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; font-size: 0.72rem;">
+            <span style="
+                background: rgba(129,140,248,0.1);
+                color: var(--accent);
+                padding: 0.1rem 0.5rem;
+                border-radius: 99px;
+                border: 1px solid var(--accent-dim);
+            ">{{ item.product.category }}</span>
+            <span style="color: var(--success); font-weight: 700; font-size: 0.85rem;">
+                ${{ "%.2f"|format(item.product.price) }}
+            </span>
+            <span style="color: var(--dim); margin-left: auto;">
+                distance: {{ "%.4f"|format(1 - item.score) }}
+            </span>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}

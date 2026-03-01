@@ -27,10 +27,10 @@ jobs:
             MERGEABLE=""
             for i in $(seq 1 5); do
               MERGEABLE=$(gh api "/repos/${{ github.repository }}/pulls/${pr_number}" --jq '.mergeable // empty')
+              echo "PR #${pr_number}: attempt $i/5, mergeable=$MERGEABLE"
               if [ -n "$MERGEABLE" ]; then
                 break
               fi
-              echo "Mergeability not yet computed for PR #${pr_number} (attempt $i/5), waiting..."
               sleep 2
             done
 
@@ -59,10 +59,10 @@ jobs:
           MERGEABLE=""
           for i in $(seq 1 5); do
             MERGEABLE=$(gh api "/repos/${{ github.repository }}/pulls/${PR_NUMBER}" --jq '.mergeable // empty')
+            echo "PR #${PR_NUMBER}: attempt $i/5, mergeable=$MERGEABLE"
             if [ -n "$MERGEABLE" ]; then
               break
             fi
-            echo "Mergeability not yet computed (attempt $i/5), waiting..."
             sleep 2
           done
 

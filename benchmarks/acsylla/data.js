@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772387656358,
+  "lastUpdate": 1772388585632,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -8558,6 +8558,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.523334204552649e-7",
             "extra": "mean: 5.269373305493789 usec\nrounds: 6713"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "b73985fe72bd758cc33f1bc5959161dd53ca6b75",
+          "message": "feat(migrations): phase C — makemigration, schema-diff, checksum validation\n\n  76c49a6 fc57185 2>/dev/null | head -60\n\nImplement Phase C of the migrations system: automatic schema diff and migration file generation.\n\nAdd `src/coodie/migrations/autogen.py` with `introspect_table`, `diff_schema`, `render_migration`, `next_migration_filename`, and `format_diff` — functions that compare a live keyspace against model definitions and produce ready-to-apply migration files. Extend `src/coodie/migrations/cli.py` with two new commands: `makemigration` (generates a migration file from detected schema drift) and `schema-diff` (prints a human-readable diff without writing files). Add checksum validation to `migrate --status` (Phase C.5). Export the new public API from `src/coodie/migrations/__init__.py`.\n\nCover the new functionality with 47 tests in `tests/test_migrations_autogen.py`, and add an API warning to `autogen.py` recommending the CLI over direct programmatic use. Follow-up commits apply ruff lint and format fixes.",
+          "timestamp": "2026-03-01T20:09:14+02:00",
+          "tree_id": "4993fc0286b402dd635dbd640e295e9d46562d82",
+          "url": "https://github.com/fruch/coodie/commit/b73985fe72bd758cc33f1bc5959161dd53ca6b75"
+        },
+        "date": 1772388585213,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52919.39552435561,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000017788564842258363",
+            "extra": "mean: 18.896663313921646 usec\nrounds: 9047"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 559169.3589327917,
+            "unit": "iter/sec",
+            "range": "stddev: 7.760483357608598e-7",
+            "extra": "mean: 1.7883669482686966 usec\nrounds: 46993"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 628698.4111384748,
+            "unit": "iter/sec",
+            "range": "stddev: 3.741663370525594e-7",
+            "extra": "mean: 1.59058776399507 usec\nrounds: 51422"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 812828.363761169,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4819472642803475e-7",
+            "extra": "mean: 1.2302720286146744 usec\nrounds: 152370"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 947612.4814778895,
+            "unit": "iter/sec",
+            "range": "stddev: 3.214118398766308e-7",
+            "extra": "mean: 1.0552836940691277 usec\nrounds: 90654"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 734212.592443327,
+            "unit": "iter/sec",
+            "range": "stddev: 3.6458504512588983e-7",
+            "extra": "mean: 1.3620033356717303 usec\nrounds: 98630"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188026.70174587084,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010091682226003451",
+            "extra": "mean: 5.318393561737624 usec\nrounds: 6741"
           }
         ]
       }

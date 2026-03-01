@@ -113,6 +113,8 @@ async def init_coodie_async(
             import acsylla  # type: ignore[import-untyped]
         except ImportError as exc:
             raise ImportError("acsylla is required for AcsyllaDriver. Install it with: pip install acsylla") from exc
+        from coodie.drivers.acsylla import AcsyllaDriver
+
         if ssl_enabled is not None:
             kwargs["ssl_enabled"] = ssl_enabled
         if ssl_trusted_cert is not None:
@@ -123,8 +125,17 @@ async def init_coodie_async(
             kwargs["ssl_private_key"] = ssl_private_key
         if ssl_verify_flags is not None:
             kwargs["ssl_verify_flags"] = ssl_verify_flags
-        cluster = acsylla.create_cluster(hosts, **kwargs)
-        session = await cluster.create_session(keyspace=keyspace)
+
+        async def _make_session() -> Any:
+            cluster = acsylla.create_cluster(hosts, **kwargs)
+            return await cluster.create_session(keyspace=keyspace)
+
+        driver: AbstractDriver = AcsyllaDriver.connect(
+            session_factory=_make_session,
+            default_keyspace=keyspace,
+        )
+        register_driver(name, driver, default=True)
+        return driver
 
     if driver_type == "acsylla":
         from coodie.drivers.acsylla import AcsyllaDriver
@@ -134,7 +145,7 @@ async def init_coodie_async(
                 "AcsyllaDriver requires a pre-created acsylla session. "
                 "Pass session= or use init_coodie_async() with hosts."
             )
-        driver: AbstractDriver = AcsyllaDriver(session=session, default_keyspace=keyspace)
+        driver = AcsyllaDriver(session=session, default_keyspace=keyspace)
         register_driver(name, driver, default=True)
         return driver
 

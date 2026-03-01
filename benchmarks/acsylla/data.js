@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772393490146,
+  "lastUpdate": 1772394020676,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9288,6 +9288,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.993884634674112e-7",
             "extra": "mean: 5.25039138210559 usec\nrounds: 6661"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "19356ff91193a050f591b90baddf094ec06d88eb",
+          "message": "feat(migrations): add data migration support (Phase D.1–D.4)\n\nAdd scan_table() to the migrations context object, enabling data migrations to iterate over all partitions in a table using token-range chunking.\n\nProgress is logged at 10% intervals. Callers can pass resume_token to skip ahead after a restart, and throttle_seconds to rate-limit between chunks. All behaviour is covered by 15 new unit tests.",
+          "timestamp": "2026-03-01T21:39:38+02:00",
+          "tree_id": "687ebceb03970610bfd210a5336680d3fdcfd429",
+          "url": "https://github.com/fruch/coodie/commit/19356ff91193a050f591b90baddf094ec06d88eb"
+        },
+        "date": 1772394019961,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52468.74736093493,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001744563498667509",
+            "extra": "mean: 19.05896462747536 usec\nrounds: 12750"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 585342.7160215747,
+            "unit": "iter/sec",
+            "range": "stddev: 4.378035862251971e-7",
+            "extra": "mean: 1.7084008609464647 usec\nrounds: 53894"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 594978.5895011561,
+            "unit": "iter/sec",
+            "range": "stddev: 4.296024599668182e-7",
+            "extra": "mean: 1.6807327484480126 usec\nrounds: 58473"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 832821.4196862129,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4150693648765624e-7",
+            "extra": "mean: 1.2007376087622432 usec\nrounds: 157208"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 841941.9273432279,
+            "unit": "iter/sec",
+            "range": "stddev: 3.615951997814775e-7",
+            "extra": "mean: 1.1877303737034794 usec\nrounds: 106770"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 715584.3364532088,
+            "unit": "iter/sec",
+            "range": "stddev: 5.355992549809413e-7",
+            "extra": "mean: 1.397459319688992 usec\nrounds: 144259"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 184828.14452107318,
+            "unit": "iter/sec",
+            "range": "stddev: 9.784542882628036e-7",
+            "extra": "mean: 5.4104314177432276 usec\nrounds: 7378"
           }
         ]
       }

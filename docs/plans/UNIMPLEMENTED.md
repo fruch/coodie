@@ -4,10 +4,10 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-01 (post-merge: lazy connection done,
-> `delete_columns()` done, connection-level optimizations done,
-> python-rs Phases 1–4 done, counter integration tests done,
-> new plan: python-rs-feature-gaps)
+> **Last reviewed:** 2026-03-01 (post-merge: Phase C migration autogen done,
+> LWT user-registry demo shipped, PR conflict detection workflow shipped,
+> lazy connection done, `delete_columns()` done, connection-level
+> optimizations done, python-rs Phases 1–4 done, counter tests done)
 
 ---
 
@@ -28,13 +28,9 @@
 
 *Source: `migration-strategy.md`*
 
-> *Phase A (enhanced `sync_table`) is ✅ Done. Phase B (migration framework core) is ✅ Done — `src/coodie/migrations/` exists with `base.py`, `runner.py`, `cli.py`, and `coodie migrate` CLI. Phases C and D remain.*
+> *Phase A (enhanced `sync_table`) is ✅ Done. Phase B (migration framework core) is ✅ Done — `src/coodie/migrations/` exists with `base.py`, `runner.py`, `cli.py`, and `coodie migrate` CLI. Phase C (auto-generation) is ✅ Done — `src/coodie/migrations/autogen.py` with `coodie makemigration`, `coodie schema-diff`, checksum validation, 47 tests. Only Phase D remains.*
 
-### 1.1 Phase C — Auto-Generation (`coodie makemigration`)
-
-> **Prompt:** Implement migration auto-generation for coodie. Add a `coodie makemigration --name <description>` CLI command that: (1) introspects the live database schema via `system_schema.columns` and `system_schema.tables`, (2) diffs against the current `Document` class definitions, (3) generates a migration file with `upgrade()` containing the required CQL statements, (4) flags unsafe or unsupported operations (e.g., primary key changes) with TODO comments and warnings. The generated file should follow the `YYYYMMDD_NNN_description.py` naming convention and define a `ForwardMigration(Migration)` class. Also add a `coodie schema-diff` command that shows the diff without creating a file. See `docs/plans/migration-strategy.md` Phase C (tasks C.1–C.5).
-
-### 1.2 Phase D — Data Migrations (Tier 3)
+### 1.1 Phase D — Data Migrations (Tier 3)
 
 > **Prompt:** Implement data migration support for coodie's migration framework. Add `ctx.scan_table(keyspace, table)` to `MigrationContext` that uses token-range queries to iterate over all rows in batches without loading the entire table into memory. Add progress reporting (log percentage for long-running migrations). Add resume-from-token support so a failed migration can resume where it stopped. Add optional rate limiting / throttle support. See `docs/plans/migration-strategy.md` Phase D (tasks D.1–D.4).
 
@@ -88,7 +84,7 @@
 
 *Source: `demos-extension-plan.md`*
 
-> *3 demos exist: `demos/fastapi-catalog/`, `demos/flask-blog/`, and `demos/django-taskboard/` (✅). Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for 11+ additional demos.*
+> *4 demos exist: `demos/fastapi-catalog/`, `demos/flask-blog/`, `demos/django-taskboard/` (✅), and `demos/lwt-user-registry/` (✅). Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for 10+ additional demos.*
 
 ### 4.1 TTL & Ephemeral Data Demo
 
@@ -98,43 +94,39 @@
 
 > **Prompt:** Create `demos/realtime-counters/` — a page-view analytics demo showcasing coodie's `CounterDocument`, `increment()`, and `decrement()`. Build a live analytics dashboard showing counter updates in real-time. Add `seed.py` to generate synthetic traffic, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.2).
 
-### 4.3 Lightweight Transactions Demo
-
-> **Prompt:** Create `demos/lwt-user-registry/` — a user registration demo showcasing coodie's Lightweight Transactions (`if_not_exists`, `if_exists`, `if_conditions`). Demonstrate uniqueness guarantees and optimistic locking patterns. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.3).
-
-### 4.4 Batch Operations Demo
+### 4.3 Batch Operations Demo
 
 > **Prompt:** Create `demos/batch-importer/` — a CSV bulk import tool demo showcasing coodie's `BatchQuery` with logged and unlogged batches. Use `rich` for progress bars during import. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.1).
 
-### 4.5 Collections & Tags Demo
+### 4.4 Collections & Tags Demo
 
 > **Prompt:** Create `demos/collections-tags/` — an article tagging system demo showcasing coodie's collection types (`list`, `set`, `map` fields) and collection mutation operations (`add__`, `remove__`, `append__`, `prepend__`). Include frozen collection examples. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.2).
 
-### 4.6 Materialized Views Demo
+### 4.5 Materialized Views Demo
 
 > **Prompt:** Create `demos/materialized-views/` — a product catalog demo with auto-maintained `MaterializedView` by category. Show `sync_view()`, read-only queries against the view, and how the view auto-updates when the base table changes. Add `seed.py`, UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.3).
 
-### 4.7 Vector Similarity Search (Library + Demo)
+### 4.6 Vector Similarity Search (Library + Demo)
 
 > **Prompt:** Add vector column support to coodie and create a vector search demo. **Library work:** (1) Add `Vector(dimensions=N)` field annotation to `coodie/fields.py` mapping to CQL `vector<float, N>`. (2) Update `coodie/schema.py` to emit `vector<float, N>` in DDL. (3) Add `VectorIndex(similarity_function="COSINE")` annotation for `CREATE INDEX ... USING 'vector_index'`. (4) Support ANN queries via a QuerySet method that emits `ORDER BY field ANN OF [...]` CQL. (5) Validate vector dimensions on save. (6) Add unit and integration tests. **Demo work:** Create `demos/vector-search/` — semantic product search using sentence-transformer embeddings with ANN queries. See `docs/plans/demos-extension-plan.md` Phase 6.
 
-### 4.8 Time-Series IoT Demo
+### 4.7 Time-Series IoT Demo
 
 > **Prompt:** Create `demos/timeseries-iot/` — an IoT sensor data demo showcasing time-bucketed partitions, clustering keys with DESC order, `per_partition_limit()`, and `paged_all()` for pagination. Add `seed.py` generating synthetic sensor readings, colorful dashboard UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.1).
 
-### 4.9 Polymorphic CMS Demo
+### 4.8 Polymorphic CMS Demo
 
 > **Prompt:** Create `demos/polymorphic-cms/` — a content management system demo showcasing coodie's single-table inheritance with `Discriminator` column. Define `Article`, `Video`, and `Podcast` subtypes sharing a single table. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.2).
 
-### 4.10 Argus-Style Test Tracker Demo
+### 4.9 Argus-Style Test Tracker Demo
 
 > **Prompt:** Create `demos/argus-tracker/` — a scaled-down test tracker inspired by scylladb/argus. Define complex models: User, TestRun (composite PK + clustering), Event (compound partition), Notification (TimeUUID). Include batch event ingestion, prepared-statement caching patterns, and partition-scoped queries. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.1).
 
-### 4.11 cqlengine → coodie Migration Guide Demo
+### 4.10 cqlengine → coodie Migration Guide Demo
 
 > **Prompt:** Create `demos/migration-guide/` — a side-by-side migration walkthrough from cqlengine to coodie. Include `cqlengine_models.py` and `coodie_models.py` with equivalent models, a `migrate.py` script that syncs tables, and a `verify.py` that checks data round-trip. Reference argus model patterns. Add `README.md` with step-by-step walkthrough. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.3).
 
-### 4.12 Schema Migrations Demo
+### 4.11 Schema Migrations Demo
 
 > **Prompt:** Create `demos/schema-migrations/` — a demo showcasing coodie's Phase B migration framework CLI (`coodie migrate`). Demonstrate `apply`, `rollback`, `dry-run`, and state tracking with the `_coodie_migrations` table. Include sample migration files following the `YYYYMMDD_NNN_description.py` pattern. Add `Makefile` and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 10 reference.
 
@@ -232,24 +224,20 @@
 
 *Source: `pr-conflict-detection-solve.md`*
 
-> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). All 5 workflow phases are pending — no conflict detection or `/solve` command workflows exist yet.*
+> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). Phase 1 (conflict detection workflow) is ✅ Done — `.github/workflows/pr-conflict-detect.yml` shipped. Phases 2–5 remain.*
 
-### 8.1 Conflict Detection & Labeling Workflow
-
-> **Prompt:** Create `.github/workflows/pr-conflict-detect.yml` — a workflow that detects merge conflicts on PRs. Trigger on `push` to default branch and `pull_request` events (`opened`, `synchronize`, `reopened`). For each open PR, attempt `git merge --no-commit --no-ff` and add/remove the `conflict` label based on result. See `docs/plans/pr-conflict-detection-solve.md` Phase 1 (tasks 1.1–1.5).
-
-### 8.2 `/solve` Slash-Command Workflow
+### 8.1 `/solve` Slash-Command Workflow
 
 > **Prompt:** Create `.github/workflows/pr-solve-command.yml` — a workflow triggered by `issue_comment` with `/solve` command. Checkout the PR branch, attempt `git merge origin/<base>`, and if conflicts exist, invoke Copilot CLI to resolve them (reusing logic from `resolve-conflicts.sh`). Push the merge commit. See `docs/plans/pr-conflict-detection-solve.md` Phase 2 (tasks 2.1–2.6).
 
-### 8.3 Shared Conflict-Resolution Script
+### 8.2 Shared Conflict-Resolution Script
 
 > **Prompt:** Extract and generalize the conflict-resolution logic from the existing `resolve-conflicts.sh` (rebase-focused) into a shared script that also supports merge-based resolution. Add a `--strategy` flag (`rebase` vs `merge`). Update both the existing `/rebase` workflow and the new `/solve` workflow to use the shared script. See `docs/plans/pr-conflict-detection-solve.md` Phase 3 (tasks 3.1–3.5).
 
-### 8.4 Safety Gates & Edge Cases
+### 8.3 Safety Gates & Edge Cases
 
 > **Prompt:** Add safety gates to the conflict detection and `/solve` workflows: draft PR skip, max file limit, protected branch checks, binary file conflict handling, concurrent run prevention. See `docs/plans/pr-conflict-detection-solve.md` Phase 4 (tasks 4.1–4.6).
 
-### 8.5 Testing & Documentation
+### 8.4 Testing & Documentation
 
 > **Prompt:** Add Bats tests for the shared conflict-resolution script, Python workflow convention tests, and update `CONTRIBUTING.md` with `/solve` command documentation. See `docs/plans/pr-conflict-detection-solve.md` Phase 5 (tasks 5.1–5.4).

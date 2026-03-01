@@ -28,6 +28,7 @@ seeds sample data, and launches the app.
 | 🛒 Product Catalog | FastAPI + HTMX | Async CRUD, secondary indexes, clustering order, Jinja2 templates, seed data | [`fastapi-catalog/`](fastapi-catalog/) |
 | 📝 Blog | Flask + Jinja2 | Sync CRUD, clustering keys (newest-first), secondary indexes, tags (list field), seed data | [`flask-blog/`](flask-blog/) |
 | 🐝 Task Board | Django | Sync API, dual-database pattern, counter columns, Kanban UI | [`django-taskboard/`](django-taskboard/) |
+| 🔮 Materialized Views | FastAPI + HTMX | `MaterializedView`, `sync_view()`, read-only queries, auto-updating views | [`materialized-views/`](materialized-views/) |
 
 ## Shared Infrastructure
 

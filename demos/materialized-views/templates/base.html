@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>🔮 The Oracle's Mirror — Dimension-9</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root {
+      --bg: #0a0812; --bg-deep: #06040d; --surface: #131020;
+      --surface-hover: #1a1530; --border: #2a2044; --border-glow: #3d2b6b;
+      --text: #d0c8e5; --muted: #7c6b9f; --dim: #4d3a6c;
+      --accent: #a855f7; --accent-glow: #9333ea; --accent-dim: #581c87;
+      --accent-hover: #c084fc; --danger: #ef4444; --danger-dim: #7f1d1d;
+      --success: #10b981; --warning: #f59e0b;
+      --silver: #cbd5e1; --silver-dim: #64748b;
+      --radius: 6px; --radius-lg: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Courier New', 'Fira Code', monospace;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(168,85,247,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(147,51,234,0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(203,213,225,0.02) 0%, transparent 50%);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); text-shadow: 0 0 8px rgba(168,85,247,0.4); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+    @media (min-width: 768px) { .container { padding: 1.5rem; } }
+
+    /* --- Header --- */
+    header {
+      background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border-glow);
+      padding: 0.75rem 0;
+      position: relative; overflow: hidden;
+    }
+    header::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-glow), var(--silver-dim), var(--accent-glow), transparent);
+      animation: header-scan 4s linear infinite;
+    }
+    @keyframes header-scan {
+      0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; }
+    }
+    header .container {
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    }
+    header h1 {
+      font-size: 1.1rem; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    @media (min-width: 768px) { header h1 { font-size: 1.3rem; } }
+    header h1 .glyph { color: var(--accent); text-shadow: 0 0 12px rgba(168,85,247,0.5); }
+    header .badge {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
+      background: linear-gradient(135deg, var(--accent-dim), var(--border-glow));
+      color: var(--accent); padding: 3px 10px; border-radius: 99px;
+      border: 1px solid var(--accent-dim); text-transform: uppercase;
+      animation: badge-pulse 3s ease-in-out infinite;
+    }
+    @keyframes badge-pulse {
+      0%, 100% { box-shadow: 0 0 4px rgba(168,85,247,0.2); }
+      50% { box-shadow: 0 0 12px rgba(168,85,247,0.5); }
+    }
+
+    /* --- Story lore panel --- */
+    .lore-panel {
+      background: linear-gradient(135deg, rgba(19,16,32,0.95), rgba(10,8,18,0.98));
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-dim);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.7;
+      position: relative; overflow: hidden;
+    }
+    .lore-panel::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 100%;
+      background: linear-gradient(90deg, rgba(168,85,247,0.03), transparent 30%);
+      pointer-events: none;
+    }
+    .lore-panel .lore-title {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--accent-dim);
+      margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;
+    }
+    .lore-panel .lore-title::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+    .lore-panel em { color: var(--accent); font-style: normal; font-weight: 600; }
+    .lore-panel strong { color: var(--danger); font-weight: 700; }
+
+    /* --- Grid layout --- */
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; }
+    @media (min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; } }
+
+    /* --- Card (solid, for base table) --- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-glow), transparent);
+    }
+    .card h2 {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; margin-bottom: 1rem; color: var(--accent-dim);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    /* --- Glass card (for materialized views) --- */
+    .card-glass {
+      background: rgba(19,16,32,0.6);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      position: relative; overflow: hidden;
+    }
+    .card-glass::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.5;
+    }
+    .card-glass h2 {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; margin-bottom: 1rem; color: var(--accent);
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    /* --- Form elements --- */
+    label {
+      display: block; font-size: 0.7rem; font-weight: 600;
+      color: var(--dim); margin-bottom: 0.3rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    input, textarea, select {
+      width: 100%; padding: 0.5rem 0.75rem;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-family: inherit; font-size: 0.85rem; margin-bottom: 0.75rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none; border-color: var(--accent-dim);
+      box-shadow: 0 0 0 2px rgba(168,85,247,0.15), inset 0 0 8px rgba(168,85,247,0.05);
+    }
+    input::placeholder, textarea::placeholder { color: var(--dim); font-style: italic; }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* --- Buttons --- */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.5rem 1rem; border: none; border-radius: var(--radius);
+      font-family: inherit; font-size: 0.8rem; font-weight: 700;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-dim), var(--accent-glow));
+      color: #fff; border: 1px solid var(--accent-dim);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--accent-glow), var(--accent));
+      box-shadow: 0 0 16px rgba(168,85,247,0.3);
+    }
+    .btn-danger {
+      background: transparent; color: var(--danger);
+      border: 1px solid var(--danger-dim); padding: 0.25rem 0.5rem;
+      font-size: 0.65rem;
+    }
+    .btn-danger:hover {
+      background: var(--danger-dim); color: #fff;
+      box-shadow: 0 0 8px rgba(239,68,68,0.3);
+    }
+
+    /* --- Product items --- */
+    .product-item {
+      display: flex; justify-content: space-between; align-items: start;
+      padding: 0.75rem 1rem; border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 0.5rem;
+      transition: all 0.3s; position: relative;
+      background: var(--bg-deep);
+    }
+    .product-item::after {
+      content: '';
+      position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(168,85,247,0.04), transparent);
+      transition: left 0.6s;
+    }
+    .product-item:hover {
+      border-color: var(--accent-dim);
+      background: var(--surface-hover);
+      box-shadow: 0 0 20px rgba(168,85,247,0.06), inset 0 0 20px rgba(168,85,247,0.02);
+    }
+    .product-item:hover::after { left: 100%; }
+    .product-name { font-weight: 700; font-size: 0.9rem; color: var(--text); }
+    .product-meta {
+      font-size: 0.7rem; color: var(--dim); margin-top: 2px;
+      letter-spacing: 0.03em;
+    }
+    .product-price {
+      font-weight: 700; color: var(--success); white-space: nowrap;
+      font-size: 0.9rem; text-shadow: 0 0 6px rgba(16,185,129,0.3);
+    }
+
+    /* --- Read-only badge --- */
+    .readonly-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.55rem; font-weight: 700; color: var(--silver);
+      letter-spacing: 0.1em; text-transform: uppercase;
+      background: rgba(203,213,225,0.08);
+      padding: 2px 8px; border-radius: 99px;
+      border: 1px solid rgba(203,213,225,0.15);
+    }
+
+    /* --- Category/Brand badge --- */
+    .view-badge {
+      font-size: 0.55rem; font-weight: 700; color: var(--accent);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+
+    /* --- Empty state --- */
+    .empty {
+      text-align: center; padding: 2.5rem 1rem; color: var(--dim);
+      font-size: 0.85rem; font-style: italic;
+    }
+
+    /* --- HTMX loading --- */
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline; }
+    .htmx-request { opacity: 0.6; transition: opacity 0.2s; }
+
+    /* --- Filter bar --- */
+    .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .filter-bar input { margin-bottom: 0; flex: 1; min-width: 120px; }
+    .filter-bar .btn { white-space: nowrap; }
+
+    /* --- Scanline overlay --- */
+    body::after {
+      content: '';
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none; z-index: 9999;
+    }
+
+    /* --- Footer --- */
+    footer {
+      text-align: center; padding: 1.5rem; font-size: 0.65rem;
+      color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase;
+      border-top: 1px solid var(--border); margin-top: 2rem;
+    }
+    footer em { color: var(--accent-dim); font-style: normal; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><span class="glyph">🔮</span> The Oracle's Mirror</h1>
+      <span class="badge">Dimension-9 // Materialized Views</span>
+    </div>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    <em>coodie</em> · Pydantic-native Cassandra ORM · Powered by ScyllaDB
+  </footer>
+</body>
+</html>

@@ -149,21 +149,17 @@ jobs:
             cat /tmp/failed_logs.txt
           } > /tmp/comment.md
 
-          # Prefer GH_PAT (enables @copilot on bot PRs), fall back to GITHUB_TOKEN
-          fallback_token="$GH_TOKEN"
-          if [ -n "$GH_PAT" ]; then
-            export GH_TOKEN="$GH_PAT"
+          # GH_PAT is required: comments from GITHUB_TOKEN (github-actions[bot])
+          # are ignored by Copilot, so there is no useful fallback.
+          if [ -z "$GH_PAT" ]; then
+            echo "::error::GH_PAT secret is not set. Set it to a fine-grained PAT with Pull requests: Read and write so the comment appears from a real user and @copilot responds."
+            exit 1
           fi
+          export GH_TOKEN="$GH_PAT"
           # Use REST API (gh api POST) instead of gh pr comment: the latter uses
           # the GraphQL API which fine-grained PATs do not support.
           # jq is pre-installed on all ubuntu-latest GitHub Actions runners.
           jq -Rs '{body: .}' /tmp/comment.md > /tmp/comment.json
-          if ! gh api --method POST \
-               "repos/${{ github.repository }}/issues/${pr_number}/comments" \
-               --input /tmp/comment.json; then
-            echo "::warning::GH_PAT failed, retrying with GITHUB_TOKEN"
-            export GH_TOKEN="$fallback_token"
-            gh api --method POST \
-              "repos/${{ github.repository }}/issues/${pr_number}/comments" \
-              --input /tmp/comment.json
-          fi
+          gh api --method POST \
+            "repos/${{ github.repository }}/issues/${pr_number}/comments" \
+            --input /tmp/comment.json

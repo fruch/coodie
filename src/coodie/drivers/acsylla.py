@@ -190,6 +190,8 @@ class AcsyllaDriver(AbstractDriver):
         This is the recommended entry-point when calling ``init_coodie()`` with
         ``driver_type="acsylla"`` and ``hosts=...``.
 
+        Extra ``**kwargs`` are forwarded to ``acsylla.create_cluster(hosts, **kwargs)``.
+
         Example::
 
             driver = AcsyllaDriver.connect_sync(["127.0.0.1"], keyspace="catalog")

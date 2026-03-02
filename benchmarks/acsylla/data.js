@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772428357659,
+  "lastUpdate": 1772448400345,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9507,6 +9507,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.225602652294939e-7",
             "extra": "mean: 5.537090274822482 usec\nrounds: 7311"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "bff0b33fa305dbec9f7c804780f934b555d9f70f",
+          "message": "fix(ci): replace gh pr comment with gh api REST endpoint for fine-grained PAT compatibility\n\ngh pr comment uses the GitHub GraphQL API internally to resolve the PR,\nbut fine-grained PATs do NOT support the GitHub GraphQL API. This caused\nHTTP 401 errors, triggering the fallback to GITHUB_TOKEN, resulting in\ncomments posted by github-actions[bot] (which Copilot ignores).\n\nThe fix replaces gh pr comment with gh api --method POST to the REST\nendpoint (repos/{owner}/{repo}/issues/{n}/comments), which fine-grained\nPATs support. A jq step builds the JSON payload from the markdown file.\n\nUpdate the header comment to document this limitation clearly.\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-02T12:45:58+02:00",
+          "tree_id": "64380b8859fd0335afd825d0a15b7a81dafab05e",
+          "url": "https://github.com/fruch/coodie/commit/bff0b33fa305dbec9f7c804780f934b555d9f70f"
+        },
+        "date": 1772448398996,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52582.72145541609,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015772025146033699",
+            "extra": "mean: 19.01765394261462 usec\nrounds: 5999"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 569903.1195152837,
+            "unit": "iter/sec",
+            "range": "stddev: 5.191848505885116e-7",
+            "extra": "mean: 1.7546842011507569 usec\nrounds: 28078"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 621318.3066664146,
+            "unit": "iter/sec",
+            "range": "stddev: 4.930822095802759e-7",
+            "extra": "mean: 1.6094809846588014 usec\nrounds: 33473"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 826932.3387588052,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1355947741999527e-7",
+            "extra": "mean: 1.2092887811123254 usec\nrounds: 70943"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 880057.6969974743,
+            "unit": "iter/sec",
+            "range": "stddev: 7.512641491402097e-7",
+            "extra": "mean: 1.1362891358279548 usec\nrounds: 58201"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 732212.439843893,
+            "unit": "iter/sec",
+            "range": "stddev: 3.783589943729462e-7",
+            "extra": "mean: 1.3657238604320885 usec\nrounds: 69320"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 191350.5397932663,
+            "unit": "iter/sec",
+            "range": "stddev: 8.370798801035221e-7",
+            "extra": "mean: 5.226010865087669 usec\nrounds: 7179"
           }
         ]
       }

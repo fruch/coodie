@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 
+from coodie.results import LWTResult
 from tests.conftest import _maybe_await
 
 pytestmark = [
@@ -115,7 +116,7 @@ class TestPartialUpdate:
 
         result = await _maybe_await(p.update, if_conditions={"name": "Conditional"}, price=20.0)
 
-        assert result is not None
+        assert isinstance(result, LWTResult)
         assert result.applied is True
 
         fetched = await _maybe_await(Product.get, id=pid)
@@ -132,8 +133,11 @@ class TestPartialUpdate:
 
         result = await _maybe_await(p.update, if_conditions={"name": "WrongName"}, price=999.0)
 
-        assert result is not None
+        assert isinstance(result, LWTResult)
         assert result.applied is False
+        # existing should carry the server's current column values
+        assert result.existing is not None
+        assert result.existing.get("name") == "Original"
 
         # Price should remain unchanged
         fetched = await _maybe_await(Product.get, id=pid)
@@ -150,7 +154,7 @@ class TestPartialUpdate:
 
         result = await _maybe_await(p.update, if_exists=True, price=50.0)
 
-        assert result is not None
+        assert isinstance(result, LWTResult)
         assert result.applied is True
 
         fetched = await _maybe_await(Product.get, id=pid)
@@ -167,7 +171,7 @@ class TestPartialUpdate:
 
         result = await _maybe_await(p.update, if_exists=True, name="ShouldFail")
 
-        assert result is not None
+        assert isinstance(result, LWTResult)
         assert result.applied is False
 
     # ------------------------------------------------------------------

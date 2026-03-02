@@ -22,13 +22,16 @@ hand-written CQL and hydrating plain Python ``dataclasses``.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 from uuid import uuid4
 
 import pytest
 
 from tests.conftest_scylla import create_acsylla_session, create_cql_session, create_python_rs_session  # noqa: F401
+from tests.conftest_scylla import create_vector_cql_session  # noqa: F401
 from tests.conftest_scylla import scylla_container  # noqa: F401
+from tests.conftest_scylla import vector_store_container  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +87,7 @@ def cqlengine_connection(cql_session: Any):
     cql_conn.register_connection("bench", session=cql_session)
     cql_conn.set_default_connection("bench")
 
-    from benchmarks.models_cqlengine import CqlProduct, CqlReview, CqlEvent
+    from benchmarks.models_cqlengine import CqlProduct, CqlReview, CqlEvent, CqlVectorProduct
     from benchmarks.models_argus_cqlengine import (
         CqlArgusUser,
         CqlArgusTestRun,
@@ -96,6 +99,7 @@ def cqlengine_connection(cql_session: Any):
     sync_table(CqlProduct, keyspaces=["bench_ks"])
     sync_table(CqlReview, keyspaces=["bench_ks"])
     sync_table(CqlEvent, keyspaces=["bench_ks"])
+    sync_table(CqlVectorProduct, keyspaces=["bench_ks"])
     sync_table(CqlArgusUser, keyspaces=["bench_ks"])
     sync_table(CqlArgusTestRun, keyspaces=["bench_ks"])
     sync_table(CqlArgusEvent, keyspaces=["bench_ks"])
@@ -111,16 +115,31 @@ def cqlengine_connection(cql_session: Any):
 
 
 @pytest.fixture(scope="session")
-def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str):  # noqa: F811
+def coodie_connection(cql_session: Any, scylla_container: Any, vector_store_container: Any, driver_type: str):  # noqa: F811
     """Register a coodie driver — backend chosen by ``--driver-type``.
 
-    * ``scylla`` / ``cassandra`` — CassandraDriver sharing the cql_session
-    * ``acsylla`` — AcsyllaDriver with its own async-native session
-    * ``python-rs`` — PythonRsDriver with a Rust-backed async session
+        * ``scylla`` / ``cassandra`` — CassandraDriver sharing the cql_session
+        * ``acsylla`` — AcsyllaDriver with its own async-native session
+    <<<<<<< HEAD
+        * ``python-rs`` — PythonRsDriver with a Rust-backed async session
+    ||||||| parent of fcbfdbf (fix(vector): use scylla:latest + vector-store sidecar, consolidate create_cql_session)
+    =======
+
+        Depends on ``vector_store_container`` so the vector-store service is started
+        before benchmarks that exercise vector search (e.g. ``test_coodie_ann_select``).
+    >>>>>>> fcbfdbf (fix(vector): use scylla:latest + vector-store sidecar, consolidate create_cql_session)
     """
     from coodie.drivers import _registry, init_coodie, register_driver
 
     _registry.clear()
+
+    # Create a tablet-enabled keyspace for vector benchmarks (required by
+    # vector_index on ScyllaDB 6.x+).
+    try:
+        _vec_session, _vec_cluster = create_cql_session(scylla_container, "bench_vector_ks")
+        _vec_cluster.shutdown()
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("Could not create bench_vector_ks with tablets (%s)", exc)
 
     if driver_type == "acsylla":
         try:
@@ -149,7 +168,7 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
     else:
         driver = init_coodie(session=cql_session, keyspace="bench_ks", driver_type=driver_type)
 
-    from benchmarks.models_coodie import CoodieProduct, CoodieReview, CoodieEvent
+    from benchmarks.models_coodie import CoodieProduct, CoodieReview, CoodieEvent, CoodieVectorProduct
     from benchmarks.models_argus_coodie import (
         CoodieArgusUser,
         CoodieArgusTestRun,
@@ -161,6 +180,7 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
     CoodieProduct.sync_table()
     CoodieReview.sync_table()
     CoodieEvent.sync_table()
+    CoodieVectorProduct.sync_table()
     CoodieArgusUser.sync_table()
     CoodieArgusTestRun.sync_table()
     CoodieArgusEvent.sync_table()

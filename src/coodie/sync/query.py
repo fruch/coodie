@@ -51,6 +51,7 @@ class QuerySet:
         "_group_by_val",
         "_select_token_val",
         "_cast_val",
+        "_ann_of_val",
     )
 
     def __init__(
@@ -77,6 +78,7 @@ class QuerySet:
         group_by_val: list[str] | None = None,
         select_token_val: list[str] | None = None,
         cast_val: list[tuple[str, str]] | None = None,
+        ann_of_val: tuple[str, list[float]] | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -99,6 +101,7 @@ class QuerySet:
         self._group_by_val: list[str] = group_by_val or []
         self._select_token_val = select_token_val
         self._cast_val = cast_val
+        self._ann_of_val: tuple[str, list[float]] | None = ann_of_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -127,6 +130,7 @@ class QuerySet:
         new._group_by_val = self._group_by_val
         new._select_token_val = self._select_token_val
         new._cast_val = self._cast_val
+        new._ann_of_val = self._ann_of_val
         for key, val in overrides.items():
             setattr(new, f"_{key}", val)
         return new
@@ -223,6 +227,13 @@ class QuerySet:
     def is_null(self, column: str) -> QuerySet:
         return self._clone(where=self._where + [(column, "ISNULL", True)])
 
+    def order_by_ann(self, field: str, query_vector: list[float]) -> QuerySet:
+        """Order results by approximate nearest neighbor distance to *query_vector*.
+
+        Emits ``ORDER BY "field" ANN OF ?`` using ScyllaDB's SAI vector index.
+        """
+        return self._clone(ann_of_val=(field, query_vector))
+
     # ------------------------------------------------------------------
     # Terminal methods
     # ------------------------------------------------------------------
@@ -259,6 +270,7 @@ class QuerySet:
             group_by=self._group_by_val or None,
             select_token=self._select_token_val,
             cast=self._cast_val,
+            ann_of=self._ann_of_val,
         )
         rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
         if self._values_list_val is not None:
@@ -302,7 +314,12 @@ class QuerySet:
         return result
 
     def paged_all(self) -> PagedResult:
-        """Execute query returning a :class:`PagedResult` with documents and paging state."""
+        """Execute query returning a :class:`PagedResult` with documents and paging state.
+
+        When combined with :meth:`order_by_ann`, ScyllaDB ANN queries do not support
+        cursor-based pagination and will always return a single page with
+        ``paging_state=None``.  Use :meth:`limit` to control the number of results.
+        """
         cql, params = build_select(
             self._table(),
             self._keyspace(),
@@ -310,6 +327,7 @@ class QuerySet:
             limit=self._limit_val,
             order_by=self._order_by_val or None,
             allow_filtering=self._allow_filtering_val,
+            ann_of=self._ann_of_val,
         )
         driver = self._get_driver()
         rows = driver.execute(
@@ -454,4 +472,4 @@ def _snake_case(name: str) -> str:
     import re
 
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+    return re.sub(r"([a-z0-9])([A-Z])", r

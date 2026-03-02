@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772448993156,
+  "lastUpdate": 1772492290356,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9726,6 +9726,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000012257113190735382",
             "extra": "mean: 5.304544480338808 usec\nrounds: 6812"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "cb96ce02b9690492927a29490ddc1a0f8e23b436",
+          "message": "docs(aio): document kwargs forwarding in AcsyllaDriver.connect_sync docstring\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-03T00:57:30+02:00",
+          "tree_id": "790628d42af5888c05e3599dadf743c7a9cbe80d",
+          "url": "https://github.com/fruch/coodie/commit/cb96ce02b9690492927a29490ddc1a0f8e23b436"
+        },
+        "date": 1772492289141,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53875.620193534465,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001506929110579326",
+            "extra": "mean: 18.56127124676717 usec\nrounds: 8413"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 587926.4591299571,
+            "unit": "iter/sec",
+            "range": "stddev: 4.5458467704698705e-7",
+            "extra": "mean: 1.7008930019578468 usec\nrounds: 51057"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 599932.9240150126,
+            "unit": "iter/sec",
+            "range": "stddev: 4.540200301121287e-7",
+            "extra": "mean: 1.6668530096790892 usec\nrounds: 49806"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 842145.4134116054,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5833882670274167e-7",
+            "extra": "mean: 1.1874433845681256 usec\nrounds: 42877"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 845596.5647287673,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3324208694722936e-7",
+            "extra": "mean: 1.1825970465250875 usec\nrounds: 99612"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 751411.5519099057,
+            "unit": "iter/sec",
+            "range": "stddev: 3.550066534701602e-7",
+            "extra": "mean: 1.3308286217562701 usec\nrounds: 85676"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190791.54769572467,
+            "unit": "iter/sec",
+            "range": "stddev: 6.454291684903427e-7",
+            "extra": "mean: 5.241322333601513 usec\nrounds: 7576"
           }
         ]
       }

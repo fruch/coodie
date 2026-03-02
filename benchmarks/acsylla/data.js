@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772448400345,
+  "lastUpdate": 1772448424980,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9580,6 +9580,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.370798801035221e-7",
             "extra": "mean: 5.226010865087669 usec\nrounds: 7179"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "e9f03ae5e6a6d29a0ad137049f7fde6bceaffd30",
+          "message": "fix(ci): move checkout step before script sourcing in plan-continuation workflow\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-02T12:46:29+02:00",
+          "tree_id": "dc9d0606e4cc34f20bebcfae17f3d45595cd4f1d",
+          "url": "https://github.com/fruch/coodie/commit/e9f03ae5e6a6d29a0ad137049f7fde6bceaffd30"
+        },
+        "date": 1772448424475,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52248.88143606707,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015673837372680925",
+            "extra": "mean: 19.13916571063101 usec\nrounds: 12552"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 561108.5560410954,
+            "unit": "iter/sec",
+            "range": "stddev: 4.594174946685918e-7",
+            "extra": "mean: 1.7821863331678733 usec\nrounds: 56619"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 612745.7379632689,
+            "unit": "iter/sec",
+            "range": "stddev: 3.6570548314968786e-7",
+            "extra": "mean: 1.6319982956126986 usec\nrounds: 62779"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 850876.6446745995,
+            "unit": "iter/sec",
+            "range": "stddev: 3.2059222446122575e-7",
+            "extra": "mean: 1.1752584892989155 usec\nrounds: 160231"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 854692.1132344619,
+            "unit": "iter/sec",
+            "range": "stddev: 3.448356372042561e-7",
+            "extra": "mean: 1.1700119663157307 usec\nrounds: 111396"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 740509.912276966,
+            "unit": "iter/sec",
+            "range": "stddev: 3.532211035707839e-7",
+            "extra": "mean: 1.350420816009252 usec\nrounds: 151470"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 189387.48253872638,
+            "unit": "iter/sec",
+            "range": "stddev: 7.960983944306126e-7",
+            "extra": "mean: 5.280180012929406 usec\nrounds: 7755"
           }
         ]
       }

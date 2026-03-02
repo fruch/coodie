@@ -97,9 +97,9 @@ Legend:
 | `close()` sync bridge when session is on `_bg_loop` | `run_coroutine_threadsafe` on `_bg_loop` | ✅ |
 | `AcsyllaDriver.connect(session_factory)` classmethod | Creates session on `_bg_loop`; `_bridge_to_bg_loop = True` | ✅ |
 | `init_coodie_async(driver_type="acsylla", hosts=...)` → sync-capable | Session created on caller's loop; `_bridge_to_bg_loop = False` | ❌ |
-| `init_coodie(driver_type="acsylla", hosts=...)` → auto-create session | Raises `ConfigurationError` — no sync session-creation path | ❌ |
-| `init_coodie(driver_type="acsylla", session=<external>)` → sync-capable | `_bridge_to_bg_loop = False`; hangs on sync call | 🔧 |
-| Warning when `AcsyllaDriver(session=...)` is used with sync calls | No warning; silent hang | ❌ |
+| `init_coodie(driver_type="acsylla", hosts=...)` → auto-create session | Calls `AcsyllaDriver.connect_sync(hosts, ...)` — sync-capable | ✅ |
+| `init_coodie(driver_type="acsylla", session=<external>)` → sync-capable | `_bridge_to_bg_loop = False`; emits `UserWarning` | ✅ |
+| Warning when `AcsyllaDriver(session=...)` is used with sync calls | `UserWarning` emitted at construction | ✅ |
 | Documentation — which `init_coodie` path enables sync | Implicit in `connect()` docstring only | ❌ |
 
 **Gap summary — AcsyllaDriver sync API:**
@@ -147,17 +147,17 @@ Legend:
 | 1.3 | Update `test_init_coodie_async_acsylla_with_hosts` in `test_drivers.py` to assert `driver._bridge_to_bg_loop is True` |
 | 1.4 | Add unit test: calling `execute()` on the driver returned by `init_coodie_async()` succeeds (mock session on `_bg_loop`) |
 
-### Phase 2: Add sync-capable hosts path to init_coodie for acsylla (Priority: High)
+### Phase 2: Add sync-capable hosts path to init_coodie for acsylla (Priority: High) ✅ Done
 
 **Goal:** Allow `init_coodie(driver_type="acsylla", hosts=...)` to auto-create a session and return a sync-capable driver, removing the `ConfigurationError`.
 
-| Task | Description |
-|---|---|
-| 2.1 | Add `AcsyllaDriver.connect_sync(hosts, keyspace, **kwargs) -> AcsyllaDriver` — a blocking classmethod that bootstraps `_bg_loop`, then calls `asyncio.run_coroutine_threadsafe(cluster.create_session(...), _bg_loop).result()` |
-| 2.2 | In `init_coodie(driver_type="acsylla")`, call `AcsyllaDriver.connect_sync(hosts, keyspace, **kwargs)` when `session is None` |
-| 2.3 | Add `UserWarning` in `AcsyllaDriver.__init__(session=...)` noting that the session was not created on `_bg_loop` and sync calls may not work; silence the warning by passing `_external_session=True` keyword |
-| 2.4 | Update the `ConfigurationError` unit test for `init_coodie(driver_type="acsylla")` — should no longer raise when `hosts` is provided |
-| 2.5 | Add unit test: `init_coodie(driver_type="acsylla", hosts=...)` returns a driver with `_bridge_to_bg_loop = True` |
+| Task | Description | Status |
+|---|---|---|
+| 2.1 | Add `AcsyllaDriver.connect_sync(hosts, keyspace, **kwargs) -> AcsyllaDriver` — a blocking classmethod that bootstraps `_bg_loop`, then calls `asyncio.run_coroutine_threadsafe(cluster.create_session(...), _bg_loop).result()` | ✅ Done |
+| 2.2 | In `init_coodie(driver_type="acsylla")`, call `AcsyllaDriver.connect_sync(hosts, keyspace, **kwargs)` when `session is None` | ✅ Done |
+| 2.3 | Add `UserWarning` in `AcsyllaDriver.__init__(session=...)` noting that the session was not created on `_bg_loop` and sync calls may not work | ✅ Done |
+| 2.4 | Update the `ConfigurationError` unit test for `init_coodie(driver_type="acsylla")` — should no longer raise when `hosts` is provided | ✅ Done |
+| 2.5 | Add unit test: `init_coodie(driver_type="acsylla", hosts=...)` returns a driver with `_bridge_to_bg_loop = True` | ✅ Done |
 
 ### Phase 3: Implement PythonRsDriver with sync bridge (Priority: High)
 

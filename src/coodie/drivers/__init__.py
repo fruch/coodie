@@ -44,12 +44,15 @@ def init_coodie(
     if driver_type == "acsylla":
         from coodie.drivers.acsylla import AcsyllaDriver
 
-        if session is None:
+        if session is None and hosts is not None:
+            driver: AbstractDriver = AcsyllaDriver.connect_sync(hosts, keyspace=keyspace, **kwargs)
+        elif session is None:
             raise ConfigurationError(
-                "AcsyllaDriver requires a pre-created acsylla session. "
-                "Pass session= or use init_coodie_async() with hosts."
+                "AcsyllaDriver requires hosts or a pre-created acsylla session. "
+                "Pass hosts= or session=, or use init_coodie_async() with hosts."
             )
-        driver: AbstractDriver = AcsyllaDriver(session=session, default_keyspace=keyspace)
+        else:
+            driver = AcsyllaDriver(session=session, default_keyspace=keyspace)
     elif driver_type == "python-rs":
         from coodie.drivers.python_rs import PythonRsDriver
 

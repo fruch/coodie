@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import warnings
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -107,6 +108,14 @@ class AcsyllaDriver(AbstractDriver):
         )
         self._bg_thread.start()
         self._bridge_to_bg_loop: bool = False
+        warnings.warn(
+            "AcsyllaDriver(session=...) creates a driver whose session is not on "
+            "the background loop; sync calls (execute, sync_table, close) may hang. "
+            "Use AcsyllaDriver.connect_sync() or init_coodie(hosts=...) for a "
+            "sync-capable driver.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     @classmethod
     def connect(
@@ -163,6 +172,38 @@ class AcsyllaDriver(AbstractDriver):
         driver._bg_thread = bg_thread
         driver._bridge_to_bg_loop = True
         return driver
+
+    @classmethod
+    def connect_sync(
+        cls,
+        hosts: list[str],
+        keyspace: str | None = None,
+        **kwargs: Any,
+    ) -> "AcsyllaDriver":
+        """Blocking factory that creates a sync-capable driver from *hosts*.
+
+        Bootstraps a background event loop, creates the acsylla session **on
+        that loop** via ``run_coroutine_threadsafe``, and returns a driver with
+        ``_bridge_to_bg_loop = True`` so that the synchronous interface
+        (``execute``, ``sync_table``, ``close``) works correctly.
+
+        This is the recommended entry-point when calling ``init_coodie()`` with
+        ``driver_type="acsylla"`` and ``hosts=...``.
+
+        Example::
+
+            driver = AcsyllaDriver.connect_sync(["127.0.0.1"], keyspace="catalog")
+        """
+        try:
+            import acsylla  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise ImportError("acsylla is required for AcsyllaDriver. Install it with: pip install acsylla") from exc
+
+        async def _make_session() -> Any:
+            cluster = acsylla.create_cluster(hosts, **kwargs)
+            return await cluster.create_session(keyspace=keyspace)
+
+        return cls.connect(session_factory=_make_session, default_keyspace=keyspace)
 
     # ------------------------------------------------------------------
     # Internal helpers

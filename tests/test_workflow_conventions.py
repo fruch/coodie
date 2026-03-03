@@ -105,18 +105,18 @@ def test_gh_cli_has_token(workflow_path: Path):
 
 @pytest.mark.parametrize("workflow_path", WORKFLOW_FILES, ids=[p.name for p in WORKFLOW_FILES])
 def test_fetch_depth_for_git_history(workflow_path: Path):
-    """If any step uses `git rebase` or `git log`, a checkout with fetch-depth: 0 must exist."""
+    """If any step uses `git rebase`, `git log`, or `git merge`, a checkout with fetch-depth: 0 must exist."""
     workflow = _load_workflow(workflow_path)
     steps = list(_iter_steps(workflow))
 
-    needs_history = any(re.search(r"\bgit\s+(rebase|log|merge-base)\b", step.get("run", "")) for step in steps)
+    needs_history = any(re.search(r"\bgit\s+(rebase|log|merge-base|merge)\b", step.get("run", "")) for step in steps)
     if not needs_history:
         pytest.skip("no git history commands found")
 
     has_full_fetch = any(
         step.get("with", {}).get("fetch-depth") == 0 for step in steps if "actions/checkout" in step.get("uses", "")
     )
-    assert has_full_fetch, f"{workflow_path.name}: uses git rebase/log but no checkout with fetch-depth: 0"
+    assert has_full_fetch, f"{workflow_path.name}: uses git rebase/log/merge but no checkout with fetch-depth: 0"
 
 
 # ---------------------------------------------------------------------------
@@ -142,3 +142,22 @@ def test_schedule_cron_valid(workflow_path: Path):
     for entry in schedules:
         cron = entry.get("cron", "")
         assert _CRON_RE.match(cron), f"{workflow_path.name}: invalid cron expression {cron!r}"
+
+
+# ---------------------------------------------------------------------------
+# 3.7 — Slash-command workflows have per-PR concurrency groups
+# ---------------------------------------------------------------------------
+
+_SLASH_COMMAND_WORKFLOWS = [
+    p for p in WORKFLOW_FILES if p.name in ("pr-rebase-squash.yml", "pr-solve-command.yml", "pr-conflict-detect.yml")
+]
+
+
+@pytest.mark.parametrize("workflow_path", _SLASH_COMMAND_WORKFLOWS, ids=[p.name for p in _SLASH_COMMAND_WORKFLOWS])
+def test_slash_command_concurrency(workflow_path: Path):
+    """Slash-command and conflict-detection workflows must define a concurrency group
+    to prevent overlapping operations on the same PR, even if they have a single job."""
+    workflow = _load_workflow(workflow_path)
+    assert "concurrency" in workflow, (
+        f"{workflow_path.name}: slash-command workflow missing top-level concurrency group"
+    )

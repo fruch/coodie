@@ -506,3 +506,95 @@ EOF
     [ "$status" -eq 0 ]
     grep -q "Copilot resolved" "$GITHUB_STEP_SUMMARY"
 }
+
+@test "merge mode: rebase --continue is NOT called (mode isolation)" {
+    export RESOLVE_MODE=merge
+
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+
+    # Track what git sub-commands are invoked
+    local git_log="${BATS_TEST_TMPDIR}/git_log"
+    local call_count_file="${BATS_TEST_TMPDIR}/git_calls"
+    echo 0 > "$call_count_file"
+    : > "$git_log"
+    cat > "$MOCK_BIN/git" << EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$git_log"
+if [[ "\$1" == "diff" ]]; then
+    count=\$(cat "$call_count_file")
+    count=\$((count + 1))
+    echo "\$count" > "$call_count_file"
+    if [ "\$count" -eq 1 ]; then
+        echo "foo.py"
+    fi
+elif [[ "\$1" == "add" ]]; then
+    exit 0
+elif [[ "\$1" == "commit" ]]; then
+    exit 0
+elif [[ "\$1" == "rebase" ]]; then
+    echo "UNEXPECTED: rebase called in merge mode" >&2
+    exit 99
+fi
+EOF
+    chmod +x "$MOCK_BIN/git"
+
+    _mock_copilot "x = 2"
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=clean$" "$GITHUB_OUTPUT"
+    # Verify that 'rebase' was never invoked
+    ! grep -q "rebase" "$git_log"
+}
+
+@test "merge mode: multiple conflicted files resolved in one round → status=clean" {
+    export RESOLVE_MODE=merge
+
+    cat > "${WORK_DIR}/foo.py" << 'EOF'
+<<<<<<< HEAD
+x = 1
+=======
+x = 2
+>>>>>>> branch
+EOF
+    cat > "${WORK_DIR}/bar.py" << 'EOF'
+<<<<<<< HEAD
+y = 1
+=======
+y = 2
+>>>>>>> branch
+EOF
+
+    local call_count_file="${BATS_TEST_TMPDIR}/git_calls"
+    echo 0 > "$call_count_file"
+    cat > "$MOCK_BIN/git" << EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "diff" ]]; then
+    count=\$(cat "$call_count_file")
+    count=\$((count + 1))
+    echo "\$count" > "$call_count_file"
+    if [ "\$count" -eq 1 ]; then
+        printf 'foo.py\nbar.py\n'
+    fi
+elif [[ "\$1" == "add" ]]; then
+    exit 0
+elif [[ "\$1" == "commit" ]]; then
+    exit 0
+fi
+EOF
+    chmod +x "$MOCK_BIN/git"
+
+    _mock_copilot "resolved content"
+
+    run bash "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+    grep -q "^status=clean$" "$GITHUB_OUTPUT"
+}

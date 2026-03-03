@@ -164,17 +164,17 @@ Legend:
 | 4.6 | `/solve` command: if `COPILOT_PAT` secret is missing, fall back to `git merge --abort` and post a comment asking the user to resolve manually | ✅ Done |
 | 4.7 | Remove `conflict` label after a successful `/solve` run (label is already removed on next `synchronize` event, but explicit removal is faster feedback) | ✅ Done |
 
-### Phase 5: Testing & Documentation (Priority: Medium)
+### Phase 5: Testing & Documentation (Priority: Medium) ✅ Done
 
 **Goal:** Add tests, update documentation, and ensure discoverability.
 
-| Task | Description |
-|---|---|
-| 5.1 | Add workflow-convention tests in `tests/test_workflow_conventions.py` for the new workflow files (actions pinned, `GH_TOKEN` env, `fetch-depth: 0`, concurrency groups) |
-| 5.2 | Add Bats tests for any new scripts or script changes (mergeability check, parse-command extension) |
-| 5.3 | Update `CONTRIBUTING.md` with `/solve` command documentation in the slash-command reference table |
-| 5.4 | Add a note to the `pr-rebase-squash.yml` header comment cross-referencing `/solve` |
-| 5.5 | Update this plan with ✅ status for completed phases |
+| Task | Description | Status |
+|---|---|---|
+| 5.1 | Add workflow-convention tests in `tests/test_workflow_conventions.py` for the new workflow files (actions pinned, `GH_TOKEN` env, `fetch-depth: 0`, concurrency groups) | ✅ Done |
+| 5.2 | Add Bats tests for any new scripts or script changes (mergeability check, parse-command extension) | ✅ Done |
+| 5.3 | Update `CONTRIBUTING.md` with `/solve` command documentation in the slash-command reference table | ✅ Done |
+| 5.4 | Add a note to the `pr-rebase-squash.yml` header comment cross-referencing `/solve` | ✅ Done |
+| 5.5 | Update this plan with ✅ status for completed phases | ✅ Done |
 
 ---
 

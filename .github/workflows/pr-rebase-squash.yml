@@ -12,6 +12,10 @@
 #   Provide the PR number and select the command to run.
 #
 # See docs/plans/pr-comment-rebase-squash-action.md for full design details.
+#
+# Related: .github/workflows/pr-solve-command.yml provides the `/solve`
+# slash-command, which uses a merge strategy (instead of rebase) to resolve
+# conflicts while preserving commit history.
 
 name: PR Rebase & Squash
 

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772574984515,
+  "lastUpdate": 1772575081244,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10383,6 +10383,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 5.05134212487004e-7",
             "extra": "mean: 5.306880509486161 usec\nrounds: 7306"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "d72899191a07aac31b1de2a6d27b8787d69fbcbe",
+          "message": "feat(types): add frozenset support and raise on unsupported schema types\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-03T23:57:20+02:00",
+          "tree_id": "95730eb366bc831386022f0852f74b46faadecc0",
+          "url": "https://github.com/fruch/coodie/commit/d72899191a07aac31b1de2a6d27b8787d69fbcbe"
+        },
+        "date": 1772575079911,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53768.92644526059,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015933217085201556",
+            "extra": "mean: 18.598102400613282 usec\nrounds: 7998"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 547463.1857680802,
+            "unit": "iter/sec",
+            "range": "stddev: 6.550145721145239e-7",
+            "extra": "mean: 1.8266068404161635 usec\nrounds: 42044"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 579062.6239026127,
+            "unit": "iter/sec",
+            "range": "stddev: 4.363376565148302e-7",
+            "extra": "mean: 1.7269289343188223 usec\nrounds: 45268"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 790798.1998657819,
+            "unit": "iter/sec",
+            "range": "stddev: 6.421501057656551e-7",
+            "extra": "mean: 1.2645451142525674 usec\nrounds: 148523"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 876722.6400451765,
+            "unit": "iter/sec",
+            "range": "stddev: 3.215847093897274e-7",
+            "extra": "mean: 1.140611584923222 usec\nrounds: 80432"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 707453.3993385407,
+            "unit": "iter/sec",
+            "range": "stddev: 3.585437171516462e-7",
+            "extra": "mean: 1.4135206657215675 usec\nrounds: 92593"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 191029.76183169163,
+            "unit": "iter/sec",
+            "range": "stddev: 7.139449761319027e-7",
+            "extra": "mean: 5.2347864040214755 usec\nrounds: 7767"
           }
         ]
       }

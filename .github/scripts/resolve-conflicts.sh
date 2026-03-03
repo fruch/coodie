@@ -66,7 +66,6 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
         # (instead of capturing stdout, which can include MCP errors and
         # agent noise).  Only the file content is used downstream.
         COPILOT_OUTFILE=$(mktemp)
-        rm -f "$COPILOT_OUTFILE"
         export COPILOT_OUTFILE
 
         COPILOT_RC=0

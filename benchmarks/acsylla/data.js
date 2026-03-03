@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772577188696,
+  "lastUpdate": 1772578832866,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10602,6 +10602,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.81982386407745e-7",
             "extra": "mean: 5.508167701110101 usec\nrounds: 7573"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "85c31c3f109b459503f5ee9a7da285079c68d732",
+          "message": "test(ci): use mktemp for stderr capture files in bats tests\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-04T00:59:42+02:00",
+          "tree_id": "8bbdd8eb461a3ca361cc90c9c1a5bcb5c067f75e",
+          "url": "https://github.com/fruch/coodie/commit/85c31c3f109b459503f5ee9a7da285079c68d732"
+        },
+        "date": 1772578831803,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52995.06421032915,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014801784924954306",
+            "extra": "mean: 18.869681826049987 usec\nrounds: 11522"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 558144.3219570569,
+            "unit": "iter/sec",
+            "range": "stddev: 5.823907829150515e-7",
+            "extra": "mean: 1.7916512999606202 usec\nrounds: 54425"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 602125.6938483268,
+            "unit": "iter/sec",
+            "range": "stddev: 4.5804130345586615e-7",
+            "extra": "mean: 1.6607828070062332 usec\nrounds: 58303"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 849236.5052481398,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3136682012198327e-7",
+            "extra": "mean: 1.1775282784244046 usec\nrounds: 159185"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 866818.5816477058,
+            "unit": "iter/sec",
+            "range": "stddev: 3.544522824273116e-7",
+            "extra": "mean: 1.1536439356193013 usec\nrounds: 37951"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 742308.8863485956,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4838360714864333e-7",
+            "extra": "mean: 1.3471480921089098 usec\nrounds: 142776"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 185690.25132189158,
+            "unit": "iter/sec",
+            "range": "stddev: 6.509243140417268e-7",
+            "extra": "mean: 5.385312329975327 usec\nrounds: 6618"
           }
         ]
       }

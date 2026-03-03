@@ -44,6 +44,8 @@ from coodie.types import python_type_to_cql_type_str, coerce_row_none_collection
         pytest.param(list[str], "list<text>", id="list-str"),
         pytest.param(set[int], "set<int>", id="set-int"),
         pytest.param(dict[str, int], "map<text, int>", id="dict-str-int"),
+        pytest.param(frozenset[str], "frozen<set<text>>", id="frozenset-str"),
+        pytest.param(frozenset[int], "frozen<set<int>>", id="frozenset-int"),
         pytest.param(Optional[str], "text", id="optional-str"),
         pytest.param(Annotated[UUID, PrimaryKey()], "uuid", id="annotated-unwraps"),
     ],

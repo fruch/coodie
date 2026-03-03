@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772562029697,
+  "lastUpdate": 1772562036391,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9945,6 +9945,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.399565885671679e-7",
             "extra": "mean: 5.240169194053906 usec\nrounds: 7122"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "0d82d5761a2e204d1e4aff9f18eea54db1d034c4",
+          "message": "feat(ci): add Phase 4 safety gates to conflict detection and /solve workflows\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-03T20:19:47+02:00",
+          "tree_id": "639040783cfa5b3b6962183762dee2a707fe5551",
+          "url": "https://github.com/fruch/coodie/commit/0d82d5761a2e204d1e4aff9f18eea54db1d034c4"
+        },
+        "date": 1772562035742,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53395.48497083636,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014799395432796862",
+            "extra": "mean: 18.72817524826644 usec\nrounds: 8565"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 572754.2006044982,
+            "unit": "iter/sec",
+            "range": "stddev: 3.898080272417911e-7",
+            "extra": "mean: 1.745949656841585 usec\nrounds: 45329"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 604107.9989650506,
+            "unit": "iter/sec",
+            "range": "stddev: 3.8006617834068337e-7",
+            "extra": "mean: 1.6553331551861359 usec\nrounds: 54275"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 847497.9214521736,
+            "unit": "iter/sec",
+            "range": "stddev: 3.2050112296500027e-7",
+            "extra": "mean: 1.179943896837548 usec\nrounds: 164447"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 852917.1487806727,
+            "unit": "iter/sec",
+            "range": "stddev: 3.612500919155154e-7",
+            "extra": "mean: 1.1724468213936095 usec\nrounds: 75444"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 738348.767143755,
+            "unit": "iter/sec",
+            "range": "stddev: 3.400115177758587e-7",
+            "extra": "mean: 1.3543734946134232 usec\nrounds: 100221"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 191728.7190263909,
+            "unit": "iter/sec",
+            "range": "stddev: 8.737876363218843e-7",
+            "extra": "mean: 5.215702713073219 usec\nrounds: 7740"
           }
         ]
       }

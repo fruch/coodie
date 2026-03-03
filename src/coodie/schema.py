@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import functools
+import logging
 import typing
 from dataclasses import dataclass
 from typing import Any, get_type_hints
+
+logger = logging.getLogger("coodie")
 
 
 @functools.lru_cache(maxsize=128)
@@ -14,7 +17,8 @@ def _cached_type_hints(cls: type) -> dict[str, Any]:
     """
     try:
         return get_type_hints(cls, include_extras=True)
-    except Exception:
+    except (NameError, AttributeError, TypeError) as exc:
+        logger.debug("get_type_hints(%s) failed, falling back to __annotations__: %s", cls.__name__, exc)
         return getattr(cls, "__annotations__", {})
 
 

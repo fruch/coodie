@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772575081244,
+  "lastUpdate": 1772575097199,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10456,6 +10456,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.139449761319027e-7",
             "extra": "mean: 5.2347864040214755 usec\nrounds: 7767"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "0ec061b561f3ee3485e5f54dae166b35fdb80dcc",
+          "message": "ci: add copilot CI proxy workflow and repository_dispatch trigger\n\nBot-authored PRs (e.g. from `copilot-workspace[bot]`) cannot trigger GitHub Actions due to platform restrictions. This adds a proxy workflow pattern to bridge that gap.\n\n### Changes\n\n- **New `.github/workflows/copilot-ci-proxy.yml`**: Listens on `pull_request_target`, gates on bot authors (`copilot-workspace[bot]`, `github-actions[bot]`), and fires a `trigger-main-ci` repository dispatch via `peter-evans/repository-dispatch@v3` authenticated with `secrets.CI_DISPATCH_TOKEN`. Workflow-level `permissions: {}` since only the PAT is used.\n\n- **Updated `.github/workflows/ci.yml`**: Added `repository_dispatch` trigger restricted to `types: [trigger-main-ci]`. Existing `push`/`pull_request` triggers unchanged.\n\n- **Updated `.github/workflows/test-unit.yml`**: Added `repository_dispatch` trigger restricted to `types: [trigger-main-ci]`. Existing `push`/`pull_request` triggers unchanged.\n\n- **Updated `.github/workflows/test-integration.yml`**: Added `repository_dispatch` trigger restricted to `types: [trigger-main-ci]`. Existing `push`/`pull_request` triggers unchanged.\n\n- **Updated `.github/workflows/benchmark.yml`**: Added `repository_dispatch` trigger restricted to `types: [trigger-main-ci]`. Existing `push`/`pull_request`/`schedule` triggers unchanged. The existing `if` condition (`github.event_name != 'pull_request'`) naturally allows `repository_dispatch` events to proceed without requiring the `benchmark` label.\n\n### Flow\n\n```\nBot opens PR\n  → pull_request_target fires copilot-ci-proxy.yml\n    → repository-dispatch sends trigger-main-ci event\n      → ci.yml, test-unit.yml, test-integration.yml, and benchmark.yml all run as usual\n```\n\n<!-- START COPILOT CODING AGENT SUFFIX -->\n\n<!-- START COPILOT ORIGINAL PROMPT -->\n\n<details>\n\n<summary>Original prompt</summary>\n\n> I need to bypass GitHub's limitation where bots cannot trigger other GitHub Actions. I want to implement a 'Proxy Workflow' pattern. Please do the following two things:\n> Create a new GitHub Actions workflow file named copilot-ci-proxy.yml.\n> Set the trigger to on: pull_request_target.\n> Add a job that ONLY runs if the PR author is copilot-workspace[bot] (or github-actions[bot]).\n> In that job, use the peter-evans/repository-dispatch@v3 action to trigger a custom repository dispatch event called trigger-main-ci.\n> Authenticate this dispatch action using a secret called secrets.CI_DISPATCH_TOKEN.\n> Update my existing main CI workflow file (assume it's named ci.yml).\n> Keep the existing triggers, but add a new trigger for repository_dispatch.\n> Restrict the repository_dispatch trigger so it only listens for the trigger-main-ci event type.\n> Please output the exact YAML for the new proxy file, and show me the updated on: block for my existing CI file.\n\n</details>\n\n<!-- START COPILOT CODING AGENT TIPS -->\n---\n\n✨ Let Copilot coding agent [set things up for you](https://github.com/fruch/coodie/issues/new?title=✨+Set+up+Copilot+instructions&body=Configure%20instructions%20for%20this%20repository%20as%20documented%20in%20%5BBest%20practices%20for%20Copilot%20coding%20agent%20in%20your%20repository%5D%28https://gh.io/copilot-coding-agent-tips%29%2E%0A%0A%3COnboard%20this%20repo%3E&assignees=copilot) — coding agent works faster and does higher quality work when set up for your repo.",
+          "timestamp": "2026-03-03T23:57:44+02:00",
+          "tree_id": "b420880f1bd2b911e57b069bb6c13801a0bb1b58",
+          "url": "https://github.com/fruch/coodie/commit/0ec061b561f3ee3485e5f54dae166b35fdb80dcc"
+        },
+        "date": 1772575096323,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 80029.53747727186,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010082820195970107",
+            "extra": "mean: 12.495386472575788 usec\nrounds: 8782"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 590847.2404531104,
+            "unit": "iter/sec",
+            "range": "stddev: 2.934356729784319e-7",
+            "extra": "mean: 1.6924848447004972 usec\nrounds: 46980"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 644617.8096080314,
+            "unit": "iter/sec",
+            "range": "stddev: 2.7277445435459503e-7",
+            "extra": "mean: 1.5513068132698093 usec\nrounds: 45161"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 864429.8862387902,
+            "unit": "iter/sec",
+            "range": "stddev: 1.852295131841745e-7",
+            "extra": "mean: 1.156831821665823 usec\nrounds: 114117"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 848007.2127192562,
+            "unit": "iter/sec",
+            "range": "stddev: 2.1781148048328067e-7",
+            "extra": "mean: 1.1792352529565842 usec\nrounds: 74422"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 775819.7898775659,
+            "unit": "iter/sec",
+            "range": "stddev: 1.946139591889569e-7",
+            "extra": "mean: 1.288959128198847 usec\nrounds: 91408"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190660.51779954162,
+            "unit": "iter/sec",
+            "range": "stddev: 4.464964919209984e-7",
+            "extra": "mean: 5.24492438991165 usec\nrounds: 7499"
           }
         ]
       }

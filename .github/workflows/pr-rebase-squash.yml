@@ -237,7 +237,6 @@ jobs:
           # noise).  Copilot's own file-writing tool is used, so only
           # intentional content ends up in the file.
           COPILOT_OUTPUT_FILE=$(mktemp)
-          rm -f "$COPILOT_OUTPUT_FILE"
           export COPILOT_OUTPUT_FILE
           npm install -g @github/copilot 2>/dev/null || true
           copilot -p \

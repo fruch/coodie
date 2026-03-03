@@ -63,17 +63,16 @@ teardown() {
   [[ "$MESSAGE" == *"Fixed the typo in README"* ]]
 }
 
-@test "Copilot output has agent step lines — passed through (no cleanup needed with file-based output)" {
+@test "Copilot writes clean multi-line body to file — message = title + body" {
   export TITLE="feat: new api"
-  printf '● Running tool\n$ npm install\nActual commit body here\n└ Done\n' > "$COPILOT_OUTPUT_FILE"
+  printf 'Add REST endpoints for user management.\nIncludes create, read, update, delete operations.\n' > "$COPILOT_OUTPUT_FILE"
   export PR_BODY=""
   source "$SCRIPT_DIR/build-squash-message.sh"
-  [[ "$MESSAGE" == *"Actual commit body here"* ]]
-  # Agent step lines are no longer stripped — with file-based output
-  # Copilot only writes intentional content to the file
+  [[ "$MESSAGE" == *"Add REST endpoints for user management."* ]]
+  [[ "$MESSAGE" == *"Includes create, read, update, delete operations."* ]]
 }
 
-@test "Copilot output with MCP errors — passed through (not expected with file-based output)" {
+@test "Copilot writes concise body to file — no agent noise present" {
   export TITLE="test: add counter tests"
   printf 'Add integration tests for counter operations.\n' > "$COPILOT_OUTPUT_FILE"
   export PR_BODY=""

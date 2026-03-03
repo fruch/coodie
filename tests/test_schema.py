@@ -372,7 +372,10 @@ def test_cached_type_hints_falls_back_on_name_error(monkeypatch):
     class Dummy:
         __annotations__ = {"x": int}
 
-    monkeypatch.setattr(_schema_mod, "get_type_hints", lambda *a, **kw: (_ for _ in ()).throw(NameError("boom")))
+    def _raise_name_error(*a, **kw):
+        raise NameError("boom")
+
+    monkeypatch.setattr(_schema_mod, "get_type_hints", _raise_name_error)
     result = _cached_type_hints(Dummy)
     assert result == {"x": int}
     _cached_type_hints.cache_clear()
@@ -388,7 +391,10 @@ def test_cached_type_hints_propagates_recursion_error(monkeypatch):
     class Dummy:
         __annotations__ = {"x": int}
 
-    monkeypatch.setattr(_schema_mod, "get_type_hints", lambda *a, **kw: (_ for _ in ()).throw(RecursionError("deep")))
+    def _raise_recursion_error(*a, **kw):
+        raise RecursionError("deep")
+
+    monkeypatch.setattr(_schema_mod, "get_type_hints", _raise_recursion_error)
     with pytest.raises(RecursionError, match="deep"):
         _cached_type_hints(Dummy)
     _cached_type_hints.cache_clear()

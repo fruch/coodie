@@ -35,11 +35,13 @@ Guide for modern Python tooling and best practices, based on [trailofbits/cookie
 | `[project.optional-dependencies]` for dev tools | `[dependency-groups]` (PEP 735) |
 | Manual virtualenv activation (`source .venv/bin/activate`) | `uv run <cmd>` |
 | pre-commit | prek (faster, no Python runtime needed) |
+| Inline imports inside functions/methods | Top-of-file imports (PEP 8) |
 
 **Key principles:**
 - Always use `uv add` and `uv remove` to manage dependencies
 - Never manually activate or manage virtual environments—use `uv run` for all commands
 - Use `[dependency-groups]` for dev/test/docs dependencies, not `[project.optional-dependencies]`
+- Never use inline imports — all imports must be at the top of the file, per PEP 8
 
 ## Decision Tree
 

@@ -6,6 +6,8 @@ on:
       - master
   pull_request:
     types: [labeled, opened, synchronize]
+  repository_dispatch:
+    types: [trigger-main-ci]
   schedule:
     # Weekly — every Monday at 06:00 UTC
     - cron: "0 6 * * 1"

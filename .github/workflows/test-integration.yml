@@ -9,6 +9,8 @@ on:
       - "src/**"
       - "tests/**"
       - ".github/workflows/test-integration.yml"
+  repository_dispatch:
+    types: [trigger-main-ci]
 
 concurrency:
   group: integration-${{ github.head_ref || github.run_id }}

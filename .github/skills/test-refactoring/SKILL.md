@@ -49,6 +49,16 @@ When multiple test files need the same Document subclass, define it once and imp
 
 </essential_principles>
 
+## Prerequisites
+
+See [setup-environment.md](../setup-environment.md) for the shared environment
+setup. **Install pre-commit hooks before making any commits:**
+
+```bash
+uv sync --all-groups
+uv run pre-commit install
+```
+
 ## When to Use
 
 - A test file exceeds 400 lines and contains tests for multiple feature areas

@@ -311,8 +311,9 @@ Install with: `uv sync --group dev --group test`
 
 ## Pre-commit Workflow
 
-> **Always** set up and run pre-commit hooks before touching code. Forgetting
-> this is the most common cause of "lint failed on CI but passed locally".
+> **Always** install and run pre-commit hooks before making any commits.
+> This is the most common cause of "lint failed on CI but passed locally".
+> No commits should be made before hooks are active.
 
 ### Setup (once per clone)
 

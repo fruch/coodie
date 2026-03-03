@@ -13,17 +13,23 @@ See also: [CONTRIBUTING.md](../../CONTRIBUTING.md) for the full contributor guid
 
 ## Quick Setup
 
+> ⚠️ **Install pre-commit hooks first — before making any commits.**
+> Copilot and human contributors must run `uv run pre-commit install` as the
+> very first step after cloning or checking out a branch. No commits should be
+> made before hooks are active. This ensures every commit passes lint, format,
+> and commit-message checks.
+
 ```bash
-# Install all dev dependencies (lint, test, docs, benchmarks)
+# 1. Install all dev dependencies (lint, test, docs, benchmarks)
 uv sync --all-groups
 
-# Install the driver extra you need
+# 2. Install pre-commit hooks (MUST happen before any commits)
+uv run pre-commit install
+
+# 3. Install the driver extra you need
 uv pip install -e ".[scylla]"    # scylla-driver (default)
 uv pip install -e ".[acsylla]"   # acsylla (async-native)
 uv pip install -e ".[cassandra]" # cassandra-driver
-
-# Install pre-commit hooks (required before pushing any changes)
-uv run pre-commit install
 ```
 
 ## Before Committing and Pushing

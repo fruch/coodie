@@ -2,6 +2,10 @@
 
 A 5-phase process for systematically refactoring a test file in the coodie test suite.
 
+**Before starting:** Ensure pre-commit hooks are installed (`uv run pre-commit install`).
+No commits should be made before hooks are active.
+See [setup-environment.md](../../setup-environment.md).
+
 ---
 
 ## Phase 1: Analyze Current State

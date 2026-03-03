@@ -4,8 +4,9 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-02 (post-merge: python-rs Phase 5 benchmarks done,
-> sync-api Phase 2 WIP in PR #157, vector search WIP in PR #150)
+> **Last reviewed:** 2026-03-03 (post-merge: TTL/batch/materialized-views demos shipped,
+> sync-api Phases 2–3 done, PR conflict Phase 4 done; vector search WIP in PR #150,
+> collections-tags demo WIP in PR #147)
 
 ---
 
@@ -35,29 +36,25 @@
 
 *Source: `python-rs-feature-gaps.md`*
 
-> *Continuation plan for PythonRsDriver feature gaps blocked by upstream python-rs-driver limitations. Each phase is gated on an upstream improvement. All 6 phases are pending.*
+> *Continuation plan for PythonRsDriver feature gaps blocked by upstream python-rs-driver limitations. Each phase is gated on an upstream improvement. Phase 2 (background-thread sync bridge) is ✅ Done — PythonRsDriver uses `_bg_loop`, `_bg_thread`, `_bridge_to_bg_loop`, `connect()` classmethod, `run_coroutine_threadsafe()` (implemented via sync-api-support Phase 3). 5 phases remain.*
 
 ### 2.1 Per-Query Consistency & Timeout
 
 > **Prompt:** Implement per-query consistency level and timeout support in `PythonRsDriver`. Currently these parameters are silently ignored in `execute_async()`. Wire `consistency` through `Statement.with_consistency()` and `timeout` through `Statement.with_request_timeout()`. Add unit tests with mocked session and update integration tests to un-skip consistency-dependent tests. See `docs/plans/python-rs-feature-gaps.md` Phase 1.
 
-### 2.2 Background-Thread Sync Bridge
-
-> **Prompt:** Replace `PythonRsDriver.execute()` / `sync_table()` / `close()` using `loop.run_until_complete()` with a proper background-thread sync bridge (same pattern as `AcsyllaDriver`). Spawn a background thread running `asyncio.run_forever()`, set `_bridge_to_bg_loop = True`, route sync calls through `run_coroutine_threadsafe()`. This un-blocks 68 skipped sync variant integration tests. See `docs/plans/python-rs-feature-gaps.md` Phase 2.
-
-### 2.3 Pagination Support
+### 2.2 Pagination Support
 
 > **Prompt:** Implement pagination in `PythonRsDriver` once upstream python-rs-driver adds `execute_paged()`. Wire `fetch_size` through `PreparedStatement.with_page_size()`, extract `paging_state` from `RequestResult`, and return it for `paged_all()` continuation. Un-skip 3 pagination integration tests. See `docs/plans/python-rs-feature-gaps.md` Phase 3.
 
-### 2.4 Session Close / Shutdown
+### 2.3 Session Close / Shutdown
 
 > **Prompt:** Implement proper `close_async()` and `close()` in `PythonRsDriver` once upstream python-rs-driver adds `Session.close()`. Currently these are no-ops. See `docs/plans/python-rs-feature-gaps.md` Phase 4.
 
-### 2.5 Non-Row Result Handling
+### 2.4 Non-Row Result Handling
 
 > **Prompt:** Improve non-row result handling in `PythonRsDriver._rows_to_dicts()`. Currently catches `RuntimeError("does not have rows")` — improve once upstream adds `has_rows()` or `ResultType` enum. See `docs/plans/python-rs-feature-gaps.md` Phase 5.
 
-### 2.6 SSL/TLS & Authentication
+### 2.5 SSL/TLS & Authentication
 
 > **Prompt:** Add SSL/TLS and authentication support to `PythonRsDriver` once upstream python-rs-driver adds `SessionBuilder` TLS and auth configuration. Wire `ssl_context`, `ssl_enabled`, and auth parameters from `init_coodie()` / `init_coodie_async()`. See `docs/plans/python-rs-feature-gaps.md` Phase 6.
 
@@ -67,51 +64,41 @@
 
 *Source: `demos-extension-plan.md`*
 
-> *4 demos exist: `demos/fastapi-catalog/`, `demos/flask-blog/`, `demos/django-taskboard/` (✅), and `demos/lwt-user-registry/` (✅). Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for 10+ additional demos.*
+> *7 demos exist: `demos/fastapi-catalog/`, `demos/flask-blog/`, `demos/django-taskboard/` (✅), `demos/lwt-user-registry/` (✅), `demos/ttl-sessions/` (✅), `demos/batch-importer/` (✅), and `demos/materialized-views/` (✅). Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for 10+ additional demos.*
 
-### 3.1 TTL & Ephemeral Data Demo
-
-> **Prompt:** Create `demos/ttl-sessions/` — an ephemeral session store demo showcasing coodie's TTL support. Demonstrate `ttl=` on save, `__default_ttl__` on the model's Settings, and show data auto-expiring. Include a web UI that displays session tokens and their remaining TTL. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.1).
-
-### 3.2 Real-Time Counters Demo
+### 3.1 Real-Time Counters Demo
 
 > **Prompt:** Create `demos/realtime-counters/` — a page-view analytics demo showcasing coodie's `CounterDocument`, `increment()`, and `decrement()`. Build a live analytics dashboard showing counter updates in real-time. Add `seed.py` to generate synthetic traffic, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.2).
 
-### 3.3 Batch Operations Demo
+### 3.2 Collections & Tags Demo
 
-> **Prompt:** Create `demos/batch-importer/` — a CSV bulk import tool demo showcasing coodie's `BatchQuery` with logged and unlogged batches. Use `rich` for progress bars during import. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.1).
-
-### 3.4 Collections & Tags Demo
+> **⚠️ IN PROGRESS — [PR #147](https://github.com/fruch/coodie/pull/147): Collections-tags demo (Phase 5.2).**
 
 > **Prompt:** Create `demos/collections-tags/` — an article tagging system demo showcasing coodie's collection types (`list`, `set`, `map` fields) and collection mutation operations (`add__`, `remove__`, `append__`, `prepend__`). Include frozen collection examples. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.2).
 
-### 3.5 Materialized Views Demo
-
-> **Prompt:** Create `demos/materialized-views/` — a product catalog demo with auto-maintained `MaterializedView` by category. Show `sync_view()`, read-only queries against the view, and how the view auto-updates when the base table changes. Add `seed.py`, UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.3).
-
-### 3.6 Vector Similarity Search (Library + Demo)
+### 3.3 Vector Similarity Search (Library + Demo)
 
 > **⚠️ IN PROGRESS — [PR #150](https://github.com/fruch/coodie/pull/150) (WIP/draft): Vector column support + demo. Library work (Vector, VectorIndex annotations, CQL builder, ANN queries, unit tests) is done; demo creation in progress.**
 
 > **Prompt:** Add vector column support to coodie and create a vector search demo. **Library work:** (1) Add `Vector(dimensions=N)` field annotation to `coodie/fields.py` mapping to CQL `vector<float, N>`. (2) Update `coodie/schema.py` to emit `vector<float, N>` in DDL. (3) Add `VectorIndex(similarity_function="COSINE")` annotation for `CREATE INDEX ... USING 'vector_index'`. (4) Support ANN queries via a QuerySet method that emits `ORDER BY field ANN OF [...]` CQL. (5) Validate vector dimensions on save. (6) Add unit and integration tests. **Demo work:** Create `demos/vector-search/` — semantic product search using sentence-transformer embeddings with ANN queries. See `docs/plans/demos-extension-plan.md` Phase 6.
 
-### 3.7 Time-Series IoT Demo
+### 3.4 Time-Series IoT Demo
 
 > **Prompt:** Create `demos/timeseries-iot/` — an IoT sensor data demo showcasing time-bucketed partitions, clustering keys with DESC order, `per_partition_limit()`, and `paged_all()` for pagination. Add `seed.py` generating synthetic sensor readings, colorful dashboard UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.1).
 
-### 3.8 Polymorphic CMS Demo
+### 3.5 Polymorphic CMS Demo
 
 > **Prompt:** Create `demos/polymorphic-cms/` — a content management system demo showcasing coodie's single-table inheritance with `Discriminator` column. Define `Article`, `Video`, and `Podcast` subtypes sharing a single table. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.2).
 
-### 3.9 Argus-Style Test Tracker Demo
+### 3.6 Argus-Style Test Tracker Demo
 
 > **Prompt:** Create `demos/argus-tracker/` — a scaled-down test tracker inspired by scylladb/argus. Define complex models: User, TestRun (composite PK + clustering), Event (compound partition), Notification (TimeUUID). Include batch event ingestion, prepared-statement caching patterns, and partition-scoped queries. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.1).
 
-### 3.10 cqlengine → coodie Migration Guide Demo
+### 3.7 cqlengine → coodie Migration Guide Demo
 
 > **Prompt:** Create `demos/migration-guide/` — a side-by-side migration walkthrough from cqlengine to coodie. Include `cqlengine_models.py` and `coodie_models.py` with equivalent models, a `migrate.py` script that syncs tables, and a `verify.py` that checks data round-trip. Reference argus model patterns. Add `README.md` with step-by-step walkthrough. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.3).
 
-### 3.11 Schema Migrations Demo
+### 3.8 Schema Migrations Demo
 
 > **Prompt:** Create `demos/schema-migrations/` — a demo showcasing coodie's Phase B migration framework CLI (`coodie migrate`). Demonstrate `apply`, `rollback`, `dry-run`, and state tracking with the `_coodie_migrations` table. Include sample migration files following the `YYYYMMDD_NNN_description.py` pattern. Add `Makefile` and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 10 reference.
 
@@ -161,23 +148,13 @@
 
 *Source: `sync-api-support.md`*
 
-> *Phase 1 is ✅ Done — `init_coodie_async(driver_type="acsylla", hosts=...)` now routes through `AcsyllaDriver.connect()` with `_bridge_to_bg_loop = True`. PythonRsDriver exists (`src/coodie/drivers/python_rs.py`) but uses `run_until_complete()` instead of the proper background-thread sync bridge. Phases 2–5 remain.*
+> *Phase 1 is ✅ Done — `init_coodie_async(driver_type="acsylla", hosts=...)` routes through `AcsyllaDriver.connect()` with `_bridge_to_bg_loop = True`. Phase 2 is ✅ Done — `AcsyllaDriver.connect_sync()` + `init_coodie(driver_type="acsylla", hosts=...)` auto-create sync session + `UserWarning`. Phase 3 is ✅ Done — `PythonRsDriver` uses bg-thread sync bridge with `_bg_loop`, `_bg_thread`, `_bridge_to_bg_loop`, `connect()` classmethod, `run_coroutine_threadsafe()`. Phases 4–5 remain.*
 
-### 6.1 Add sync-capable `init_coodie` for AcsyllaDriver
-
-> **⚠️ IN PROGRESS — [PR #157](https://github.com/fruch/coodie/pull/157) (draft): `AcsyllaDriver.connect_sync()` + `init_coodie(driver_type="acsylla", hosts=...)` auto-create sync session + `UserWarning` on direct `session=` usage.**
-
-> **Prompt:** Allow `init_coodie(driver_type="acsylla", hosts=...)` to auto-create a sync-capable session instead of raising `ConfigurationError`. Add `AcsyllaDriver.connect_sync(hosts, keyspace, **kwargs)` — a blocking classmethod that bootstraps the background loop and creates the session on it. Add a `UserWarning` when `AcsyllaDriver(session=...)` is used directly (sync calls may not work). See `docs/plans/sync-api-support.md` Phase 2 (tasks 2.1–2.5).
-
-### 6.2 Upgrade PythonRsDriver to Sync Bridge
-
-> **Prompt:** Upgrade `src/coodie/drivers/python_rs.py` to use a proper background-thread sync bridge (same pattern as `AcsyllaDriver`) instead of `loop.run_until_complete()`. The file already exists with basic async+sync via `run_until_complete()`. Add: (1) `_bridge_to_bg_loop` flag and background event-loop thread. (2) `execute()` via `run_coroutine_threadsafe()`. (3) `PythonRsDriver.connect(session_factory, default_keyspace)` classmethod. (4) Update `init_coodie()` / `init_coodie_async()` to use `PythonRsDriver.connect()`. See `docs/plans/sync-api-support.md` Phase 3 (tasks 3.5, 3.6, 3.9, 3.10).
-
-### 6.3 Sync API Integration Tests
+### 6.1 Sync API Integration Tests
 
 > **Prompt:** Verify both AcsyllaDriver and PythonRsDriver pass the integration test suite in sync and async variants. Add `"python-rs"` to `--driver-type` choices, create `create_python_rs_session()` helper, update `coodie_driver` fixture, and add CI matrix entries for both drivers. See `docs/plans/sync-api-support.md` Phase 4 (tasks 4.1–4.5).
 
-### 6.4 Sync API Documentation
+### 6.2 Sync API Documentation
 
 > **Prompt:** Document the sync bridge pattern, supported init paths, and caveats for AcsyllaDriver and PythonRsDriver. Update class docstrings and `init_coodie()`/`init_coodie_async()` docstrings. See `docs/plans/sync-api-support.md` Phase 5 (tasks 5.1–5.3).
 
@@ -187,12 +164,8 @@
 
 *Source: `pr-conflict-detection-solve.md`*
 
-> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). Phase 1 (conflict detection workflow) is ✅ Done — `.github/workflows/pr-conflict-detect.yml` shipped. Phase 2 (`/solve` slash-command) is ✅ Done — `.github/workflows/pr-solve-command.yml` shipped (207 lines). Phase 3 (shared conflict-resolution script) is ✅ Done — `resolve-conflicts.sh` supports `RESOLVE_MODE=merge|rebase`. Phases 4–5 remain.*
+> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). Phase 1 (conflict detection workflow) is ✅ Done — `.github/workflows/pr-conflict-detect.yml` shipped. Phase 2 (`/solve` slash-command) is ✅ Done — `.github/workflows/pr-solve-command.yml` shipped (207 lines). Phase 3 (shared conflict-resolution script) is ✅ Done — `resolve-conflicts.sh` supports `RESOLVE_MODE=merge|rebase`. Phase 4 (safety gates) is ✅ Done — fork skip, concurrency groups, closed/merged PR block, no-conflict no-op, COPILOT_PAT fallback, explicit label removal. Phase 5 remains.*
 
-### 7.1 Safety Gates & Edge Cases
-
-> **Prompt:** Add safety gates to the conflict detection and `/solve` workflows: draft PR skip, max file limit, protected branch checks, binary file conflict handling, concurrent run prevention. See `docs/plans/pr-conflict-detection-solve.md` Phase 4 (tasks 4.1–4.6).
-
-### 7.2 Testing & Documentation
+### 7.1 Testing & Documentation
 
 > **Prompt:** Add Bats tests for the shared conflict-resolution script, Python workflow convention tests, and update `CONTRIBUTING.md` with `/solve` command documentation. See `docs/plans/pr-conflict-detection-solve.md` Phase 5 (tasks 5.1–5.4).

@@ -152,7 +152,9 @@ async def _seed(count: int, num_pages: int) -> None:
 
     total_views = sum(s["views"] for s in stats.values())
     total_visitors = sum(s["visitors"] for s in stats.values())
-    console.print(f"[bold magenta]📊 {count} increments applied — {total_views} views, {total_visitors} visitors across {len(stats)} URL/date combos.[/]")
+    console.print(
+        f"[bold magenta]📊 {count} increments applied — {total_views} views, {total_visitors} visitors across {len(stats)} URL/date combos.[/]"
+    )
     console.print("[dim]   Launch the app with: uv run uvicorn main:app --reload[/]")
     console.print()
 

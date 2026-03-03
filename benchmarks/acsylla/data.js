@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772563669687,
+  "lastUpdate": 1772563703221,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10164,6 +10164,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.766287019603632e-7",
             "extra": "mean: 5.235886381584517 usec\nrounds: 7446"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "015d6a566ac3cc5bd632c4d6f7d1a9504ed9eb86",
+          "message": "feat(demos): add batch-importer demo showcasing BatchQuery with logged/unlogged batches\n\nDemonstrates practical use of coodie's BatchQuery feature for high-throughput\nCSV bulk imports into ScyllaDB. The demo is needed to provide users with a\nworking example of batch operations, comparing logged batches (atomic writes\nfor critical data) vs. unlogged batches (best-effort, higher throughput for logs).\n\nCode changes include a complete runnable demo with models (CargoEntry, ShipmentLog),\na CLI importer (seed.py) with rich progress bars, Makefile automation, sample CSV data,\nsmoke tests, and CI workflow integration.\n\nUsers can generate random cargo manifests or import CSV files,\nobserving batch performance differences in a practical scenario.\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-03T20:47:35+02:00",
+          "tree_id": "c4b193726d8b2987e5dc8643bde9b484d3b00437",
+          "url": "https://github.com/fruch/coodie/commit/015d6a566ac3cc5bd632c4d6f7d1a9504ed9eb86"
+        },
+        "date": 1772563702336,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52685.4979061187,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015871281729231515",
+            "extra": "mean: 18.980555176339404 usec\nrounds: 11427"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 575565.1568657045,
+            "unit": "iter/sec",
+            "range": "stddev: 5.588832813497102e-7",
+            "extra": "mean: 1.7374227540902518 usec\nrounds: 56948"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 617472.5365377726,
+            "unit": "iter/sec",
+            "range": "stddev: 3.959922300837474e-7",
+            "extra": "mean: 1.619505226268192 usec\nrounds: 65630"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 816873.612156259,
+            "unit": "iter/sec",
+            "range": "stddev: 3.354024635891688e-7",
+            "extra": "mean: 1.2241795855791593 usec\nrounds: 159211"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 853404.3212344175,
+            "unit": "iter/sec",
+            "range": "stddev: 3.6295386413997203e-7",
+            "extra": "mean: 1.171777521062393 usec\nrounds: 113831"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 732327.8447189296,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5045661703587077e-7",
+            "extra": "mean: 1.3655086409882504 usec\nrounds: 120993"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190600.0513694594,
+            "unit": "iter/sec",
+            "range": "stddev: 7.201280344182404e-7",
+            "extra": "mean: 5.2465883026526505 usec\nrounds: 7865"
           }
         ]
       }

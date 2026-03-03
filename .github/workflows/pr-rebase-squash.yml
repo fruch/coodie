@@ -238,6 +238,13 @@ jobs:
           # intentional content ends up in the file.
           COPILOT_OUTPUT_FILE=$(mktemp)
           export COPILOT_OUTPUT_FILE
+
+          echo "::group::Copilot output-file validation (pre)"
+          echo "COPILOT_OUTPUT_FILE=$COPILOT_OUTPUT_FILE"
+          ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
+          echo "File writable: $(test -w "$COPILOT_OUTPUT_FILE" && echo yes || echo no)"
+          echo "::endgroup::"
+
           npm install -g @github/copilot 2>/dev/null || true
           copilot -p \
             "Write ONLY a git commit body (no subject line) summarising these changes. \
@@ -246,6 +253,18 @@ jobs:
              Write the result to the file $COPILOT_OUTPUT_FILE. \
              Commits: $LOG --- Diff stat: $STAT" \
             >/dev/null 2>/dev/null || true
+
+          echo "::group::Copilot output-file validation (post)"
+          if [ -f "$COPILOT_OUTPUT_FILE" ]; then
+            echo "File exists: yes"
+            echo "File size: $(wc -c < "$COPILOT_OUTPUT_FILE") bytes"
+            echo "--- file content (first 20 lines) ---"
+            head -20 "$COPILOT_OUTPUT_FILE"
+            echo "--- end ---"
+          else
+            echo "File exists: no (Copilot may have removed or not written to the file)"
+          fi
+          echo "::endgroup::"
 
           # Clean and validate Copilot output, with PR body fallback
           PR_BODY=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
@@ -261,6 +280,8 @@ jobs:
 
           {
             echo "### Squashed $COMMIT_COUNT commits"
+            echo ""
+            echo "**Message source:** \`$MESSAGE_SOURCE\`"
             echo ""
             echo '```'
             echo "$MESSAGE"

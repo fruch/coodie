@@ -56,12 +56,29 @@ def init_coodie(
     elif driver_type == "python-rs":
         from coodie.drivers.python_rs import PythonRsDriver
 
-        if session is None:
-            raise ConfigurationError(
-                "PythonRsDriver requires a pre-created python-rs-driver session. "
-                "Pass session= or use init_coodie_async() with hosts."
+        if session is None and hosts is not None:
+            try:
+                from scylla.session_builder import SessionBuilder  # type: ignore[import-untyped]
+            except ImportError as exc:
+                raise ImportError(
+                    "python-rs-driver is required for PythonRsDriver. "
+                    "Build from source: https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver"
+                ) from exc
+
+            async def _make_session() -> Any:
+                builder = SessionBuilder(contact_points=hosts, **kwargs)
+                return await builder.connect()
+
+            driver = PythonRsDriver.connect(
+                session_factory=_make_session,
+                default_keyspace=keyspace,
             )
-        driver = PythonRsDriver(session=session, default_keyspace=keyspace)
+        elif session is None:
+            raise ConfigurationError(
+                "PythonRsDriver requires a pre-created python-rs-driver session or hosts. Pass session= or hosts=."
+            )
+        else:
+            driver = PythonRsDriver(session=session, default_keyspace=keyspace)
     elif driver_type in ("scylla", "cassandra"):
         if lazy and session is None:
             from coodie.drivers.lazy import LazyDriver
@@ -160,12 +177,20 @@ async def init_coodie_async(
                 "python-rs-driver is required for PythonRsDriver. "
                 "Build from source: https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver"
             ) from exc
-        builder = SessionBuilder(contact_points=hosts, **kwargs)
-        session = await builder.connect()
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        async def _make_python_rs_session() -> Any:
+            builder = SessionBuilder(contact_points=hosts, **kwargs)
+            return await builder.connect()
+
+        driver = PythonRsDriver.connect(
+            session_factory=_make_python_rs_session,
+            default_keyspace=keyspace,
+        )
+        register_driver(name, driver, default=True)
+        return driver
 
     if driver_type == "python-rs":
-        import asyncio
-
         from coodie.drivers.python_rs import PythonRsDriver
 
         if session is None:
@@ -173,8 +198,7 @@ async def init_coodie_async(
                 "PythonRsDriver requires a pre-created python-rs-driver session. "
                 "Pass session= or use init_coodie_async() with hosts."
             )
-        loop = asyncio.get_running_loop()
-        driver = PythonRsDriver(session=session, default_keyspace=keyspace, loop=loop)
+        driver = PythonRsDriver(session=session, default_keyspace=keyspace)
         register_driver(name, driver, default=True)
         return driver
 

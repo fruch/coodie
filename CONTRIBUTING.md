@@ -320,6 +320,45 @@ support `workflow_dispatch` triggers for manual testing:
 5. Verify the expected comment is posted on the PR.
 6. **Cleanup:** If the operation modified the PR branch (rebase/squash), restore it with `git reflog` and `git push --force-with-lease`.
 
+### Self-Healing CI / `GH_PAT` Setup
+
+The **Self-Healing CI** workflow (`.github/workflows/self-healing-ci.yml`) automatically
+comments on pull requests when a CI job fails, including an AI-generated failure
+analysis and `@copilot` mention so Copilot can investigate the issue.
+
+For the `@copilot` mention to work on **Copilot-authored PRs**, the comment must
+come from a real user account — not `github-actions[bot]`. This requires a
+fine-grained Personal Access Token (PAT) stored as the `GH_PAT` repository secret.
+
+If `GH_PAT` is missing or invalid, the workflow still posts the failure comment
+using `GITHUB_TOKEN`, but Copilot will not respond to the mention.
+
+**Creating the PAT:**
+
+1. Go to <https://github.com/settings/personal-access-tokens/new>
+2. Set **Resource owner** to `fruch` (or the org that owns this repo)
+3. Set **Repository access** to **Only select repositories** → `fruch/coodie`
+4. Under **Repository permissions**, grant:
+   - **Pull requests: Read and write** — needed to post PR comments
+5. Click **Generate token** and copy the value
+
+**Storing the secret:**
+
+1. Go to <https://github.com/fruch/coodie/settings/secrets/actions/new>
+2. Name: `GH_PAT`
+3. Value: paste the token from the previous step
+4. Click **Add secret**
+
+**Important notes:**
+
+- Fine-grained PATs **do not support** the GitHub GraphQL API. The workflow uses
+  the REST API (`gh api --method POST repos/{owner}/{repo}/issues/{n}/comments`)
+  to avoid this limitation.
+- PATs expire. When the token expires, the workflow will fall back to
+  `GITHUB_TOKEN` and post a warning comment on the PR with a link to these
+  instructions.
+- Only repository admins can add or update secrets.
+
 ## Making a new release
 
 Publishing to PyPI is triggered automatically whenever a tag matching `v<major>.<minor>.<patch>` (e.g. `v1.0.0`) is pushed to the repository. The [Publish to PyPI](.github/workflows/publish.yml) GitHub Actions workflow will build the package and publish it using [Trusted Publishing](#setting-up-trusted-publishing-on-pypi) — no API tokens or credentials are stored in GitHub secrets.

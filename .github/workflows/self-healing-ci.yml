@@ -149,17 +149,50 @@ jobs:
             cat /tmp/failed_logs.txt
           } > /tmp/comment.md
 
-          # GH_PAT is required: comments from GITHUB_TOKEN (github-actions[bot])
-          # are ignored by Copilot, so there is no useful fallback.
-          if [ -z "$GH_PAT" ]; then
-            echo "::error::GH_PAT secret is not set. Set it to a fine-grained PAT with Pull requests: Read and write so the comment appears from a real user and @copilot responds."
-            exit 1
-          fi
-          export GH_TOKEN="$GH_PAT"
           # Use REST API (gh api POST) instead of gh pr comment: the latter uses
           # the GraphQL API which fine-grained PATs do not support.
           # jq is pre-installed on all ubuntu-latest GitHub Actions runners.
           jq -Rs '{body: .}' /tmp/comment.md > /tmp/comment.json
-          gh api --method POST \
-            "repos/${{ github.repository }}/issues/${pr_number}/comments" \
-            --input /tmp/comment.json
+
+          # Try GH_PAT first (so @copilot mentions work on Copilot-authored PRs).
+          # Fall back to GITHUB_TOKEN if the PAT is missing or returns an auth error,
+          # and post a separate diagnostic comment about the broken PAT.
+          pat_problem=""
+          posted=false
+          if [ -n "$GH_PAT" ]; then
+            if GH_TOKEN="$GH_PAT" gh api --method POST \
+                "repos/${{ github.repository }}/issues/${pr_number}/comments" \
+                --input /tmp/comment.json; then
+              posted=true
+            else
+              echo "::warning::GH_PAT authentication failed — falling back to GITHUB_TOKEN."
+              pat_problem="expired or invalid"
+            fi
+          else
+            echo "::warning::GH_PAT secret is not set — falling back to GITHUB_TOKEN."
+            pat_problem="not configured"
+          fi
+
+          if [ "$posted" = false ]; then
+            # Post the CI failure comment with GITHUB_TOKEN
+            gh api --method POST \
+              "repos/${{ github.repository }}/issues/${pr_number}/comments" \
+              --input /tmp/comment.json
+
+            # Post a separate warning comment about the broken PAT
+            docs_url="https://github.com/${{ github.repository }}/blob/${{ github.sha }}/CONTRIBUTING.md#self-healing-ci--gh_pat-setup"
+            {
+              echo "## ⚠️ Self-Healing CI: \`GH_PAT\` is ${pat_problem}"
+              echo ""
+              echo "The CI failure comment above was posted by \`github-actions[bot]\`."
+              echo "**Copilot will not respond** to \`@copilot\` mentions in bot-posted comments on Copilot-authored PRs."
+              echo ""
+              echo "To fix this, a repository admin must configure the \`GH_PAT\` secret with a valid fine-grained Personal Access Token."
+              echo ""
+              echo "**Setup instructions:** [CONTRIBUTING.md — Self-Healing CI / GH_PAT Setup](${docs_url})"
+            } > /tmp/pat_warning.md
+            jq -Rs '{body: .}' /tmp/pat_warning.md > /tmp/pat_warning.json
+            gh api --method POST \
+              "repos/${{ github.repository }}/issues/${pr_number}/comments" \
+              --input /tmp/pat_warning.json
+          fi

@@ -314,3 +314,44 @@ def test_pk_columns_cached():
     first = _pk_columns(SimpleDoc)
     second = _pk_columns(SimpleDoc)
     assert first is second
+
+
+# ------------------------------------------------------------------
+# frozenset column support
+# ------------------------------------------------------------------
+
+
+def test_build_schema_frozenset_column():
+    """frozenset[X] columns should map to frozen<set<cql_type>>."""
+
+    class FrozenSetDoc(BaseModel):
+        id: Annotated[UUID, PrimaryKey()]
+        tags: frozenset[str]
+
+        class Settings:
+            name = "frozenset_docs"
+            keyspace = "test_ks"
+
+    schema = build_schema(FrozenSetDoc)
+    col = next(c for c in schema if c.name == "tags")
+    assert col.cql_type == "frozen<set<text>>"
+
+
+# ------------------------------------------------------------------
+# Unsupported type raises InvalidQueryError (no silent skip)
+# ------------------------------------------------------------------
+
+
+def test_build_schema_unsupported_type_raises():
+    """build_schema() must raise InvalidQueryError for unsupported column types."""
+
+    class BadDoc(BaseModel):
+        id: Annotated[UUID, PrimaryKey()]
+        bad_col: object  # not a valid CQL type
+
+        class Settings:
+            name = "bad_docs"
+            keyspace = "test_ks"
+
+    with pytest.raises(InvalidQueryError, match="bad_col"):
+        build_schema(BadDoc)

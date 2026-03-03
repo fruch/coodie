@@ -88,6 +88,11 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
         inner = python_type_to_cql_type_str(args[0]) if args else "text"
         return f"set<{inner}>"
 
+    # frozenset[X] -> frozen<set<cql_type>>
+    if origin is frozenset:
+        inner = python_type_to_cql_type_str(args[0]) if args else "text"
+        return f"frozen<set<{inner}>>"
+
     # dict[K, V] -> map<k_type, v_type>
     if origin is dict:
         k = python_type_to_cql_type_str(args[0]) if args else "text"

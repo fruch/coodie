@@ -73,8 +73,11 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         # Determine CQL type — pass full annotation so markers are visible
         try:
             cql_type = python_type_to_cql_type_str(annotation)
-        except Exception:
-            continue
+        except Exception as exc:
+            raise InvalidQueryError(
+                f"Cannot determine CQL type for field {field_name!r} on {doc_cls.__name__!r}: {exc}. "
+                "If this type is not supported, please open an issue."
+            ) from exc
 
         # Defaults
         is_primary_key = False

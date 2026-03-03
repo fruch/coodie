@@ -73,6 +73,7 @@ docs = [
 ]
 
 [tool.uv]
+required-version = ">=0.5.0"
 # scylla-driver and cassandra-driver both provide the `cassandra` Python
 # namespace and cannot coexist in the same environment.
 conflicts = [

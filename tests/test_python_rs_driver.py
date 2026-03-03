@@ -84,6 +84,9 @@ def test_python_rs_driver_has_slots():
 
         assert hasattr(PythonRsDriver, "__slots__")
         assert "_session" in PythonRsDriver.__slots__
+        assert "_bg_loop" in PythonRsDriver.__slots__
+        assert "_bg_thread" in PythonRsDriver.__slots__
+        assert "_bridge_to_bg_loop" in PythonRsDriver.__slots__
 
 
 # ------------------------------------------------------------------
@@ -325,7 +328,7 @@ async def test_python_rs_driver_close_async(python_rs_driver):
 def test_init_coodie_python_rs_requires_session():
     _registry.clear()
     with patch.dict("sys.modules", _mock_scylla_modules()):
-        with pytest.raises(ConfigurationError, match="pre-created python-rs-driver session"):
+        with pytest.raises(ConfigurationError, match="pre-created python-rs-driver session or hosts"):
             init_coodie(driver_type="python-rs", keyspace="ks")
     _registry.clear()
 
@@ -358,8 +361,10 @@ async def test_init_coodie_async_python_rs_with_hosts():
             driver_type="python-rs",
         )
     assert get_driver() is driver
+    # connect() creates session on background loop via session_factory
     mock_scylla.session_builder.SessionBuilder.assert_called_once()
     mock_builder.connect.assert_awaited_once()
+    assert driver._bridge_to_bg_loop is True
     _registry.clear()
 
 
@@ -377,4 +382,92 @@ def test_init_coodie_unknown_driver_type_includes_python_rs():
     _registry.clear()
     with pytest.raises(ConfigurationError, match="python-rs"):
         init_coodie(driver_type="unknown", keyspace="ks")
+    _registry.clear()
+
+
+# ------------------------------------------------------------------
+# Background-thread sync bridge & connect() classmethod
+# ------------------------------------------------------------------
+
+
+def test_python_rs_driver_init_sets_bridge_false():
+    """__init__ sets _bridge_to_bg_loop to False."""
+    with patch.dict("sys.modules", _mock_scylla_modules()):
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        driver = PythonRsDriver(session=MagicMock(), default_keyspace="ks")
+        assert driver._bridge_to_bg_loop is False
+        assert driver._bg_loop is not None
+        assert driver._bg_thread.is_alive()
+        driver.close()
+
+
+def test_python_rs_driver_connect_classmethod():
+    """connect() creates a driver with _bridge_to_bg_loop = True."""
+    mock_session = MagicMock()
+
+    async def factory():
+        return mock_session
+
+    with patch.dict("sys.modules", _mock_scylla_modules()):
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        driver = PythonRsDriver.connect(session_factory=factory, default_keyspace="ks")
+        assert driver._bridge_to_bg_loop is True
+        assert driver._session is mock_session
+        assert driver._default_keyspace == "ks"
+        assert driver._bg_loop is not None
+        assert driver._bg_thread.is_alive()
+        driver.close()
+
+
+def test_python_rs_driver_connect_import_error():
+    """connect() raises ImportError when scylla is not installed."""
+    with patch.dict("sys.modules", {"scylla": None}):
+        with pytest.raises(ImportError, match="python-rs-driver is required"):
+            from coodie.drivers.python_rs import PythonRsDriver
+
+            PythonRsDriver.connect(session_factory=AsyncMock())
+
+
+def test_python_rs_driver_execute_via_run_coroutine_threadsafe():
+    """Sync execute() dispatches to _bg_loop via run_coroutine_threadsafe."""
+    with patch.dict("sys.modules", _mock_scylla_modules()):
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        mock_session = MagicMock()
+        prepared = MagicMock()
+        mock_session.prepare = AsyncMock(return_value=prepared)
+        result = MagicMock()
+        result.iter_rows.return_value = iter([{"id": "1"}])
+        mock_session.execute = AsyncMock(return_value=result)
+
+        async def factory():
+            return mock_session
+
+        driver = PythonRsDriver.connect(session_factory=factory, default_keyspace="ks")
+        rows = driver.execute("SELECT * FROM ks.t", [])
+        assert rows == [{"id": "1"}]
+        driver.close()
+
+
+def test_init_coodie_python_rs_with_hosts():
+    """init_coodie(hosts=..., driver_type='python-rs') uses PythonRsDriver.connect()."""
+    _registry.clear()
+    mock_scylla = MagicMock()
+    mock_builder = MagicMock()
+    mock_session = MagicMock()
+    mock_scylla.session_builder.SessionBuilder = MagicMock(return_value=mock_builder)
+    mock_builder.connect = AsyncMock(return_value=mock_session)
+
+    modules = {
+        "scylla": mock_scylla,
+        "scylla.session_builder": mock_scylla.session_builder,
+    }
+    with patch.dict("sys.modules", modules):
+        driver = init_coodie(hosts=["127.0.0.1"], keyspace="ks", driver_type="python-rs")
+    assert get_driver() is driver
+    assert driver._bridge_to_bg_loop is True
+    mock_scylla.session_builder.SessionBuilder.assert_called_once()
+    mock_builder.connect.assert_awaited_once()
     _registry.clear()

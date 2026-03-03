@@ -163,19 +163,19 @@ Legend:
 
 **Goal:** Create `src/coodie/drivers/python_rs.py` with a fully functional sync bridge mirroring the `AcsyllaDriver` pattern.
 
-| Task | Description |
-|---|---|
-| 3.1 | Create `src/coodie/drivers/python_rs.py` with `PythonRsDriver(AbstractDriver)` and `__slots__` matching `AcsyllaDriver` |
-| 3.2 | Implement `_prepare()` with local cache; skip prepare for DDL (reuse `_is_ddl()` helper pattern from `CassandraDriver`) |
-| 3.3 | Implement `_rows_to_dicts()` — iterate `RequestResult.iter_rows()` to `list[dict]`; return `[]` on `RuntimeError("does not have rows")` for non-SELECT results |
-| 3.4 | Implement `_execute_async_impl()` — prepare statement, call `session.execute(prepared, values)`, collect rows |
-| 3.5 | Implement `execute_async()` — route through `_run_on_bg_loop()` when `_bridge_to_bg_loop` is `True` |
-| 3.6 | Implement `execute()` — `run_coroutine_threadsafe(_execute_async_impl(...), _bg_loop).result()` |
-| 3.7 | Implement `_sync_table_async_impl()`, `sync_table_async()`, and `sync_table()` — reuse CQL builder; DDL statements executed as raw `Statement` (no prepare) |
-| 3.8 | Implement `_close_async_impl()`, `close_async()`, and `close()` |
-| 3.9 | Add `PythonRsDriver.connect(session_factory, default_keyspace)` classmethod — same structure as `AcsyllaDriver.connect()` |
-| 3.10 | Register `driver_type="python-rs"` in `init_coodie()` and `init_coodie_async()` using `PythonRsDriver.connect()` |
-| 3.11 | Unit tests for `PythonRsDriver` with mocked `scylla` session |
+| Task | Description | Status |
+|---|---|---|
+| 3.1 | Create `src/coodie/drivers/python_rs.py` with `PythonRsDriver(AbstractDriver)` and `__slots__` matching `AcsyllaDriver` | ✅ Done |
+| 3.2 | Implement `_prepare()` with local cache; skip prepare for DDL (reuse `_is_ddl()` helper pattern from `CassandraDriver`) | ✅ Done |
+| 3.3 | Implement `_rows_to_dicts()` — iterate `RequestResult.iter_rows()` to `list[dict]`; return `[]` on `RuntimeError("does not have rows")` for non-SELECT results | ✅ Done |
+| 3.4 | Implement `_execute_async_impl()` — prepare statement, call `session.execute(prepared, values)`, collect rows | ✅ Done |
+| 3.5 | Implement `execute_async()` — route through `_run_on_bg_loop()` when `_bridge_to_bg_loop` is `True` | ✅ Done |
+| 3.6 | Implement `execute()` — `run_coroutine_threadsafe(_execute_async_impl(...), _bg_loop).result()` | ✅ Done |
+| 3.7 | Implement `_sync_table_async_impl()`, `sync_table_async()`, and `sync_table()` — reuse CQL builder; DDL statements executed as raw `Statement` (no prepare) | ✅ Done |
+| 3.8 | Implement `_close_async_impl()`, `close_async()`, and `close()` | ✅ Done |
+| 3.9 | Add `PythonRsDriver.connect(session_factory, default_keyspace)` classmethod — same structure as `AcsyllaDriver.connect()` | ✅ Done |
+| 3.10 | Register `driver_type="python-rs"` in `init_coodie()` and `init_coodie_async()` using `PythonRsDriver.connect()` | ✅ Done |
+| 3.11 | Unit tests for `PythonRsDriver` with mocked `scylla` session | ✅ Done |
 
 ### Phase 4: Integration Tests (Priority: Medium)
 

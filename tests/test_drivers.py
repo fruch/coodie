@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import namedtuple
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -1532,8 +1533,6 @@ async def test_cassandra_driver_sync_table_async_warms_prepared_cache(cassandra_
 
 def test_cassandra_driver_logs_warning_on_missing_dict_factory(mock_cassandra_session, caplog):
     """CassandraDriver logs a warning when cassandra.query.dict_factory cannot be imported."""
-    import logging
-
     from coodie.drivers.cassandra import CassandraDriver
 
     with patch.dict("sys.modules", {"cassandra.query": None}):

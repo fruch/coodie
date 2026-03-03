@@ -62,21 +62,30 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
         MARKER_COUNT=$(grep -c '^<<<<<<<' "$FILE" || true)
         echo "Attempting to resolve: $FILE (${FILE_SIZE} bytes, ${MARKER_COUNT} conflict marker(s))"
 
+        # Have Copilot write the resolved content directly to a temp file
+        # (instead of capturing stdout, which can include MCP errors and
+        # agent noise).  Only the file content is used downstream.
+        COPILOT_OUTFILE=$(mktemp)
+        rm -f "$COPILOT_OUTFILE"
+        export COPILOT_OUTFILE
+
         COPILOT_RC=0
-        RESOLVED=$(timeout "$COPILOT_TIMEOUT" copilot -p \
+        timeout "$COPILOT_TIMEOUT" copilot -p \
             "Resolve ALL git conflict markers (<<<<<<<, =======, >>>>>>>) in the file \
              below. Output ONLY the complete resolved file content — no markdown fences, \
-             no explanations, no preamble. File: $FILE --- Content: $CONFLICT_CONTENT" \
-            2>/dev/null) || COPILOT_RC=$?
+             no explanations, no preamble. Write the result to the file $COPILOT_OUTFILE. \
+             File: $FILE --- Content: $CONFLICT_CONTENT" \
+            >/dev/null 2>/dev/null || COPILOT_RC=$?
 
         if [ "$COPILOT_RC" -eq 124 ]; then
             echo "Copilot timed out after ${COPILOT_TIMEOUT}s for file: $FILE"
         fi
 
-        # Strip fenced code blocks if Copilot wrapped the output in ``` markers
-        if [ -n "$RESOLVED" ] && echo "$RESOLVED" | grep -q '^```'; then
-            RESOLVED=$(echo "$RESOLVED" | awk '/^```/{if(f){exit}else{f=1;next}} f{print}')
+        RESOLVED=""
+        if [ -f "$COPILOT_OUTFILE" ]; then
+            RESOLVED=$(cat "$COPILOT_OUTFILE")
         fi
+        rm -f "$COPILOT_OUTFILE"
 
         # Accept only if non-empty and all conflict markers are gone
         if [ -n "$RESOLVED" ] && ! echo "$RESOLVED" | grep -qF '<<<<<<<'; then

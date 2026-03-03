@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772563703221,
+  "lastUpdate": 1772563716126,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10237,6 +10237,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.201280344182404e-7",
             "extra": "mean: 5.2465883026526505 usec\nrounds: 7865"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "ec0883255fa0c6fd830c110a7fab718d0aa96c0b",
+          "message": "feat(drivers): upgrade PythonRsDriver to background-thread sync bridge\n\nUpgrade PythonRsDriver from using loop.run_until_complete() to a proper\nbackground-thread sync bridge, matching the pattern already used by\nAcsyllaDriver. The driver now starts a dedicated event loop on a daemon\nthread (_bg_loop / _bg_thread) and routes all synchronous calls through\nrun_coroutine_threadsafe(), eliminating the risk of blocking or nesting\nthe caller's event loop.\n\nRegister the python-rs driver in init_coodie() (sync path) so it can be\nused outside async contexts. Update the driver factory in __init__.py to\nhandle the new connect() classmethod signature.\n\nExtend the test suite with thread-safety assertions and explicit cleanup\nof the background thread after each test, preventing resource leaks\nbetween test runs.\n\nMark Phase 3 of sync-api-support.md as complete.",
+          "timestamp": "2026-03-03T20:47:58+02:00",
+          "tree_id": "28927af72d500375e59a2fdccd675cf3f9c05577",
+          "url": "https://github.com/fruch/coodie/commit/ec0883255fa0c6fd830c110a7fab718d0aa96c0b"
+        },
+        "date": 1772563715364,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53371.18937995285,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015089445229078474",
+            "extra": "mean: 18.736700673483917 usec\nrounds: 8018"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 568133.3195231713,
+            "unit": "iter/sec",
+            "range": "stddev: 4.5904165499207043e-7",
+            "extra": "mean: 1.7601502422693502 usec\nrounds: 31163"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 603759.903134639,
+            "unit": "iter/sec",
+            "range": "stddev: 3.8316311070161296e-7",
+            "extra": "mean: 1.6562875321930732 usec\nrounds: 48172"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 834397.1003298404,
+            "unit": "iter/sec",
+            "range": "stddev: 3.499759184329117e-7",
+            "extra": "mean: 1.1984701284372825 usec\nrounds: 156202"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 788578.2890851846,
+            "unit": "iter/sec",
+            "range": "stddev: 3.6063413702179653e-7",
+            "extra": "mean: 1.2681049096090153 usec\nrounds: 86341"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 735867.1073808664,
+            "unit": "iter/sec",
+            "range": "stddev: 3.374678649249279e-7",
+            "extra": "mean: 1.358941023412839 usec\nrounds: 99921"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 189337.8459191467,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010858653461710472",
+            "extra": "mean: 5.28156425961998 usec\nrounds: 7672"
           }
         ]
       }

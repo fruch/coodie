@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772562036391,
+  "lastUpdate": 1772563042690,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10018,6 +10018,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.737876363218843e-7",
             "extra": "mean: 5.215702713073219 usec\nrounds: 7740"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "7118a521f118fec2995e454459b22049d7faaeac",
+          "message": "feat(demos): randomize per-item TTL in seed.py with shorter default range (20–120s)\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-03T20:36:44+02:00",
+          "tree_id": "a76d55fd9f4f45b919109ba328afb7a71d1c7c21",
+          "url": "https://github.com/fruch/coodie/commit/7118a521f118fec2995e454459b22049d7faaeac"
+        },
+        "date": 1772563041774,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52944.83142311242,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015926762648566185",
+            "extra": "mean: 18.887584927949405 usec\nrounds: 8466"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 574518.4179586347,
+            "unit": "iter/sec",
+            "range": "stddev: 4.059566048368704e-7",
+            "extra": "mean: 1.7405882365846104 usec\nrounds: 45123"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 598703.8948894065,
+            "unit": "iter/sec",
+            "range": "stddev: 3.84149908429858e-7",
+            "extra": "mean: 1.6702747527385329 usec\nrounds: 48833"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 834443.2548204816,
+            "unit": "iter/sec",
+            "range": "stddev: 3.2392237721398445e-7",
+            "extra": "mean: 1.1984038389945826 usec\nrounds: 139412"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 878614.1416087082,
+            "unit": "iter/sec",
+            "range": "stddev: 3.1007822921809766e-7",
+            "extra": "mean: 1.1381560489898774 usec\nrounds: 78046"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 691222.9724872806,
+            "unit": "iter/sec",
+            "range": "stddev: 3.754502654711477e-7",
+            "extra": "mean: 1.4467111768603744 usec\nrounds: 92593"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 174992.4696372946,
+            "unit": "iter/sec",
+            "range": "stddev: 7.633851766347271e-7",
+            "extra": "mean: 5.714531614261411 usec\nrounds: 7718"
           }
         ]
       }

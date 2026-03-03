@@ -150,19 +150,19 @@ Legend:
 | 3.4 | Update `pr-rebase-squash.yml` to pass `--mode rebase` (or set `RESOLVE_MODE=rebase` env var) |
 | 3.5 | Update Bats tests in `tests/workflows/test_resolve_conflicts.bats` to cover merge mode |
 
-### Phase 4: Safety Gates & Edge Cases (Priority: Medium)
+### Phase 4: Safety Gates & Edge Cases (Priority: Medium) ✅ Done
 
 **Goal:** Handle edge cases and prevent unintended behavior.
 
-| Task | Description |
-|---|---|
-| 4.1 | Conflict detection: skip PRs from forks (cannot add labels to cross-repo PRs without additional permissions) |
-| 4.2 | Conflict detection: add concurrency group to prevent overlapping label updates |
-| 4.3 | `/solve` command: block if PR is closed or merged |
-| 4.4 | `/solve` command: add concurrency group per PR number |
-| 4.5 | `/solve` command: handle case where PR already has no conflicts (no-op with informative comment) |
-| 4.6 | `/solve` command: if `COPILOT_PAT` secret is missing, fall back to `git merge --abort` and post a comment asking the user to resolve manually |
-| 4.7 | Remove `conflict` label after a successful `/solve` run (label is already removed on next `synchronize` event, but explicit removal is faster feedback) |
+| Task | Description | Status |
+|---|---|---|
+| 4.1 | Conflict detection: skip PRs from forks (cannot add labels to cross-repo PRs without additional permissions) | ✅ Done |
+| 4.2 | Conflict detection: add concurrency group to prevent overlapping label updates | ✅ Done |
+| 4.3 | `/solve` command: block if PR is closed or merged | ✅ Done |
+| 4.4 | `/solve` command: add concurrency group per PR number | ✅ Done |
+| 4.5 | `/solve` command: handle case where PR already has no conflicts (no-op with informative comment) | ✅ Done |
+| 4.6 | `/solve` command: if `COPILOT_PAT` secret is missing, fall back to `git merge --abort` and post a comment asking the user to resolve manually | ✅ Done |
+| 4.7 | Remove `conflict` label after a successful `/solve` run (label is already removed on next `synchronize` event, but explicit removal is faster feedback) | ✅ Done |
 
 ### Phase 5: Testing & Documentation (Priority: Medium)
 

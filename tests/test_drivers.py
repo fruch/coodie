@@ -139,7 +139,7 @@ def test_init_coodie_unknown_driver_type():
 def test_init_coodie_acsylla_requires_session():
     _registry.clear()
     with patch.dict("sys.modules", {"acsylla": MagicMock()}):
-        with pytest.raises(ConfigurationError, match="pre-created acsylla session"):
+        with pytest.raises(ConfigurationError, match="hosts or a pre-created acsylla session"):
             init_coodie(driver_type="acsylla", keyspace="ks")
     _registry.clear()
 
@@ -148,8 +148,27 @@ def test_init_coodie_acsylla_with_session():
     _registry.clear()
     mock_session = MagicMock()
     with patch.dict("sys.modules", {"acsylla": MagicMock()}):
-        driver = init_coodie(session=mock_session, keyspace="ks", driver_type="acsylla")
+        with pytest.warns(UserWarning, match="sync calls.*may hang"):
+            driver = init_coodie(session=mock_session, keyspace="ks", driver_type="acsylla")
     assert get_driver() is driver
+    _registry.clear()
+
+
+def test_init_coodie_acsylla_with_hosts_returns_sync_capable_driver():
+    """init_coodie(driver_type='acsylla', hosts=...) returns a driver with _bridge_to_bg_loop=True."""
+    _registry.clear()
+    mock_acsylla = MagicMock()
+    mock_cluster = MagicMock()
+    mock_session = MagicMock()
+    mock_acsylla.create_cluster = MagicMock(return_value=mock_cluster)
+    mock_cluster.create_session = AsyncMock(return_value=mock_session)
+
+    with patch.dict("sys.modules", {"acsylla": mock_acsylla}):
+        driver = init_coodie(hosts=["127.0.0.1"], keyspace="ks", driver_type="acsylla")
+    assert get_driver() is driver
+    assert driver._bridge_to_bg_loop is True
+    mock_acsylla.create_cluster.assert_called_once()
+    mock_cluster.create_session.assert_awaited_once_with(keyspace="ks")
     _registry.clear()
 
 
@@ -180,11 +199,12 @@ async def test_init_coodie_async_acsylla_with_session_no_bridge():
     _registry.clear()
     mock_session = MagicMock()
     with patch.dict("sys.modules", {"acsylla": MagicMock()}):
-        driver = await init_coodie_async(
-            session=mock_session,
-            keyspace="ks",
-            driver_type="acsylla",
-        )
+        with pytest.warns(UserWarning, match="sync calls.*may hang"):
+            driver = await init_coodie_async(
+                session=mock_session,
+                keyspace="ks",
+                driver_type="acsylla",
+            )
     assert get_driver() is driver
     assert driver._bridge_to_bg_loop is False
     _registry.clear()
@@ -743,10 +763,14 @@ def mock_acsylla_session():
 @pytest.fixture
 def acsylla_driver(mock_acsylla_session):
     """Create an AcsyllaDriver with import of acsylla mocked out."""
+    import warnings
+
     with patch.dict("sys.modules", {"acsylla": MagicMock()}):
         from coodie.drivers.acsylla import AcsyllaDriver
 
-        driver = AcsyllaDriver(session=mock_acsylla_session, default_keyspace="test_ks")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            driver = AcsyllaDriver(session=mock_acsylla_session, default_keyspace="test_ks")
         try:
             yield driver
         finally:

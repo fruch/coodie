@@ -1,0 +1,20 @@
+{% for product in products %}
+<div class="product-item">
+  <div>
+    <div class="product-name">{{ product.name }}</div>
+    <div class="product-meta">
+      <span class="view-badge">{{ product.category }}</span> ·
+      {{ product.brand }}
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:0.5rem;">
+    <span class="product-price">${{ "%.2f"|format(product.price) }}</span>
+    <button class="btn btn-danger"
+            hx-delete="/ui/products/{{ product.id }}"
+            hx-target="#product-list" hx-swap="innerHTML"
+            hx-confirm="Delete this product from the base table?">✕</button>
+  </div>
+</div>
+{% else %}
+<div class="empty">No products in the base table yet — insert one above</div>
+{% endfor %}

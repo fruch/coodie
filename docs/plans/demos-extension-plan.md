@@ -356,7 +356,7 @@ demos/
 
 | Task | Description |
 |---|---|
-| 4.1 | Create `demos/ttl-sessions/` — ephemeral session store with `ttl=` on save and `__default_ttl__` on model |
+| ✅ 4.1 | Create `demos/ttl-sessions/` — ephemeral session store with `ttl=` on save and `__default_ttl__` on model |
 | 4.2 | Create `demos/realtime-counters/` — page-view analytics with `CounterDocument`, `increment()`, and a live dashboard |
 | 4.3 | Create `demos/lwt-user-registry/` — user registration with `if_not_exists`, optimistic locking with `if_conditions` |
 | 4.4 | Each demo gets `seed.py`, colorful UI, and README |

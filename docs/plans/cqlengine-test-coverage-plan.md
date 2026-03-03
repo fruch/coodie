@@ -241,8 +241,10 @@ Reference:
 | `LWTException` raised when condition fails | exception class | ❌ |
 | `doc.iff(col=val).delete()` conditional delete | same | ❌ |
 | `batch.add(doc.iff(…).update(…))` LWT in batch | same | ❌ |
-| `delete()` with `IF EXISTS` guard | `Document.delete(if_exists=True)` | ❌ |
+| `delete()` with `IF EXISTS` guard | `Document.delete(if_exists=True)` | 🔧 unit only |
 | Conditional update in batch raises `LWTException` | same | ❌ |
+| `doc.update(if_conditions={"col": val})` conditional update | `Document.update(if_conditions={…})` | ✅ `test_update.py` |
+| `doc.update(if_exists=True)` conditional update | `Document.update(if_exists=True)` | ✅ `test_update.py` |
 
 **Gap summary — LWT:**
 - Add `Document.iff(**conditions)` returning a conditional write context.

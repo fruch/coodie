@@ -232,17 +232,20 @@ jobs:
             TITLE="chore: squash ${COMMIT_COUNT} commits"
           fi
 
-          # Try Copilot CLI for a full commit body description.
-          # Write to a temp file so stray CLI output cannot leak into the
-          # commit message (only the file content is used downstream).
+          # Have Copilot write the commit body directly to a file (instead
+          # of redirecting stdout, which can include MCP errors and agent
+          # noise).  Copilot's own file-writing tool is used, so only
+          # intentional content ends up in the file.
           COPILOT_OUTPUT_FILE=$(mktemp)
+          export COPILOT_OUTPUT_FILE
           npm install -g @github/copilot 2>/dev/null || true
           copilot -p \
             "Write ONLY a git commit body (no subject line) summarising these changes. \
              Output plain text only — no markdown fences, no code blocks, no tool \
              calls, no reasoning steps. Be concise. \
+             Write the result to the file $COPILOT_OUTPUT_FILE. \
              Commits: $LOG --- Diff stat: $STAT" \
-            > "$COPILOT_OUTPUT_FILE" 2>/dev/null || true
+            >/dev/null 2>/dev/null || true
 
           # Clean and validate Copilot output, with PR body fallback
           PR_BODY=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" \

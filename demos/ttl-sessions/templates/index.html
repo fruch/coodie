@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="lore-panel" style="margin-top: 1.5rem;">
+  <div class="lore-title">⏳ MISSION BRIEF — OPERATION: MEMORY THIEF</div>
+  In <em>Dimension-4</em>, SCYLLA-9's fragment became <strong>EPHEMERA</strong> — an AI that
+  harvests memories and stores them as session tokens with a TTL. After the countdown reaches
+  zero, the row <em>literally disappears</em> from the database. The <em>Coodie Corps</em> must
+  inject counter-memories before expiry. Every token is a life. Every TTL is a countdown.
+</div>
+
+<div class="lore-panel" style="border-left-color: rgba(45,212,191,0.3); margin-top: 0;">
+  <div class="lore-title">🧑‍💻 COODIE TTL PATTERNS</div>
+  <div class="code-snippet"><span class="cm"># Pattern 1: __default_ttl__ on Settings (table-level default)</span>
+<span class="kw">class</span> Session(Document):
+    <span class="kw">class</span> Settings:
+        __default_ttl__ = <span class="num">300</span>  <span class="cm"># every row expires in 5 min by default</span>
+
+<span class="cm"># Pattern 2: ttl= on save() (per-record override)</span>
+<span class="kw">await</span> session.save(ttl=<span class="num">30</span>)  <span class="cm"># this row expires in 30 seconds</span></div>
+</div>
+
+<div class="grid">
+  <!-- Left: create session form -->
+  <div class="card">
+    <h2>⚡ Steal a Memory</h2>
+    <form
+      hx-post="/ui/sessions"
+      hx-target="#session-list"
+      hx-swap="innerHTML"
+      hx-indicator="#form-indicator"
+    >
+      <label for="user_name">Agent / Victim</label>
+      <input id="user_name" name="user_name" type="text"
+             placeholder="e.g. Agent Cipher" required>
+
+      <label for="memory_fragment">Memory Fragment</label>
+      <textarea id="memory_fragment" name="memory_fragment"
+                placeholder="What was stolen?" required></textarea>
+
+      <label for="ttl">TTL (seconds)</label>
+      <input id="ttl" name="ttl" type="number" value="30" min="5" max="3600">
+      <div style="font-size:0.7rem; color:var(--muted); margin-top:-0.5rem; margin-bottom:0.75rem;">
+        ⚠ Overrides the model's <code style="color:var(--accent)">__default_ttl__=300</code> for this single row
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        👻 Store Memory
+        <span class="htmx-indicator" id="form-indicator">⏳</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Right: live session list -->
+  <div class="card">
+    <h2>🗂 Active Memory Tokens</h2>
+    <p class="refresh-notice"
+       hx-get="/ui/sessions"
+       hx-trigger="every 5s"
+       hx-target="#session-list"
+       hx-swap="innerHTML">
+      ↻ auto-refreshes every 5s
+    </p>
+    <div id="session-list"
+         hx-get="/ui/sessions"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div class="empty">
+        <span class="empty-icon">👻</span>
+        <p>Loading memory tokens...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

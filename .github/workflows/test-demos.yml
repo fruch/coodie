@@ -23,6 +23,10 @@ jobs:
             dir: demos/fastapi-catalog
           - name: flask-blog
             dir: demos/flask-blog
+          - name: ttl-sessions
+            dir: demos/ttl-sessions
+          - name: batch-importer
+            dir: demos/batch-importer
     runs-on: ubuntu-latest
     name: ${{ matrix.demo.name }}
     permissions:

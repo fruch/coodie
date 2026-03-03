@@ -10,9 +10,19 @@ permissions:
   contents: read
   pull-requests: write
 
+# Prevent concurrent label updates for the same PR or push event.
+concurrency:
+  group: conflict-detect-${{ github.event.pull_request.number || 'push' }}
+  cancel-in-progress: true
+
 jobs:
   detect-conflicts:
     runs-on: ubuntu-latest
+    # Skip fork PRs on the pull_request trigger — GITHUB_TOKEN lacks
+    # pull-requests: write permission for cross-repo PRs.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v6
 
@@ -24,14 +34,23 @@ jobs:
         run: |
           pr_numbers=$(gh pr list --state open --json number -q '.[].number')
           for pr_number in $pr_numbers; do
-            MERGEABLE=""
-            for i in $(seq 1 5); do
+            PR_DATA=$(gh api "/repos/${{ github.repository }}/pulls/${pr_number}")
+
+            # Skip fork PRs — label-write permissions are not available for cross-repo PRs.
+            IS_FORK=$(echo "$PR_DATA" | jq -r '.head.repo.full_name != .base.repo.full_name')
+            if [ "$IS_FORK" = "true" ]; then
+              echo "PR #${pr_number}: skipping (fork PR)"
+              continue
+            fi
+
+            MERGEABLE=$(echo "$PR_DATA" | jq -r '.mergeable // empty')
+            echo "PR #${pr_number}: attempt 1/5, mergeable=$MERGEABLE"
+
+            for i in $(seq 2 5); do
+              [ -n "$MERGEABLE" ] && break
+              sleep 2
               MERGEABLE=$(gh api "/repos/${{ github.repository }}/pulls/${pr_number}" --jq '.mergeable // empty')
               echo "PR #${pr_number}: attempt $i/5, mergeable=$MERGEABLE"
-              if [ -n "$MERGEABLE" ]; then
-                break
-              fi
-              sleep 2
             done
 
             if [ -z "$MERGEABLE" ]; then

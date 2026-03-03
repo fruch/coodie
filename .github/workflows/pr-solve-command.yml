@@ -127,11 +127,29 @@ jobs:
           BASE="${{ steps.pr.outputs.base_ref }}"
           git fetch origin "$BASE"
 
-          if git merge "origin/$BASE" --no-edit; then
+          MERGE_OUT=$(git merge "origin/$BASE" --no-edit 2>&1) && MERGE_EXIT=0 || MERGE_EXIT=$?
+          echo "$MERGE_OUT"
+
+          if echo "$MERGE_OUT" | grep -qF 'Already up to date'; then
+            echo "status=already_clean" >> "$GITHUB_OUTPUT"
+          elif [ "$MERGE_EXIT" -eq 0 ]; then
             echo "status=clean" >> "$GITHUB_OUTPUT"
           else
             echo "status=conflict" >> "$GITHUB_OUTPUT"
           fi
+
+      # ── 4a. No conflicts to resolve ──────────────────────────
+      - name: No conflicts to resolve
+        if: steps.merge.outputs.status == 'already_clean'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ steps.ctx.outputs.has_comment }}" = "true" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+              -f content='rocket' --silent || true
+          fi
+          gh pr comment "${{ steps.ctx.outputs.pr_number }}" --repo "${{ github.repository }}" \
+            --body "ℹ️ **No conflicts to resolve.** This PR is already up to date with the base branch."
 
       # ── 5. Push clean merge ──────────────────────────────────
       - name: Push clean merge
@@ -143,6 +161,21 @@ jobs:
           gh pr edit "${{ steps.ctx.outputs.pr_number }}" --remove-label "conflict" || true
 
       # ── 6. Resolve conflicts with Copilot CLI ────────────────
+
+      # Guard: abort early if COPILOT_PAT is not configured.
+      - name: Abort if COPILOT_PAT is not configured
+        if: steps.merge.outputs.status == 'conflict'
+        env:
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$COPILOT_PAT" ]; then
+            git merge --abort || true
+            gh pr comment "${{ steps.ctx.outputs.pr_number }}" --repo "${{ github.repository }}" \
+              --body "⚠️ **Cannot resolve conflicts automatically:** the \`COPILOT_PAT\` secret is not configured in this repository. Please resolve the conflicts manually and push."
+            exit 1
+          fi
+
       - name: Resolve conflicts with Copilot CLI
         id: resolve
         if: steps.merge.outputs.status == 'conflict'
@@ -180,7 +213,7 @@ jobs:
 
       # ── 7. Summary comment ──────────────────────────────────
       - name: Post summary comment
-        if: always()
+        if: always() && steps.merge.outputs.status != 'already_clean'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

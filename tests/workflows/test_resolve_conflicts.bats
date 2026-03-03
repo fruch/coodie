@@ -55,7 +55,9 @@ _mock_copilot() {
     local output="$1"
     cat > "$MOCK_BIN/copilot" << EOF
 #!/usr/bin/env bash
-printf '%s\n' "$output"
+if [ -n "\${COPILOT_OUTFILE:-}" ] && [ -n "$output" ]; then
+    printf '%s\n' "$output" > "\$COPILOT_OUTFILE"
+fi
 EOF
     chmod +x "$MOCK_BIN/copilot"
 }
@@ -191,7 +193,7 @@ x = 2
     grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
 }
 
-@test "Copilot returns fenced code block → stripped and accepted" {
+@test "Copilot writes resolved content to file → accepted" {
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
 x = 1
@@ -217,10 +219,12 @@ fi
 EOF
     chmod +x "$MOCK_BIN/git"
 
-    # Copilot wraps response in a fenced code block
+    # Copilot writes resolved content (clean, no fences) to the output file
     cat > "$MOCK_BIN/copilot" << 'MOCK'
 #!/usr/bin/env bash
-printf '```python\nx = 2\n```\n'
+if [ -n "${COPILOT_OUTFILE:-}" ]; then
+    printf 'x = 2\n' > "$COPILOT_OUTFILE"
+fi
 MOCK
     chmod +x "$MOCK_BIN/copilot"
 
@@ -228,7 +232,7 @@ MOCK
 
     [ "$status" -eq 0 ]
     grep -q "^status=clean$" "$GITHUB_OUTPUT"
-    # File should contain stripped content (no ``` markers)
+    # File should contain the resolved content written by Copilot
     [ "$(cat "${WORK_DIR}/foo.py")" = "x = 2" ]
 }
 
@@ -322,11 +326,10 @@ EOF
 
     _mock_git_conflicts "foo.py"
 
-    # Slow copilot that outlasts COPILOT_TIMEOUT
+    # Slow copilot that outlasts COPILOT_TIMEOUT (never writes to file)
     cat > "$MOCK_BIN/copilot" << 'MOCK'
 #!/usr/bin/env bash
 sleep 5
-printf 'x = 2\n'
 MOCK
     chmod +x "$MOCK_BIN/copilot"
 

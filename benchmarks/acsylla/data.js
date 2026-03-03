@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772563042690,
+  "lastUpdate": 1772563669687,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10091,6 +10091,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.633851766347271e-7",
             "extra": "mean: 5.714531614261411 usec\nrounds: 7718"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "fa3c42c2021e5618e7467b65f22c0581b5c9a97a",
+          "message": "feat(demos): add materialized-views demo with product catalog, views, and HTMX UI\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-03T20:47:12+02:00",
+          "tree_id": "89bf3b16206fefbe9814765e4b48d3f155d6744a",
+          "url": "https://github.com/fruch/coodie/commit/fa3c42c2021e5618e7467b65f22c0581b5c9a97a"
+        },
+        "date": 1772563669076,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53582.33203929453,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001667626594535082",
+            "extra": "mean: 18.662868186973487 usec\nrounds: 8201"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 573121.6098464319,
+            "unit": "iter/sec",
+            "range": "stddev: 5.718253697552433e-7",
+            "extra": "mean: 1.7448303864653618 usec\nrounds: 41229"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 627281.5258266086,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7602624289661713e-7",
+            "extra": "mean: 1.5941805374903024 usec\nrounds: 43304"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 829994.9960509032,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1643695340755117e-7",
+            "extra": "mean: 1.2048265408321455 usec\nrounds: 153304"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 862930.5605132567,
+            "unit": "iter/sec",
+            "range": "stddev: 3.471167193431733e-7",
+            "extra": "mean: 1.1588417953412344 usec\nrounds: 75908"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 753278.8339505974,
+            "unit": "iter/sec",
+            "range": "stddev: 3.944346877013096e-7",
+            "extra": "mean: 1.3275296675408554 usec\nrounds: 95694"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190989.62947652306,
+            "unit": "iter/sec",
+            "range": "stddev: 8.766287019603632e-7",
+            "extra": "mean: 5.235886381584517 usec\nrounds: 7446"
           }
         ]
       }

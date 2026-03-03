@@ -6,10 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.github/scripts" && pwd
 setup() {
   COPILOT_OUTPUT_FILE=$(mktemp)
   export COPILOT_OUTPUT_FILE
+  STDERR_FILE=$(mktemp)
 }
 
 teardown() {
-  rm -f "${COPILOT_OUTPUT_FILE:-}"
+  rm -f "${COPILOT_OUTPUT_FILE:-}" "${STDERR_FILE:-}"
 }
 
 @test "Copilot CLI returns valid body via file — message = title + body" {
@@ -128,31 +129,28 @@ teardown() {
   export TITLE="feat: add feature"
   echo "installed successfully" > "$COPILOT_OUTPUT_FILE"
   export PR_BODY="Fallback"
-  source "$SCRIPT_DIR/build-squash-message.sh" 2>/tmp/bats_stderr.txt
+  source "$SCRIPT_DIR/build-squash-message.sh" 2>"$STDERR_FILE"
   [ "$MESSAGE_SOURCE" = "pr-body" ]
-  grep -q "Rejected Copilot output" /tmp/bats_stderr.txt
-  rm -f /tmp/bats_stderr.txt
+  grep -q "Rejected Copilot output" "$STDERR_FILE"
 }
 
 @test "Debug log shows file read byte count for valid Copilot output" {
   export TITLE="feat: add feature"
   echo "Some valid body" > "$COPILOT_OUTPUT_FILE"
   export PR_BODY=""
-  source "$SCRIPT_DIR/build-squash-message.sh" 2>/tmp/bats_stderr.txt
+  source "$SCRIPT_DIR/build-squash-message.sh" 2>"$STDERR_FILE"
   [ "$MESSAGE_SOURCE" = "copilot" ]
-  grep -q "Read .* bytes from COPILOT_OUTPUT_FILE" /tmp/bats_stderr.txt
-  grep -q "Using Copilot-generated commit body" /tmp/bats_stderr.txt
-  rm -f /tmp/bats_stderr.txt
+  grep -q "Read .* bytes from COPILOT_OUTPUT_FILE" "$STDERR_FILE"
+  grep -q "Using Copilot-generated commit body" "$STDERR_FILE"
 }
 
 @test "Debug log shows empty file message" {
   export TITLE="feat: add feature"
   : > "$COPILOT_OUTPUT_FILE"
   export PR_BODY="Fallback"
-  source "$SCRIPT_DIR/build-squash-message.sh" 2>/tmp/bats_stderr.txt
+  source "$SCRIPT_DIR/build-squash-message.sh" 2>"$STDERR_FILE"
   [ "$MESSAGE_SOURCE" = "pr-body" ]
-  grep -q "exists but is empty" /tmp/bats_stderr.txt
-  rm -f /tmp/bats_stderr.txt
+  grep -q "exists but is empty" "$STDERR_FILE"
 }
 
 @test "Debug log shows missing file message" {
@@ -160,8 +158,7 @@ teardown() {
   rm -f "$COPILOT_OUTPUT_FILE"
   export COPILOT_OUTPUT_FILE="/nonexistent/path"
   export PR_BODY="Fallback"
-  source "$SCRIPT_DIR/build-squash-message.sh" 2>/tmp/bats_stderr.txt
+  source "$SCRIPT_DIR/build-squash-message.sh" 2>"$STDERR_FILE"
   [ "$MESSAGE_SOURCE" = "pr-body" ]
-  grep -q "does not exist" /tmp/bats_stderr.txt
-  rm -f /tmp/bats_stderr.txt
+  grep -q "does not exist" "$STDERR_FILE"
 }

@@ -17,35 +17,21 @@
 
 set -euo pipefail
 
-# Read Copilot output from file (never from a shell variable, so stray CLI
-# output cannot leak into the commit message).
+# Read Copilot output from file (Copilot writes here directly via its
+# file-writing tool; stdout is discarded, so agent noise never reaches
+# this file).
 BODY=""
 if [ -n "${COPILOT_OUTPUT_FILE:-}" ] && [ -f "$COPILOT_OUTPUT_FILE" ]; then
   BODY=$(cat "$COPILOT_OUTPUT_FILE")
 fi
 
-# Clean copilot output: if the response is wrapped in a fenced code
-# block (```...```) with tool-call / reasoning preamble before it,
-# extract only the content between the first pair of ``` markers.
+# Safety net: strip fenced code blocks (``` ... ```) — Copilot may still
+# wrap its response even when writing to a file.
 if [ -n "$BODY" ] && echo "$BODY" | grep -q '^```'; then
   BODY=$(echo "$BODY" | awk '/^```/{if(f){exit}else{f=1;next}} f{print}')
 fi
 
-# Strip any remaining copilot agent step-output lines
-# (● action headers, $ shell commands, └ result summaries,
-#  ✗/✓ check markers and their indented detail lines)
-if [ -n "$BODY" ]; then
-  BODY=$(echo "$BODY" | grep -vE '^\s*(●|└|\$ |✗ |✓ )') || true
-fi
-
-# Strip lines that are clearly shell artifacts or Copilot CLI noise
-# (redirections like 2>/dev/null, standalone pipes like | head -5,
-#  permission errors from the agent)
-if [ -n "$BODY" ]; then
-  BODY=$(echo "$BODY" | grep -vE '(^\s*[0-9]*>/dev/null|^\s*\|\s*(head|tail|wc|grep|sed|awk|sort|cat|cut|tr|tee|xargs|less|more|uniq)\b|Permission denied|could not request permission)') || true
-fi
-
-# Trim leading blank lines left after filtering
+# Trim leading blank lines
 if [ -n "$BODY" ]; then
   BODY=$(echo "$BODY" | sed '/[^[:space:]]/,$!d')
 fi

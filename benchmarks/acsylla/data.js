@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772493107823,
+  "lastUpdate": 1772562029697,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -9872,6 +9872,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.628594883569095e-7",
             "extra": "mean: 5.281328012990604 usec\nrounds: 7393"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "6b13fc3e9519e6ccaa4974a04f32628e0f9edca4",
+          "message": "test(update): add LWTResult type assertions and existing-field check in if_conditions tests\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-03T20:19:25+02:00",
+          "tree_id": "76179e6acc3ae9ed4ab00211e8216d1c80f6e3f6",
+          "url": "https://github.com/fruch/coodie/commit/6b13fc3e9519e6ccaa4974a04f32628e0f9edca4"
+        },
+        "date": 1772562028901,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52729.9988128604,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000021264026227717525",
+            "extra": "mean: 18.964536744046132 usec\nrounds: 7838"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 586711.8393736767,
+            "unit": "iter/sec",
+            "range": "stddev: 6.000531017516578e-7",
+            "extra": "mean: 1.704414216470413 usec\nrounds: 30542"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 587983.2930291976,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2728344625569913e-7",
+            "extra": "mean: 1.7007285952771838 usec\nrounds: 41381"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 822926.2981636937,
+            "unit": "iter/sec",
+            "range": "stddev: 3.979029410168399e-7",
+            "extra": "mean: 1.2151756508832379 usec\nrounds: 144030"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 835800.9515484398,
+            "unit": "iter/sec",
+            "range": "stddev: 3.213372669008378e-7",
+            "extra": "mean: 1.1964571207383266 usec\nrounds: 33641"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 716246.6898986257,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0728963594491485e-7",
+            "extra": "mean: 1.396167010756497 usec\nrounds: 80887"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190833.5328436941,
+            "unit": "iter/sec",
+            "range": "stddev: 8.399565885671679e-7",
+            "extra": "mean: 5.240169194053906 usec\nrounds: 7122"
           }
         ]
       }

@@ -1,0 +1,39 @@
+{% if counters %}
+<table style="width:100%; border-collapse: collapse; font-size: 0.82rem;">
+    <thead>
+        <tr style="border-bottom: 1px solid #2d1b69; color: #9b8bb4;">
+            <th style="text-align:left; padding: 0.5rem;">URL</th>
+            <th style="text-align:left; padding: 0.5rem;">Date</th>
+            <th style="text-align:right; padding: 0.5rem;">Views</th>
+            <th style="text-align:right; padding: 0.5rem;">Visitors</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in counters %}
+        <tr style="border-bottom: 1px solid #1a0a3e;">
+            <td style="padding: 0.4rem 0.5rem; color: #69f0ae; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ c.url }}
+            </td>
+            <td style="padding: 0.4rem 0.5rem; color: #9b8bb4;">
+                {{ c.date }}
+            </td>
+            <td style="padding: 0.4rem 0.5rem; text-align: right; color: #e040fb; font-weight: bold;">
+                {{ c.view_count }}
+            </td>
+            <td style="padding: 0.4rem 0.5rem; text-align: right; color: #ffd740; font-weight: bold;">
+                {{ c.unique_visitors }}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p style="margin-top: 0.8rem; font-size: 0.75rem; color: #9b8bb4; text-align: center;">
+    {{ counters|length }} counter row{{ "s" if counters|length != 1 else "" }} ·
+    {{ counters|map(attribute='view_count')|sum }} total views ·
+    {{ counters|map(attribute='unique_visitors')|sum }} total visitors
+</p>
+{% else %}
+<p style="color: #9b8bb4; text-align: center; padding: 2rem;">
+    📊 No counters yet — use the form or run <code>make seed</code> to generate traffic.
+</p>
+{% endif %}

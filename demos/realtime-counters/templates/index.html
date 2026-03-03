@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 The Pulse Engine — Realtime Counters</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        :root {
+            --bg: #0d0221;
+            --card: #1a0a3e;
+            --accent: #e040fb;
+            --accent-dim: #7c1fa0;
+            --text: #e0d4f5;
+            --text-dim: #9b8bb4;
+            --success: #69f0ae;
+            --warning: #ffd740;
+            --border: #2d1b69;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            color: var(--accent);
+            margin-bottom: 0.3rem;
+            text-shadow: 0 0 20px rgba(224, 64, 251, 0.5);
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.2rem;
+        }
+        .card h2 {
+            color: var(--accent);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+        label {
+            display: block;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            margin-bottom: 0.3rem;
+            margin-top: 0.8rem;
+        }
+        label:first-of-type { margin-top: 0; }
+        input, select {
+            width: 100%;
+            padding: 0.5rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 8px rgba(224, 64, 251, 0.3);
+        }
+        .btn-row { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        button {
+            flex: 1;
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.97); }
+        .btn-inc {
+            background: var(--accent);
+            color: var(--bg);
+        }
+        .btn-dec {
+            background: var(--warning);
+            color: var(--bg);
+        }
+        .code-block {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.8rem;
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .code-block .kw { color: var(--accent); }
+        .code-block .fn { color: var(--success); }
+        .code-block .cm { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 The Pulse Engine</h1>
+        <p class="subtitle">
+            DIMENSION-7 // Realtime Page-View Analytics · powered by coodie <code>CounterDocument</code>
+        </p>
+
+        <div class="grid">
+            <!-- Left: Controls -->
+            <div>
+                <div class="card">
+                    <h2>⚡ Increment / Decrement</h2>
+                    <form id="counter-form">
+                        <label for="url">URL</label>
+                        <input type="text" id="url" name="url" value="/dashboard" required>
+
+                        <label for="date">Date</label>
+                        <input type="text" id="date" name="date" value="2026-03-03" required>
+
+                        <label for="view_count">View Count Delta</label>
+                        <input type="number" id="view_count" name="view_count" value="1" min="0">
+
+                        <label for="unique_visitors">Unique Visitors Delta</label>
+                        <input type="number" id="unique_visitors" name="unique_visitors" value="1" min="0">
+
+                        <div class="btn-row">
+                            <button type="submit" class="btn-inc"
+                                    hx-post="/ui/counters/increment"
+                                    hx-target="#counter-table"
+                                    hx-include="#counter-form">
+                                ▲ Increment
+                            </button>
+                            <button type="button" class="btn-dec"
+                                    hx-post="/ui/counters/decrement"
+                                    hx-target="#counter-table"
+                                    hx-include="#counter-form">
+                                ▼ Decrement
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card" style="margin-top: 1rem;">
+                    <h2>🧬 Counter Pattern</h2>
+                    <div class="code-block"><span class="kw">class</span> PageViewCounter(<span class="kw">CounterDocument</span>):
+    url: Annotated[str, <span class="fn">PrimaryKey</span>()]
+    date: Annotated[str, <span class="fn">ClusteringKey</span>()]
+    view_count: Annotated[int, <span class="fn">Counter</span>()] = 0
+    unique_visitors: Annotated[int, <span class="fn">Counter</span>()] = 0
+
+<span class="cm"># Atomic increment — no read-modify-write</span>
+counter.<span class="fn">increment</span>(view_count=1)
+
+<span class="cm"># Atomic decrement</span>
+counter.<span class="fn">decrement</span>(view_count=1)</div>
+                </div>
+            </div>
+
+            <!-- Right: Live counter table -->
+            <div class="card">
+                <h2>📈 Live Counter Dashboard
+                    <span style="float:right; font-size: 0.7rem; color: var(--text-dim);">
+                        auto-refresh 3s
+                    </span>
+                </h2>
+                <div id="counter-table"
+                     hx-get="/ui/counters"
+                     hx-trigger="load, every 3s"
+                     hx-swap="innerHTML">
+                    <p style="color: var(--text-dim); text-align: center; padding: 2rem;">
+                        Loading counters...
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

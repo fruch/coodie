@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="lore-panel" style="margin-top: 1.5rem;">
+  <div class="lore-title">📡 STATION LOG — ARGOS-7 // SCYLLA NEBULA</div>
+  Deep in the <em>Scylla Nebula</em>, Station <em>Argos-7</em> monitors environmental conditions
+  across all decks. Each sensor transmits telemetry every few minutes, stored in
+  <em>time-bucketed partitions</em> — one partition per sensor per day.
+  The <em>DESC clustering order</em> ensures the crew always sees the newest readings first.
+</div>
+
+<div class="lore-panel" style="border-left-color: rgba(56,189,248,0.3); margin-top: 0;">
+  <div class="lore-title">🧑‍💻 COODIE PATTERNS IN THIS DEMO</div>
+  <div class="code-snippet"><span class="cm"># 1. Composite partition key — time-bucketed by day</span>
+sensor_id:   Annotated[<span class="kw">str</span>,  PrimaryKey(partition_key_index=<span class="num">0</span>)]
+date_bucket: Annotated[<span class="kw">date</span>, PrimaryKey(partition_key_index=<span class="num">1</span>)]
+
+<span class="cm"># 2. ClusteringKey DESC — newest readings first</span>
+ts: Annotated[<span class="kw">datetime</span>, ClusteringKey(order=<span class="str">"DESC"</span>)]
+
+<span class="cm"># 3. per_partition_limit() — latest N readings per sensor</span>
+readings = <span class="kw">await</span> SensorReading.find(sensor_id=sid, date_bucket=today) \
+    .per_partition_limit(<span class="num">5</span>).all()
+
+<span class="cm"># 4. paged_all() — cursor-based pagination</span>
+result = <span class="kw">await</span> SensorReading.find().fetch_size(<span class="num">10</span>).paged_all()
+<span class="cm"># result.data → list[SensorReading]</span>
+<span class="cm"># result.paging_state → bytes | None (cursor for next page)</span></div>
+</div>
+
+<!-- Tab navigation -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('dashboard', this)">📊 Dashboard</button>
+  <button class="tab" onclick="showTab('paged', this)">📄 Paginated Feed</button>
+</div>
+
+<!-- Dashboard tab -->
+<div id="tab-dashboard">
+  <p class="refresh-notice"
+     hx-get="/ui/dashboard"
+     hx-trigger="every 10s"
+     hx-target="#sensor-grid"
+     hx-swap="innerHTML">
+    ↻ auto-refreshes every 10s
+  </p>
+  <div id="sensor-grid"
+       hx-get="/ui/dashboard"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <div class="empty">
+      <span class="empty-icon">📡</span>
+      <p>Loading sensor telemetry...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Paged feed tab -->
+<div id="tab-paged" style="display: none;">
+  <div class="card">
+    <h2>📄 Paginated Reading Feed</h2>
+    <p style="font-size: 0.75rem; color: var(--muted); margin-bottom: 1rem;">
+      Demonstrates <code style="color: var(--accent);">paged_all()</code> with cursor-based pagination.
+      Click "Load More" to fetch the next page using the paging state cursor.
+    </p>
+    <div id="paged-content"
+         hx-get="/ui/paged?page_size=10"
+         hx-trigger="intersect once"
+         hx-swap="innerHTML">
+      <div class="empty">
+        <span class="empty-icon">📄</span>
+        <p>Switch to this tab to load paginated data...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-dashboard').style.display = name === 'dashboard' ? '' : 'none';
+  document.getElementById('tab-paged').style.display = name === 'paged' ? '' : 'none';
+
+  if (name === 'paged') {
+    var el = document.getElementById('paged-content');
+    if (el.querySelector('.empty')) {
+      htmx.trigger(el, 'intersect');
+    }
+  }
+}
+</script>
+
+{% endblock %}

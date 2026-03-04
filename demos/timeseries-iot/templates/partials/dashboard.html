@@ -1,0 +1,74 @@
+{% if sensors %}
+  <div class="sensor-grid">
+    {% for sensor_id, readings in sensors.items() %}
+      <div class="sensor-card"
+           hx-get="/ui/sensor/{{ sensor_id }}?days=3"
+           hx-target="#sensor-grid"
+           hx-swap="innerHTML">
+        <div class="sensor-name">📡 {{ sensor_id }}</div>
+
+        {% if readings %}
+          {% set latest = readings[0] %}
+
+          {# Temperature color coding #}
+          {% if latest.temperature > 60 %}
+            {% set temp_class = "temp-hot" %}
+          {% elif latest.temperature > 30 %}
+            {% set temp_class = "temp-warm" %}
+          {% elif latest.temperature > 0 %}
+            {% set temp_class = "temp-cool" %}
+          {% else %}
+            {% set temp_class = "temp-cold" %}
+          {% endif %}
+
+          {# Battery state #}
+          {% if latest.battery_pct > 50 %}
+            {% set batt_class = "battery-ok" %}
+          {% elif latest.battery_pct > 20 %}
+            {% set batt_class = "battery-warn" %}
+          {% else %}
+            {% set batt_class = "battery-crit" %}
+          {% endif %}
+
+          <div class="sensor-metrics">
+            <div class="metric">
+              <div class="metric-label">🌡 Temp</div>
+              <div class="metric-value {{ temp_class }}">{{ "%.1f"|format(latest.temperature) }}<span class="metric-unit">°C</span></div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">💧 Humidity</div>
+              <div class="metric-value" style="color: var(--accent);">{{ "%.1f"|format(latest.humidity) }}<span class="metric-unit">%</span></div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">🌀 Pressure</div>
+              <div class="metric-value" style="color: var(--text);">{{ "%.0f"|format(latest.pressure) }}<span class="metric-unit">hPa</span></div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">🔋 Battery</div>
+              <div class="battery">
+                <div class="battery-bar">
+                  <div class="battery-fill {{ batt_class }}" style="width: {{ latest.battery_pct }}%;"></div>
+                </div>
+                <span class="metric-value" style="font-size: 0.8rem;">{{ latest.battery_pct }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size: 0.6rem; color: var(--dim); margin-top: 0.5rem; display: flex; justify-content: space-between;">
+            <span>Last: {{ latest.ts.strftime('%H:%M:%S') if latest.ts else '—' }}</span>
+            <span>{{ readings | length }} readings loaded</span>
+          </div>
+        {% else %}
+          <div class="empty" style="padding: 1rem;">
+            <p>No recent readings</p>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty">
+    <span class="empty-icon">📡</span>
+    <p>No sensors detected — seed data with <code style="color: var(--accent);">make seed</code></p>
+  </div>
+{% endif %}

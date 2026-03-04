@@ -1,0 +1,60 @@
+{% if tag_counts %}
+<div class="tag-cloud" id="tag-cloud-inner">
+  {% for tag, count in tag_counts|dictsort %}
+  <span class="tag tag-filter {% if tag in active_tags %}tag-active{% endif %}"
+        data-tag="{{ tag|e }}"
+        onclick="toggleTagFilter(this)"
+        title="{{ count }} article{{ 's' if count != 1 else '' }}">
+    {{ tag }} <span class="tag-count">{{ count }}</span>
+  </span>
+  {% endfor %}
+</div>
+<script>
+function getActiveTags() {
+  return Array.from(document.querySelectorAll('#tag-cloud-inner .tag-filter.tag-active'))
+    .map(el => el.dataset.tag);
+}
+function applyTagFilter(tags) {
+  const param = tags.join(',');
+  const url = tags.length ? '/ui/articles?tags=' + encodeURIComponent(param) : '/ui/articles';
+  htmx.ajax('GET', url, {target: '#article-list-container', swap: 'innerHTML'});
+  const bar = document.getElementById('active-filter-bar');
+  const container = document.getElementById('active-filter-tags');
+  if (tags.length) {
+    bar.style.display = 'flex';
+    container.innerHTML = '';
+    tags.forEach(function(t) {
+      var span = document.createElement('span');
+      span.className = 'tag active-filter-tag';
+      span.textContent = t + ' ';
+      var btn = document.createElement('span');
+      btn.className = 'tag-remove';
+      btn.title = 'Remove';
+      btn.textContent = '\u2715';
+      btn.onclick = function() { removeTagFilter(t); };
+      span.appendChild(btn);
+      container.appendChild(span);
+    });
+  } else {
+    bar.style.display = 'none';
+    container.innerHTML = '';
+  }
+}
+function toggleTagFilter(el) {
+  el.classList.toggle('tag-active');
+  applyTagFilter(getActiveTags());
+}
+function removeTagFilter(tag) {
+  document.querySelectorAll('#tag-cloud-inner .tag-filter').forEach(function(el) {
+    if (el.dataset.tag === tag) el.classList.remove('tag-active');
+  });
+  applyTagFilter(getActiveTags());
+}
+function clearAllTagFilters() {
+  document.querySelectorAll('#tag-cloud-inner .tag-filter').forEach(t => t.classList.remove('tag-active'));
+  applyTagFilter([]);
+}
+</script>
+{% else %}
+<div style="font-size:0.75rem;color:var(--dim);padding:0.5rem;">No tags found — run seed.py or create articles</div>
+{% endif %}

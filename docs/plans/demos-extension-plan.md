@@ -369,7 +369,7 @@ demos/
 | Task | Description |
 |---|---|
 | 5.1 | Create `demos/batch-importer/` — CSV bulk import using `BatchQuery` (logged and unlogged), `rich` progress |
-| 5.2 | Create `demos/collections-tags/` — article tagging with `set` fields, `add__`/`remove__` operations, `map` metadata |
+| 5.2 | ✅ Create `demos/collections-tags/` — article tagging with `set` fields, `add__`/`remove__` operations, `map` metadata |
 | 5.3 | Create `demos/materialized-views/` — product catalog with auto-maintained `MaterializedView` by category |
 | 5.4 | Each demo gets `seed.py`, colorful UI, and README |
 | 5.5 | Manual end-to-end test for each demo |

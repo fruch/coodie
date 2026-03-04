@@ -237,7 +237,9 @@ jobs:
           PHASE_CONTENT=$(cat /tmp/next-phase-content.md)
 
           # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
-          timeout 60 npm install -g @github/copilot 2>/dev/null || true
+          echo "::group::Install Copilot CLI"
+          timeout 60 npm install -g @github/copilot || true
+          echo "::endgroup::"
 
           # Construct the delegation prompt via extracted script
           export PLAN_FILE PHASE TITLE PHASE_CONTENT
@@ -245,8 +247,11 @@ jobs:
 
           # Delegate via Copilot CLI — capture exit code explicitly
           # Timeout after 5 minutes to prevent the job from hanging indefinitely
+          # Use tee so output is visible in GitHub Actions log in real-time
           EXIT_CODE=0
-          RESPONSE=$(timeout 5m copilot -p "$PROMPT" 2>&1) || EXIT_CODE=$?
+          echo "::group::Copilot CLI output (delegation)"
+          RESPONSE=$(timeout 5m copilot -p "$PROMPT" 2>&1 | tee /dev/stderr) || EXIT_CODE=$?
+          echo "::endgroup::"
 
           # Fallback: if Copilot CLI failed, timed out, or is unavailable,
           # post a PR comment with the prompt so a developer can pick it up manually.

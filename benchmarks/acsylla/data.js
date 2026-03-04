@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772578841052,
+  "lastUpdate": 1772658090504,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10748,6 +10748,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.561120438797073e-7",
             "extra": "mean: 5.495499467650033 usec\nrounds: 7514"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "83f226b2bdf9826999a87168b048345a762965d9",
+          "message": "fix(ci): handle bad/expired GH_PAT gracefully in self-healing workflow\n\nSelf-healing CI workflow crashes with HTTP 401 when `GH_PAT` is set but expired/invalid. The existing check only tests for empty (`-z`), so a stale PAT passes validation then fails the `gh api` call, taking down the entire workflow.\n\n- **Fallback to `GITHUB_TOKEN`**: Try `GH_PAT` first; if it fails or is missing, post the CI failure comment with `GITHUB_TOKEN` instead\n- **Diagnostic comment on PAT failure**: When falling back, posts a separate ⚠️ comment via `GITHUB_TOKEN` explaining that `GH_PAT` is broken/not configured, warning that Copilot won't respond to bot-posted comments, and linking to setup documentation\n- **GH_PAT setup docs**: Added a new \"Self-Healing CI / `GH_PAT` Setup\" section to `CONTRIBUTING.md` with step-by-step instructions for creating a fine-grained PAT and storing it as the `GH_PAT` repository secret",
+          "timestamp": "2026-03-04T23:00:47+02:00",
+          "tree_id": "cc67165a54a423b9a3b8e6367c61956bb4abd961",
+          "url": "https://github.com/fruch/coodie/commit/83f226b2bdf9826999a87168b048345a762965d9"
+        },
+        "date": 1772658088886,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53761.66985027407,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000017183801924853245",
+            "extra": "mean: 18.60061271878262 usec\nrounds: 8397"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 549622.9114845592,
+            "unit": "iter/sec",
+            "range": "stddev: 7.380959264269423e-7",
+            "extra": "mean: 1.819429247043122 usec\nrounds: 43136"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 603866.8807342688,
+            "unit": "iter/sec",
+            "range": "stddev: 4.112857223958577e-7",
+            "extra": "mean: 1.6559941137756307 usec\nrounds: 45870"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 813624.6257705436,
+            "unit": "iter/sec",
+            "range": "stddev: 4.4458096201989974e-7",
+            "extra": "mean: 1.2290680103898644 usec\nrounds: 154991"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 834337.1675115471,
+            "unit": "iter/sec",
+            "range": "stddev: 3.369086586356148e-7",
+            "extra": "mean: 1.1985562179646758 usec\nrounds: 76488"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 726697.8928520603,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3542494472331554e-7",
+            "extra": "mean: 1.3760876560069757 usec\nrounds: 106975"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 187378.16903281608,
+            "unit": "iter/sec",
+            "range": "stddev: 6.778105046525463e-7",
+            "extra": "mean: 5.336801000680432 usec\nrounds: 7794"
           }
         ]
       }

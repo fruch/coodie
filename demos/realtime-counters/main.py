@@ -293,14 +293,27 @@ async def ui_index(request: Request) -> HTMLResponse:
     )
 
 
-@app.get("/ui/counters", response_class=HTMLResponse)
-async def ui_list_counters(request: Request) -> HTMLResponse:
+async def _render_counter_list(request: Request) -> HTMLResponse:
+    """Fetch all counters and render the list partial (date descending)."""
     counters = await PageViewCounter.find().allow_filtering().all()
-    counters_sorted = sorted(counters, key=lambda c: (c.url, c.date))
+    counters_sorted = sorted(counters, key=lambda c: (c.date, c.url), reverse=True)
+    total_views = sum(c.view_count for c in counters_sorted)
+    total_visitors = sum(c.unique_visitors for c in counters_sorted)
     return templates.TemplateResponse(
         "partials/counter_list.html",
-        {"request": request, "counters": counters_sorted},
+        {
+            "request": request,
+            "counters": counters_sorted,
+            "today": date.today().isoformat(),
+            "total_views": total_views,
+            "total_visitors": total_visitors,
+        },
     )
+
+
+@app.get("/ui/counters", response_class=HTMLResponse)
+async def ui_list_counters(request: Request) -> HTMLResponse:
+    return await _render_counter_list(request)
 
 
 @app.post("/ui/counters/increment", response_class=HTMLResponse)
@@ -314,12 +327,7 @@ async def ui_increment_counter(
     """Increment a counter from the HTMX form and return the updated list."""
     counter = PageViewCounter(url=url, date=date)
     await counter.increment(view_count=view_count, unique_visitors=unique_visitors)
-    counters = await PageViewCounter.find().allow_filtering().all()
-    counters_sorted = sorted(counters, key=lambda c: (c.url, c.date))
-    return templates.TemplateResponse(
-        "partials/counter_list.html",
-        {"request": request, "counters": counters_sorted},
-    )
+    return await _render_counter_list(request)
 
 
 @app.post("/ui/counters/decrement", response_class=HTMLResponse)
@@ -333,12 +341,7 @@ async def ui_decrement_counter(
     """Decrement a counter from the HTMX form and return the updated list."""
     counter = PageViewCounter(url=url, date=date)
     await counter.decrement(view_count=view_count, unique_visitors=unique_visitors)
-    counters = await PageViewCounter.find().allow_filtering().all()
-    counters_sorted = sorted(counters, key=lambda c: (c.url, c.date))
-    return templates.TemplateResponse(
-        "partials/counter_list.html",
-        {"request": request, "counters": counters_sorted},
-    )
+    return await _render_counter_list(request)
 
 
 # ------------------------------------------------------------------

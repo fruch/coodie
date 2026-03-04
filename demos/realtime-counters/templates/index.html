@@ -40,7 +40,7 @@
             font-size: 0.85rem;
             margin-bottom: 1.5rem;
         }
-        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
         .card {
             background: var(--card);
@@ -185,9 +185,25 @@
         </p>
 
         <div class="grid">
-            <!-- Left: Controls -->
+            <!-- Top row: Live counter table (full width) -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>📈 Live Counter Dashboard
+                    <span style="float:right; font-size: 0.7rem; color: var(--text-dim);">
+                        auto-refresh 2s · sorted by date ▼
+                    </span>
+                </h2>
+                <div id="counter-table"
+                     hx-get="/ui/counters"
+                     hx-trigger="load, every 2s"
+                     hx-swap="innerHTML">
+                    <p style="color: var(--text-dim); text-align: center; padding: 2rem;">
+                        Loading counters...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Left column: Traffic Simulator -->
             <div>
-                <!-- Traffic Simulator -->
                 <div class="card">
                     <h2>🤖 Traffic Simulator
                         <span style="float:right; font-size: 0.7rem; color: var(--text-dim);">
@@ -230,9 +246,11 @@
                          hx-swap="innerHTML">
                     </div>
                 </div>
+            </div>
 
-                <!-- Manual increment/decrement -->
-                <div class="card" style="margin-top: 1rem;">
+            <!-- Right column: Manual controls + code pattern -->
+            <div>
+                <div class="card">
                     <h2>⚡ Increment / Decrement</h2>
                     <form id="counter-form">
                         <label for="url">URL</label>
@@ -277,23 +295,6 @@ counter.<span class="fn">increment</span>(view_count=1)
 
 <span class="cm"># Atomic decrement</span>
 counter.<span class="fn">decrement</span>(view_count=1)</div>
-                </div>
-            </div>
-
-            <!-- Right: Live counter table -->
-            <div class="card">
-                <h2>📈 Live Counter Dashboard
-                    <span style="float:right; font-size: 0.7rem; color: var(--text-dim);">
-                        auto-refresh 2s
-                    </span>
-                </h2>
-                <div id="counter-table"
-                     hx-get="/ui/counters"
-                     hx-trigger="load, every 2s"
-                     hx-swap="innerHTML">
-                    <p style="color: var(--text-dim); text-align: center; padding: 2rem;">
-                        Loading counters...
-                    </p>
                 </div>
             </div>
         </div>

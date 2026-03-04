@@ -140,8 +140,12 @@ async def _seed(num_sensors: int, days: int, rpd: int) -> None:
                 minute = random.randint(0, 59)
                 second = random.randint(0, 59)
                 ts = datetime(
-                    bucket_date.year, bucket_date.month, bucket_date.day,
-                    hour, minute, second,
+                    bucket_date.year,
+                    bucket_date.month,
+                    bucket_date.day,
+                    hour,
+                    minute,
+                    second,
                     tzinfo=timezone.utc,
                 )
                 items.append(_generate_reading(sensor_id, ts))

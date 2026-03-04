@@ -60,12 +60,7 @@ async def list_sensors() -> list[str]:
     sensors: set[str] = set()
     for day_offset in range(7):
         bucket = today - timedelta(days=day_offset)
-        readings = (
-            await SensorReading.find(date_bucket=bucket)
-            .per_partition_limit(1)
-            .allow_filtering()
-            .all()
-        )
+        readings = await SensorReading.find(date_bucket=bucket).per_partition_limit(1).allow_filtering().all()
         for r in readings:
             sensors.add(r.sensor_id)
     return sorted(sensors)
@@ -86,11 +81,7 @@ async def get_latest_readings(
     all_readings: list[SensorReading] = []
     for day_offset in range(days):
         bucket = today - timedelta(days=day_offset)
-        readings = (
-            await SensorReading.find(sensor_id=sensor_id, date_bucket=bucket)
-            .per_partition_limit(limit)
-            .all()
-        )
+        readings = await SensorReading.find(sensor_id=sensor_id, date_bucket=bucket).per_partition_limit(limit).all()
         all_readings.extend(readings)
     return all_readings
 
@@ -150,30 +141,17 @@ async def ui_dashboard(request: Request) -> HTMLResponse:
     sensor_ids: set[str] = set()
     for day_offset in range(3):
         bucket = today - timedelta(days=day_offset)
-        readings = (
-            await SensorReading.find(date_bucket=bucket)
-            .per_partition_limit(1)
-            .allow_filtering()
-            .all()
-        )
+        readings = await SensorReading.find(date_bucket=bucket).per_partition_limit(1).allow_filtering().all()
         for r in readings:
             sensor_ids.add(r.sensor_id)
 
     # Get latest 5 readings per sensor (today's partition)
     for sid in sorted(sensor_ids):
-        readings = (
-            await SensorReading.find(sensor_id=sid, date_bucket=today)
-            .per_partition_limit(5)
-            .all()
-        )
+        readings = await SensorReading.find(sensor_id=sid, date_bucket=today).per_partition_limit(5).all()
         if not readings:
             # Try yesterday if no data today
             yesterday = today - timedelta(days=1)
-            readings = (
-                await SensorReading.find(sensor_id=sid, date_bucket=yesterday)
-                .per_partition_limit(5)
-                .all()
-            )
+            readings = await SensorReading.find(sensor_id=sid, date_bucket=yesterday).per_partition_limit(5).all()
         sensors[sid] = readings
 
     return templates.TemplateResponse(
@@ -193,11 +171,7 @@ async def ui_sensor_detail(
     readings: list[SensorReading] = []
     for day_offset in range(days):
         bucket = today - timedelta(days=day_offset)
-        day_readings = (
-            await SensorReading.find(sensor_id=sensor_id, date_bucket=bucket)
-            .per_partition_limit(20)
-            .all()
-        )
+        day_readings = await SensorReading.find(sensor_id=sensor_id, date_bucket=bucket).per_partition_limit(20).all()
         readings.extend(day_readings)
 
     return templates.TemplateResponse(

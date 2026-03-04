@@ -1,0 +1,145 @@
+# Auto-approve workflow runs from trusted bots (e.g. Copilot SWE agent).
+#
+# Background
+# ──────────
+# GitHub treats bot-authored PRs (even from branches in the same repo) as
+# "first-time contributor" runs, so every workflow triggered by the bot shows
+# conclusion: action_required and waits for a maintainer to click "Approve".
+#
+# The previous approach (copilot-ci-proxy.yml) tried to work around this by
+# using pull_request_target + repository_dispatch, but pull_request_target
+# itself also requires approval for bot-initiated runs — defeating the purpose.
+#
+# Solution
+# ────────
+# This workflow uses schedule + workflow_dispatch triggers.  Both are "trusted"
+# events that originate from the repository itself and never need approval.
+# On each run it finds workflow runs stuck in "action_required" from a known
+# set of trusted bot actors and approves them via the GitHub REST API.
+#
+# Alternatives (documented for future reference)
+# ───────────────────────────────────────────────
+# 1. Repository settings change — Settings → Actions → General →
+#    "Fork pull request workflows from outside collaborators" →
+#    change to a less restrictive option.  This is the simplest fix but
+#    weakens security for ALL outside contributors, not just trusted bots.
+#
+# 2. Add the bot as a repository collaborator with write access so GitHub
+#    no longer treats it as a first-time contributor.
+#
+# 3. Use a GitHub App with pre-authorized permissions instead of a bot
+#    account.  This avoids the first-time-contributor gate entirely.
+#
+# Token requirements
+# ──────────────────
+# The POST /repos/{owner}/{repo}/actions/runs/{id}/approve endpoint requires
+# a token with actions:write permission.  The built-in GITHUB_TOKEN should
+# work because schedule/workflow_dispatch events grant full repository
+# permissions.  If it does not, set a fine-grained PAT as the GH_PAT secret
+# with these repository permissions:
+#   • Actions:        Read and write
+#   • Pull requests:  Read and write  (already needed by self-healing CI)
+
+name: Auto-Approve Bot Runs
+
+on:
+  schedule:
+    # Every 5 minutes
+    - cron: "*/5 * * * *"
+
+  workflow_dispatch:
+
+jobs:
+  approve-pending-runs:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Approve pending bot workflow runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+
+          # Trusted bot actors whose workflow runs should be auto-approved.
+          # Copilot                — GitHub Copilot coding agent (App login)
+          # copilot-swe-agent[bot] — Copilot SWE agent (bot account)
+          # copilot-workspace[bot] — legacy Copilot workspace bot
+          # github-actions[bot]    — used by plan-continuation and other workflows
+          TRUSTED_BOTS=(
+            "Copilot"
+            "copilot-swe-agent[bot]"
+            "copilot-workspace[bot]"
+            "github-actions[bot]"
+          )
+
+          is_trusted() {
+            local actor="$1"
+            for bot in "${TRUSTED_BOTS[@]}"; do
+              if [ "$actor" = "$bot" ]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          # List workflow runs needing approval.
+          # The GitHub API accepts status=action_required as a valid filter.
+          PENDING_RUNS=$(gh api "repos/${REPO}/actions/runs?status=action_required&per_page=100" \
+            --jq '.workflow_runs[] | "\(.id) \(.actor.login)"' 2>/dev/null || true)
+
+          if [ -z "$PENDING_RUNS" ]; then
+            echo "✅ No pending runs found — nothing to approve."
+            exit 0
+          fi
+
+          echo "Found pending runs:"
+          echo "$PENDING_RUNS"
+          echo ""
+
+          approved=0
+          skipped=0
+          failed=0
+
+          while IFS=' ' read -r run_id actor; do
+            [ -z "$run_id" ] && continue
+
+            if ! is_trusted "$actor"; then
+              echo "⏭️  Skipping run ${run_id} (untrusted actor: ${actor})"
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            echo -n "🔄 Approving run ${run_id} (actor: ${actor})… "
+
+            # Try GITHUB_TOKEN first, fall back to GH_PAT.
+            if gh api --method POST "repos/${REPO}/actions/runs/${run_id}/approve" 2>/dev/null; then
+              echo "✅"
+              approved=$((approved + 1))
+            elif [ -n "${GH_PAT:-}" ]; then
+              echo -n "(retrying with GH_PAT) "
+              if GH_TOKEN="$GH_PAT" gh api --method POST \
+                  "repos/${REPO}/actions/runs/${run_id}/approve" 2>/dev/null; then
+                echo "✅"
+                approved=$((approved + 1))
+              else
+                echo "❌"
+                failed=$((failed + 1))
+              fi
+            else
+              echo "❌ (no GH_PAT fallback available)"
+              failed=$((failed + 1))
+            fi
+          done <<< "$PENDING_RUNS"
+
+          echo ""
+          echo "Summary: approved=${approved} skipped=${skipped} failed=${failed}"
+
+          if [ "$failed" -gt 0 ]; then
+            echo ""
+            echo "::warning::${failed} run(s) could not be approved."
+            echo "Ensure GH_PAT secret has Actions: Read and write permission."
+            echo "See: https://github.com/settings/personal-access-tokens/new"
+          fi

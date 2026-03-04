@@ -74,7 +74,6 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
         # (instead of capturing stdout, which can include MCP errors and
         # agent noise).  Only the file content is used downstream.
         COPILOT_OUTFILE=$(mktemp)
-        COPILOT_STDERR=$(mktemp)
         export COPILOT_OUTFILE
 
         COPILOT_RC=0
@@ -84,7 +83,7 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
              below. Output ONLY the complete resolved file content — no markdown fences, \
              no explanations, no preamble. Write the result to the file $COPILOT_OUTFILE. \
              File: $FILE --- Content: $CONFLICT_CONTENT" \
-            2>"$COPILOT_STDERR" || COPILOT_RC=$?
+            2>&1 || COPILOT_RC=$?
         echo "::endgroup::"
 
         if [ "$COPILOT_RC" -eq 124 ]; then
@@ -92,14 +91,6 @@ while [ "$ROUND" -lt "$MAX_ROUNDS" ]; do
         elif [ "$COPILOT_RC" -ne 0 ]; then
             echo "::warning::Copilot exited with code $COPILOT_RC for file: $FILE"
         fi
-
-        # Show stderr when Copilot failed or timed out
-        if [ "$COPILOT_RC" -ne 0 ] && [ -s "$COPILOT_STDERR" ]; then
-            echo "::group::Copilot CLI stderr for $FILE"
-            cat "$COPILOT_STDERR"
-            echo "::endgroup::"
-        fi
-        rm -f "$COPILOT_STDERR"
 
         RESOLVED=""
         if [ -f "$COPILOT_OUTFILE" ]; then

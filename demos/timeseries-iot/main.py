@@ -259,14 +259,20 @@ async def get_chart_data(
     today = date.today()
     readings: list[SensorReading] = []
 
-    # Query today's partition (and yesterday if needed for the time window)
-    for day_offset in range(2):
-        bucket = today - timedelta(days=day_offset)
-        day_readings = await SensorReading.find(sensor_id=sensor_id, date_bucket=bucket).per_partition_limit(200).all()
+    # Query today's partition first; only query yesterday if the time window spans midnight
+    day_readings = await SensorReading.find(sensor_id=sensor_id, date_bucket=today).per_partition_limit(200).all()
+    readings.extend(day_readings)
+
+    # If the requested window extends past midnight, also query yesterday
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    if cutoff.date() < today:
+        yesterday = today - timedelta(days=1)
+        day_readings = (
+            await SensorReading.find(sensor_id=sensor_id, date_bucket=yesterday).per_partition_limit(200).all()
+        )
         readings.extend(day_readings)
 
     # Filter to the requested time window
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
     recent = [r for r in readings if r.ts and r.ts >= cutoff]
     # Sort chronologically (oldest first) for chart display
     recent.sort(key=lambda r: r.ts)

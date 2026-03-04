@@ -281,6 +281,7 @@ function initChartsForSensor(sensorId) {
 function startChartRefresh() {
   if (chartRefreshInterval) return;
   // Initialize charts after HTMX loads the charts partial
+  // Wait for HTMX to finish inserting chart canvases into the DOM before initializing Chart.js
   setTimeout(function() {
     var containers = document.querySelectorAll('.sensor-charts');
     containers.forEach(function(c) { initChartsForSensor(c.dataset.sensor); });

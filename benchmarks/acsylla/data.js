@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772658090504,
+  "lastUpdate": 1772658500966,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10821,6 +10821,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 6.778105046525463e-7",
             "extra": "mean: 5.336801000680432 usec\nrounds: 7794"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "914e8f8cb89313b93d9d9407d4d60aae18d09957",
+          "message": "docs: add no-inline-imports rule to modern-python skill\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-04T23:07:42+02:00",
+          "tree_id": "c9583d0918431368dbb168e93ec753fd0392f413",
+          "url": "https://github.com/fruch/coodie/commit/914e8f8cb89313b93d9d9407d4d60aae18d09957"
+        },
+        "date": 1772658500023,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53858.31219856965,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018839189479778128",
+            "extra": "mean: 18.56723612713875 usec\nrounds: 6920"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 564749.8994929625,
+            "unit": "iter/sec",
+            "range": "stddev: 4.385648585384739e-7",
+            "extra": "mean: 1.7706953129125103 usec\nrounds: 36270"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 586148.4963536698,
+            "unit": "iter/sec",
+            "range": "stddev: 6.049391899567289e-7",
+            "extra": "mean: 1.7060523164707067 usec\nrounds: 46773"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 817681.665843989,
+            "unit": "iter/sec",
+            "range": "stddev: 3.656846792904033e-7",
+            "extra": "mean: 1.2229698203735888 usec\nrounds: 140194"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 840841.4584311587,
+            "unit": "iter/sec",
+            "range": "stddev: 3.9971963248815813e-7",
+            "extra": "mean: 1.189284840766295 usec\nrounds: 75393"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 723054.5861392922,
+            "unit": "iter/sec",
+            "range": "stddev: 4.5921545774371366e-7",
+            "extra": "mean: 1.3830214470244102 usec\nrounds: 92507"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188338.96167286596,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000011408996966870379",
+            "extra": "mean: 5.309575836660621 usec\nrounds: 6125"
           }
         ]
       }

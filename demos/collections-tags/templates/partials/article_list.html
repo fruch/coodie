@@ -1,0 +1,32 @@
+{% if active_tags is defined and active_tags %}
+<div class="filter-indicator">
+  🔍 Showing articles matching {% for t in active_tags %}<span class="tag" style="font-size:0.65rem;padding:2px 8px;">{{ t }}</span>{% if not loop.last %} + {% endif %}{% endfor %}
+  <span class="filter-clear"
+        onclick="clearAllTagFilters()">✕ show all</span>
+</div>
+{% endif %}
+{% if articles %}
+{% for a in articles %}
+<div class="article-item"
+     hx-get="/ui/articles/{{ a.article_id }}" hx-target="#detail-panel" hx-swap="innerHTML">
+  <div>
+    <div class="article-title">{{ a.title }}</div>
+    <div class="article-meta">
+      <span class="article-author">✍️ {{ a.author }}</span>
+      · {{ a.tags|length }} tags · {{ a.metadata|length }} meta · {{ a.revisions|length }} revs
+    </div>
+    <div class="tag-cloud" style="margin-top:4px;">
+      {% for tag in a.tags|sort %}
+      <span class="tag {% if active_tags is defined and tag in active_tags %}tag-active{% endif %}" style="font-size:0.6rem;padding:1px 6px;">{{ tag }}</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+{% if active_tags is defined and active_tags %}
+<div class="empty">No articles found matching all selected tags</div>
+{% else %}
+<div class="empty">No articles classified — use the form or run seed.py</div>
+{% endif %}
+{% endif %}

@@ -192,8 +192,11 @@ async def get_paged_readings(
     If ``start_date`` is given, queries partitions from that date forward to today.
     """
     if start_date and not bucket:
-        # Query across date range: collect from start_date to today
+        # Query across date range: collect from start_date to today (max 30 days)
         today = date.today()
+        max_range = timedelta(days=30)
+        if today - start_date > max_range:
+            start_date = today - max_range
         all_readings: list[SensorReading] = []
         current = start_date
         while current <= today:
@@ -314,6 +317,8 @@ async def ui_paged_readings(
     if sensor_id:
         qs = qs.filter(sensor_id=sensor_id)
     if start_date:
+        # Filter to the specific start_date partition; for multi-day range,
+        # use the JSON API at /readings/paged?start_date=...
         qs = qs.filter(date_bucket=start_date)
 
     qs = qs.fetch_size(page_size).allow_filtering()

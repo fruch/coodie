@@ -64,7 +64,7 @@ result = <span class="kw">await</span> SensorReading.find().fetch_size(<span cla
     <!-- Filter controls -->
     <div class="filter-bar">
       <div class="filter-group">
-        <label class="filter-label" for="filter-date">📅 Start Date</label>
+        <label class="filter-label" for="filter-date">📅 Date Bucket</label>
         <input type="date" id="filter-date" class="filter-input"
                onchange="applyFilters()">
       </div>
@@ -159,6 +159,7 @@ function populateSensorSelect(event) {
     });
     if (savedValue) select.value = savedValue;
   } catch(e) {
+    console.error('Failed to parse sensor list:', e);
     // If parsing fails, just reset
     select.innerHTML = '<option value="">All Sensors</option>';
   }

@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import click
 from faker import Faker
@@ -131,7 +131,7 @@ def _generate_product(*, featured: bool = False) -> Product:
     )
 
 
-def _generate_review(product_id: uuid4) -> Review:
+def _generate_review(product_id: UUID) -> Review:
     """Generate a single review for a product."""
     return Review(
         product_id=product_id,

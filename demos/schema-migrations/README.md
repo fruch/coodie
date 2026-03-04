@@ -74,7 +74,7 @@ the database.
 make seed
 ```
 
-Inserts 50 products (20 % featured) and random reviews.
+Inserts 50 products (20% featured) and random reviews.
 
 ### 6. Launch the app
 

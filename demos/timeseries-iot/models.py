@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Annotated
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from coodie.aio import Document
 from coodie.fields import ClusteringKey, Indexed, PrimaryKey
@@ -29,6 +29,15 @@ class SensorReading(Document):
 
     sensor_id: Annotated[str, PrimaryKey(partition_key_index=0)]
     date_bucket: Annotated[date, PrimaryKey(partition_key_index=1)]
+
+    @field_validator("date_bucket", mode="before")
+    @classmethod
+    def _coerce_date_bucket(cls, v: object) -> object:
+        """Convert Cassandra driver ``Date`` objects to Python ``date``."""
+        if hasattr(v, "date") and callable(v.date):
+            return v.date()
+        return v
+
     ts: Annotated[datetime, ClusteringKey(order="DESC")] = Field(
         default_factory=lambda: datetime.now(timezone.utc),
     )

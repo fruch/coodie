@@ -15,7 +15,9 @@
             --text-dim: #9b8bb4;
             --success: #69f0ae;
             --warning: #ffd740;
+            --danger: #ff5252;
             --border: #2d1b69;
+            --info: #40c4ff;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -24,7 +26,7 @@
             color: var(--text);
             min-height: 100vh;
         }
-        .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
         h1 {
             text-align: center;
             font-size: 1.8rem;
@@ -97,6 +99,22 @@
             background: var(--warning);
             color: var(--bg);
         }
+        .btn-start {
+            background: var(--success);
+            color: var(--bg);
+        }
+        .btn-stop {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-stop-one {
+            background: transparent;
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 0.2rem 0.5rem;
+            font-size: 0.7rem;
+            flex: none;
+        }
         .code-block {
             background: var(--bg);
             border: 1px solid var(--border);
@@ -111,6 +129,52 @@
         .code-block .kw { color: var(--accent); }
         .code-block .fn { color: var(--success); }
         .code-block .cm { color: #666; }
+        .sim-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        .sim-badge.active {
+            background: var(--success);
+            color: var(--bg);
+            animation: pulse-glow 1.5s ease-in-out infinite;
+        }
+        .sim-badge.idle {
+            background: var(--border);
+            color: var(--text-dim);
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 4px rgba(105, 240, 174, 0.3); }
+            50% { box-shadow: 0 0 12px rgba(105, 240, 174, 0.7); }
+        }
+        .user-list {
+            list-style: none;
+            margin-top: 0.5rem;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+        .user-list li {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.75rem;
+        }
+        .user-list li:last-child { border-bottom: none; }
+        .pattern-tag {
+            display: inline-block;
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            margin-left: 0.3rem;
+        }
+        .pattern-casual { background: #1b5e20; color: var(--success); }
+        .pattern-power { background: #4a148c; color: var(--accent); }
+        .pattern-bursty { background: #b71c1c; color: var(--danger); }
+        .pattern-balanced { background: #e65100; color: var(--warning); }
     </style>
 </head>
 <body>
@@ -123,7 +187,52 @@
         <div class="grid">
             <!-- Left: Controls -->
             <div>
+                <!-- Traffic Simulator -->
                 <div class="card">
+                    <h2>🤖 Traffic Simulator
+                        <span style="float:right; font-size: 0.7rem; color: var(--text-dim);">
+                            virtual users
+                        </span>
+                    </h2>
+                    <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.8rem;">
+                        Spin up virtual agents that continuously hit counters in
+                        parallel. Watch the numbers change in real-time!
+                    </p>
+                    <form id="sim-form">
+                        <label for="sim-count">Number of users</label>
+                        <input type="number" id="sim-count" name="count" value="3" min="1" max="50">
+
+                        <label for="sim-pattern">Traffic pattern</label>
+                        <select id="sim-pattern" name="pattern">
+                            {% for p in patterns %}
+                            <option value="{{ p }}">{{ p }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <div class="btn-row">
+                            <button type="submit" class="btn-start"
+                                    hx-post="/ui/sim/start"
+                                    hx-target="#sim-panel"
+                                    hx-include="#sim-form">
+                                ▶ Start Users
+                            </button>
+                            <button type="button" class="btn-stop"
+                                    hx-post="/ui/sim/stop"
+                                    hx-target="#sim-panel">
+                                ■ Stop All
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="sim-panel"
+                         hx-get="/ui/sim/status"
+                         hx-trigger="load, every 2s"
+                         hx-swap="innerHTML">
+                    </div>
+                </div>
+
+                <!-- Manual increment/decrement -->
+                <div class="card" style="margin-top: 1rem;">
                     <h2>⚡ Increment / Decrement</h2>
                     <form id="counter-form">
                         <label for="url">URL</label>
@@ -175,12 +284,12 @@ counter.<span class="fn">decrement</span>(view_count=1)</div>
             <div class="card">
                 <h2>📈 Live Counter Dashboard
                     <span style="float:right; font-size: 0.7rem; color: var(--text-dim);">
-                        auto-refresh 3s
+                        auto-refresh 2s
                     </span>
                 </h2>
                 <div id="counter-table"
                      hx-get="/ui/counters"
-                     hx-trigger="load, every 3s"
+                     hx-trigger="load, every 2s"
                      hx-swap="innerHTML">
                     <p style="color: var(--text-dim); text-align: center; padding: 2rem;">
                         Loading counters...

@@ -45,6 +45,7 @@ jobs:
   rebase-squash:
     name: Rebase / Squash
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -187,7 +188,7 @@ jobs:
           COPILOT_TIMEOUT: '300'
         run: |
           echo "::group::Install Copilot CLI"
-          npm install -g @github/copilot || true
+          timeout 60 npm install -g @github/copilot || true
           echo "::endgroup::"
           echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
           echo "Per-file timeout: ${COPILOT_TIMEOUT}s | Overall timeout: 900s"
@@ -254,11 +255,11 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Install Copilot CLI"
-          npm install -g @github/copilot || true
+          timeout 60 npm install -g @github/copilot || true
           echo "::endgroup::"
           echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
           echo "::group::Copilot CLI output (squash message generation)"
-          copilot -p \
+          timeout 5m copilot -p \
             "Write ONLY a git commit body (no subject line) summarising these changes. \
              Output plain text only — no markdown fences, no code blocks, no tool \
              calls, no reasoning steps. Be concise. \

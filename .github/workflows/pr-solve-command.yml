@@ -32,6 +32,7 @@ jobs:
   solve:
     name: Solve Conflicts
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -186,7 +187,7 @@ jobs:
           RESOLVE_MODE: merge
         run: |
           echo "::group::Install Copilot CLI"
-          npm install -g @github/copilot || true
+          timeout 60 npm install -g @github/copilot || true
           echo "::endgroup::"
           echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
           echo "Per-file timeout: ${COPILOT_TIMEOUT}s | Overall timeout: 900s"

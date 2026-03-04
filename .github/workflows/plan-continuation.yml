@@ -45,6 +45,7 @@ jobs:
   continue-plan:
     name: Continue Plan Phase
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Run if: manually dispatched, OR PR was actually merged AND not labelled skip-continuation
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -236,20 +237,25 @@ jobs:
           PHASE_CONTENT=$(cat /tmp/next-phase-content.md)
 
           # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
-          npm install -g @github/copilot 2>/dev/null || true
+          timeout 60 npm install -g @github/copilot 2>/dev/null || true
 
           # Construct the delegation prompt via extracted script
           export PLAN_FILE PHASE TITLE PHASE_CONTENT
           source .github/scripts/build-delegation-prompt.sh
 
           # Delegate via Copilot CLI — capture exit code explicitly
+          # Timeout after 5 minutes to prevent the job from hanging indefinitely
           EXIT_CODE=0
-          RESPONSE=$(copilot -p "$PROMPT" 2>&1) || EXIT_CODE=$?
+          RESPONSE=$(timeout 5m copilot -p "$PROMPT" 2>&1) || EXIT_CODE=$?
 
-          # Fallback: if Copilot CLI failed or is unavailable, post a PR comment
-          # with the prompt so a developer can pick it up manually.
+          # Fallback: if Copilot CLI failed, timed out, or is unavailable,
+          # post a PR comment with the prompt so a developer can pick it up manually.
           if [ "$EXIT_CODE" -ne 0 ] || [ -z "$RESPONSE" ]; then
-            echo "⚠️ Copilot CLI not available (exit code: ${EXIT_CODE})"
+            if [ "$EXIT_CODE" -eq 124 ]; then
+              echo "⚠️ Copilot CLI timed out after 5 minutes (exit code: 124)"
+            else
+              echo "⚠️ Copilot CLI not available (exit code: ${EXIT_CODE})"
+            fi
             if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${PR_NUMBER}" ]; then
               gh pr comment "${PR_NUMBER}" \
                 --repo "${{ github.repository }}" \

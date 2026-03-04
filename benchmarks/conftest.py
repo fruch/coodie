@@ -29,7 +29,6 @@ from uuid import uuid4
 import pytest
 
 from tests.conftest_scylla import create_acsylla_session, create_cql_session, create_python_rs_session  # noqa: F401
-from tests.conftest_scylla import create_vector_cql_session  # noqa: F401
 from tests.conftest_scylla import scylla_container  # noqa: F401
 from tests.conftest_scylla import vector_store_container  # noqa: F401
 
@@ -120,14 +119,10 @@ def coodie_connection(cql_session: Any, scylla_container: Any, vector_store_cont
 
         * ``scylla`` / ``cassandra`` — CassandraDriver sharing the cql_session
         * ``acsylla`` — AcsyllaDriver with its own async-native session
-    <<<<<<< HEAD
         * ``python-rs`` — PythonRsDriver with a Rust-backed async session
-    ||||||| parent of fcbfdbf (fix(vector): use scylla:latest + vector-store sidecar, consolidate create_cql_session)
-    =======
 
         Depends on ``vector_store_container`` so the vector-store service is started
         before benchmarks that exercise vector search (e.g. ``test_coodie_ann_select``).
-    >>>>>>> fcbfdbf (fix(vector): use scylla:latest + vector-store sidecar, consolidate create_cql_session)
     """
     from coodie.drivers import _registry, init_coodie, register_driver
 

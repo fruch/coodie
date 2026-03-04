@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772661648151,
+  "lastUpdate": 1772661893963,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11113,6 +11113,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 6.689365890594324e-7",
             "extra": "mean: 5.214320714895724 usec\nrounds: 6155"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "0e86df234aed24f12a6b422f2d2471b057e21df8",
+          "message": "fix(ci): improve Copilot CLI observability and increase conflict resolution timeouts\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-05T00:04:11+02:00",
+          "tree_id": "355094ea38e39d3a0ad753f0cdcd33868f4ed53b",
+          "url": "https://github.com/fruch/coodie/commit/0e86df234aed24f12a6b422f2d2471b057e21df8"
+        },
+        "date": 1772661892254,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53301.68058717087,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014431490767220373",
+            "extra": "mean: 18.761134526791807 usec\nrounds: 7597"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 569887.3058976441,
+            "unit": "iter/sec",
+            "range": "stddev: 5.744015383005067e-7",
+            "extra": "mean: 1.7547328913123874 usec\nrounds: 41178"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 619318.2629578641,
+            "unit": "iter/sec",
+            "range": "stddev: 4.4083425932106927e-7",
+            "extra": "mean: 1.6146786875361947 usec\nrounds: 45227"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 816723.4381317112,
+            "unit": "iter/sec",
+            "range": "stddev: 3.6473374424647694e-7",
+            "extra": "mean: 1.2244046801051058 usec\nrounds: 91067"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 840811.6876535717,
+            "unit": "iter/sec",
+            "range": "stddev: 3.393583945926761e-7",
+            "extra": "mean: 1.1893269499983645 usec\nrounds: 74935"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 733093.138630093,
+            "unit": "iter/sec",
+            "range": "stddev: 4.7331148320606837e-7",
+            "extra": "mean: 1.364083153020184 usec\nrounds: 90580"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 181417.14733976423,
+            "unit": "iter/sec",
+            "range": "stddev: 7.862730032459653e-7",
+            "extra": "mean: 5.512158109989271 usec\nrounds: 7577"
           }
         ]
       }

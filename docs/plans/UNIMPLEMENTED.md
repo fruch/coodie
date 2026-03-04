@@ -4,8 +4,9 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-03 (post-merge: TTL/batch/materialized-views demos shipped,
-> sync-api Phases 2–3 done, PR conflict Phase 4 done; vector search WIP in PR #150,
+> **Last reviewed:** 2026-03-04 (post-merge: PR conflict Phases 1–5 all done,
+> sync-api Phases 1–4 all done, silent-exception-pass Phase 1 done;
+> realtime-counters demo WIP in PR #176, vector support WIP in PRs #150/#155,
 > collections-tags demo WIP in PR #147)
 
 ---
@@ -18,7 +19,8 @@
 4. [cqlengine Test Coverage Gaps](#4-cqlengine-test-coverage-gaps)
 5. [Integration Test Coverage Gaps](#5-integration-test-coverage-gaps)
 6. [Sync API Support](#6-sync-api-support)
-7. [PR Conflict Detection & /solve Command](#7-pr-conflict-detection--solve-command)
+7. [CQL Gap Analysis](#7-cql-gap-analysis)
+8. [Silent Exception Pass](#8-silent-exception-pass)
 
 ---
 
@@ -68,6 +70,8 @@
 
 ### 3.1 Real-Time Counters Demo
 
+> **⚠️ IN PROGRESS — [PR #176](https://github.com/fruch/coodie/pull/176): Realtime counters demo (Phase 4.2).**
+
 > **Prompt:** Create `demos/realtime-counters/` — a page-view analytics demo showcasing coodie's `CounterDocument`, `increment()`, and `decrement()`. Build a live analytics dashboard showing counter updates in real-time. Add `seed.py` to generate synthetic traffic, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.2).
 
 ### 3.2 Collections & Tags Demo
@@ -78,7 +82,7 @@
 
 ### 3.3 Vector Similarity Search (Library + Demo)
 
-> **⚠️ IN PROGRESS — [PR #150](https://github.com/fruch/coodie/pull/150) (WIP/draft): Vector column support + demo. Library work (Vector, VectorIndex annotations, CQL builder, ANN queries, unit tests) is done; demo creation in progress.**
+> **⚠️ IN PROGRESS — [PR #150](https://github.com/fruch/coodie/pull/150) (WIP/draft): Vector column support + demo. [PR #155](https://github.com/fruch/coodie/pull/155): Extracted library-only vector support (Vector, VectorIndex, CQL builder, ANN queries, unit tests, integration tests, benchmarks).**
 
 > **Prompt:** Add vector column support to coodie and create a vector search demo. **Library work:** (1) Add `Vector(dimensions=N)` field annotation to `coodie/fields.py` mapping to CQL `vector<float, N>`. (2) Update `coodie/schema.py` to emit `vector<float, N>` in DDL. (3) Add `VectorIndex(similarity_function="COSINE")` annotation for `CREATE INDEX ... USING 'vector_index'`. (4) Support ANN queries via a QuerySet method that emits `ORDER BY field ANN OF [...]` CQL. (5) Validate vector dimensions on save. (6) Add unit and integration tests. **Demo work:** Create `demos/vector-search/` — semantic product search using sentence-transformer embeddings with ANN queries. See `docs/plans/demos-extension-plan.md` Phase 6.
 
@@ -148,24 +152,50 @@
 
 *Source: `sync-api-support.md`*
 
-> *Phase 1 is ✅ Done — `init_coodie_async(driver_type="acsylla", hosts=...)` routes through `AcsyllaDriver.connect()` with `_bridge_to_bg_loop = True`. Phase 2 is ✅ Done — `AcsyllaDriver.connect_sync()` + `init_coodie(driver_type="acsylla", hosts=...)` auto-create sync session + `UserWarning`. Phase 3 is ✅ Done — `PythonRsDriver` uses bg-thread sync bridge with `_bg_loop`, `_bg_thread`, `_bridge_to_bg_loop`, `connect()` classmethod, `run_coroutine_threadsafe()`. Phases 4–5 remain.*
+> *Phase 1 is ✅ Done — `init_coodie_async(driver_type="acsylla", hosts=...)` routes through `AcsyllaDriver.connect()` with `_bridge_to_bg_loop = True`. Phase 2 is ✅ Done — `AcsyllaDriver.connect_sync()` + `init_coodie(driver_type="acsylla", hosts=...)` auto-create sync session + `UserWarning`. Phase 3 is ✅ Done — `PythonRsDriver` uses bg-thread sync bridge with `_bg_loop`, `_bg_thread`, `_bridge_to_bg_loop`, `connect()` classmethod, `run_coroutine_threadsafe()`. Phase 4 is ✅ Done — python-rs integration fixtures, CI matrix, variant fixture (tasks 4.1–4.5 all ✅). Phase 5 remains.*
 
-### 6.1 Sync API Integration Tests
-
-> **Prompt:** Verify both AcsyllaDriver and PythonRsDriver pass the integration test suite in sync and async variants. Add `"python-rs"` to `--driver-type` choices, create `create_python_rs_session()` helper, update `coodie_driver` fixture, and add CI matrix entries for both drivers. See `docs/plans/sync-api-support.md` Phase 4 (tasks 4.1–4.5).
-
-### 6.2 Sync API Documentation
+### 6.1 Sync API Documentation
 
 > **Prompt:** Document the sync bridge pattern, supported init paths, and caveats for AcsyllaDriver and PythonRsDriver. Update class docstrings and `init_coodie()`/`init_coodie_async()` docstrings. See `docs/plans/sync-api-support.md` Phase 5 (tasks 5.1–5.3).
 
 ---
 
-## 7. PR Conflict Detection & /solve Command
+## 7. CQL Gap Analysis
 
-*Source: `pr-conflict-detection-solve.md`*
+*Source: `cql-gap-analysis.md`*
 
-> *The `conflict` label exists in `.github/labels.toml` and `resolve-conflicts.sh` is reusable (✅). Phase 1 (conflict detection workflow) is ✅ Done — `.github/workflows/pr-conflict-detect.yml` shipped. Phase 2 (`/solve` slash-command) is ✅ Done — `.github/workflows/pr-solve-command.yml` shipped (207 lines). Phase 3 (shared conflict-resolution script) is ✅ Done — `resolve-conflicts.sh` supports `RESOLVE_MODE=merge|rebase`. Phase 4 (safety gates) is ✅ Done — fork skip, concurrency groups, closed/merged PR block, no-conflict no-op, COPILOT_PAT fallback, explicit label removal. Phase 5 remains.*
+> *New plan comparing coodie against the ScyllaDB CQL Reference. Identifies 41 missing CQL features across data types, DDL, DML, LWT, and ScyllaDB extensions. 6 implementation phases planned — none started yet.*
 
-### 7.1 Testing & Documentation
+### 7.1 Core DML Gaps (Phase 1)
 
-> **Prompt:** Add Bats tests for the shared conflict-resolution script, Python workflow convention tests, and update `CONTRIBUTING.md` with `/solve` command documentation. See `docs/plans/pr-conflict-detection-solve.md` Phase 5 (tasks 5.1–5.4).
+> **Prompt:** Implement core DML gaps in coodie: (1) `TRUNCATE TABLE` via `Document.truncate()`. (2) `SELECT DISTINCT` via `QuerySet.distinct()`. (3) `GROUP BY` on clustering columns via `QuerySet.group_by()`. (4) Aggregate functions `SUM()`, `AVG()`, `MIN()`, `MAX()` via `QuerySet.aggregate()`. (5) `CAST()` in SELECT. (6) `IS NOT NULL` filter. (7) `TOKEN()` in SELECT for manual range scans. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 1.
+
+### 7.2 Data Type Gaps (Phase 2)
+
+> **Prompt:** Add missing CQL data types to coodie: (1) `duration` type with a `CqlDuration(months, days, nanoseconds)` dataclass and `Duration()` field marker. (2) `vector<float, N>` type with `Vector(dimensions=N)` field marker, `VectorIndex(similarity_function)`, and `order_by_ann()` QuerySet method. Add type mapping in `types.py`, CQL builder support, DDL generation, and unit tests. See `docs/plans/cql-gap-analysis.md` Phase 2.
+
+### 7.3 DDL & Keyspace Gaps (Phase 3)
+
+> **Prompt:** Implement DDL gaps: (1) `ALTER TABLE DROP column`, `ALTER TABLE RENAME`. (2) Custom SAI index class support. (3) Index options (`WITH OPTIONS`). (4) Collection element indexes (`KEYS`, `VALUES`, `ENTRIES`, `FULL`). (5) `ALTER MATERIALIZED VIEW`. (6) `ALTER TYPE RENAME field`. (7) `ALTER KEYSPACE` with `durable_writes` and `tablets` options. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 3.
+
+### 7.4 LWT & Collection Operations (Phase 4)
+
+> **Prompt:** Implement LWT and collection DML gaps: (1) `DELETE ... IF col = ?` conditional deletes. (2) Extended IF operators: `!=`, `IN`, `>`, `<`. (3) Map put `col[key] = val` and list set-by-index `col[idx] = val`. (4) `DELETE col[key] FROM ...` and `DELETE col[idx] FROM ...`. (5) `USING TIMESTAMP` on batches. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 4.
+
+### 7.5 JSON & Metadata Features (Phase 5)
+
+> **Prompt:** Implement JSON and metadata features: (1) `INSERT INTO ... JSON '{...}'` via `Document.save_json()`. (2) `SELECT JSON` via `QuerySet.json()`. (3) `WRITETIME(col)` via `QuerySet.writetime()`. (4) `TTL(col)` via `QuerySet.column_ttl()`. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 5.
+
+### 7.6 ScyllaDB Extensions & Low-Priority Gaps (Phase 6)
+
+> **Prompt:** Implement ScyllaDB-specific extensions and low-priority gaps: (1) `BYPASS CACHE` hint. (2) `USING TIMEOUT` in CQL statements. (3) Tablets-enabled keyspace creation. (4) Role/user management DDL (`CREATE ROLE`, `GRANT`, `REVOKE`, etc.) — evaluate if appropriate for an ORM. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 6.
+
+---
+
+## 8. Silent Exception Pass
+
+*Source: `silent-exception-pass.md`*
+
+> *Audit of `except … pass` and overly broad exception handlers. Phase 1 is ✅ Done — narrowed `_cached_type_hints` to `(NameError, AttributeError, TypeError)` and added `logging.warning()` for CassandraDriver `dict_factory` import failure. All identified problematic cases are fixed.*
+
+*No remaining items — the single implementation phase is complete.*

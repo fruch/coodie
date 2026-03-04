@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772658500966,
+  "lastUpdate": 1772658744366,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -10894,6 +10894,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000011408996966870379",
             "extra": "mean: 5.309575836660621 usec\nrounds: 6125"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "b74176fb93d2f3688249fc4dfa8c5e42878fbb7c",
+          "message": "test(workflows): add Phase 5 Bats/convention tests, update CONTRIBUTING with /solve docs\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-04T23:11:10+02:00",
+          "tree_id": "8f1ce484ab8d08e2ad24f76e1812886c87302c1b",
+          "url": "https://github.com/fruch/coodie/commit/b74176fb93d2f3688249fc4dfa8c5e42878fbb7c"
+        },
+        "date": 1772658742669,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53438.1010340502,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016228843347812802",
+            "extra": "mean: 18.713239816714488 usec\nrounds: 7856"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 569432.4149859828,
+            "unit": "iter/sec",
+            "range": "stddev: 5.762030531567128e-7",
+            "extra": "mean: 1.7561346591493499 usec\nrounds: 39173"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 585353.5745580568,
+            "unit": "iter/sec",
+            "range": "stddev: 4.977931718844819e-7",
+            "extra": "mean: 1.708369169446009 usec\nrounds: 45001"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 822330.4243922401,
+            "unit": "iter/sec",
+            "range": "stddev: 3.421958611743748e-7",
+            "extra": "mean: 1.2160561865859094 usec\nrounds: 142187"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 854172.3228061303,
+            "unit": "iter/sec",
+            "range": "stddev: 3.578009077158584e-7",
+            "extra": "mean: 1.1707239549916533 usec\nrounds: 72749"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 725996.0097560451,
+            "unit": "iter/sec",
+            "range": "stddev: 3.846221727914959e-7",
+            "extra": "mean: 1.3774180388898114 usec\nrounds: 88176"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 187510.83445275557,
+            "unit": "iter/sec",
+            "range": "stddev: 9.074227854905955e-7",
+            "extra": "mean: 5.333025171150607 usec\nrounds: 4966"
           }
         ]
       }

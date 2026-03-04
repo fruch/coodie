@@ -60,6 +60,16 @@ The Plan Phase Continuation workflow reads these lines on merge to automatically
 
 </essential_principles>
 
+## Prerequisites
+
+See [setup-environment.md](../setup-environment.md) for the shared environment
+setup. **Install pre-commit hooks before making any commits:**
+
+```bash
+uv sync --all-groups
+uv run pre-commit install
+```
+
 ## When to Use
 
 - Planning a new feature set or feature-parity effort with gap analysis

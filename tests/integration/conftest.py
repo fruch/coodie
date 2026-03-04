@@ -7,7 +7,7 @@ Use ``--driver-type`` to choose the driver backend:
 - ``scylla`` (default) — uses scylla-driver
 - ``cassandra`` — uses cassandra-driver
 - ``acsylla`` — uses acsylla
-- ``python-rs`` — uses python-rs-driver (Rust-based, async-only)
+- ``python-rs`` — uses python-rs-driver (Rust-based)
 """
 
 from __future__ import annotations
@@ -113,9 +113,10 @@ async def coodie_driver(
 
         from coodie.drivers.python_rs import PythonRsDriver
 
-        python_rs_session = await create_python_rs_session(scylla_container, "test_ks")
-        loop = asyncio.get_running_loop()
-        python_rs_driver = PythonRsDriver(session=python_rs_session, default_keyspace="test_ks", loop=loop)
+        python_rs_driver = PythonRsDriver.connect(
+            session_factory=lambda: create_python_rs_session(scylla_container, "test_ks"),
+            default_keyspace="test_ks",
+        )
         from coodie.drivers import register_driver
 
         register_driver("default", python_rs_driver, default=True)
@@ -465,8 +466,6 @@ async def _retry(fn, retries=5, delay=1):
 
 @pytest.fixture(params=["sync", "async"])
 def variant(request, driver_type):
-    if request.param == "sync" and driver_type in ("acsylla", "python-rs"):
-        pytest.skip(f"{driver_type} is async-only — sync variant not applicable")
     return request.param
 
 

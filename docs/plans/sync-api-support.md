@@ -181,13 +181,13 @@ Legend:
 
 **Goal:** Verify both drivers pass the integration test suite in both sync and async variants.
 
-| Task | Description |
-|---|---|
-| 4.1 | Add `"python-rs"` to `--driver-type` choices in `tests/conftest.py` |
-| 4.2 | Add `create_python_rs_session(scylla_container, keyspace)` async helper to `tests/conftest_scylla.py` using `SessionBuilder` with the container IP |
-| 4.3 | Update `coodie_driver` fixture in `tests/integration/conftest.py` to handle `driver_type="python-rs"` via `PythonRsDriver.connect()` |
-| 4.4 | Run full integration suite with `--driver-type=python-rs`; mark failing tests with `@pytest.mark.xfail` and a reason (batch, paging state resume) |
-| 4.5 | Add `python-rs` matrix entry to the integration CI workflow |
+| Task | Description | Status |
+|---|---|---|
+| 4.1 | Add `"python-rs"` to `--driver-type` choices in `tests/conftest.py` | ✅ Done |
+| 4.2 | Add `create_python_rs_session(scylla_container, keyspace)` async helper to `tests/conftest_scylla.py` using `SessionBuilder` with the container IP | ✅ Done |
+| 4.3 | Update `coodie_driver` fixture in `tests/integration/conftest.py` to handle `driver_type="python-rs"` via `PythonRsDriver.connect()` | ✅ Done |
+| 4.4 | Run full integration suite with `--driver-type=python-rs`; mark failing tests with `@pytest.mark.xfail` and a reason (batch, paging state resume) | ✅ Done |
+| 4.5 | Add `python-rs` matrix entry to the integration CI workflow | ✅ Done |
 
 ### Phase 5: Documentation (Priority: Low)
 

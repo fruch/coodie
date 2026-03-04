@@ -74,6 +74,16 @@ A skill can mix freedom levels. A security audit skill might use high freedom fo
 
 </essential_principles>
 
+## Prerequisites
+
+See [setup-environment.md](../setup-environment.md) for the shared environment
+setup. **Install pre-commit hooks before making any commits:**
+
+```bash
+uv sync --all-groups
+uv run pre-commit install
+```
+
 ## When to Use
 
 - Designing a new skill with multi-step workflows or phased execution

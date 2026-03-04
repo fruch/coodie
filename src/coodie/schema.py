@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import functools
+import logging
 import typing
 from dataclasses import dataclass
 from typing import Any, get_type_hints
+
+logger = logging.getLogger("coodie")
 
 
 @functools.lru_cache(maxsize=128)
@@ -14,7 +17,8 @@ def _cached_type_hints(cls: type) -> dict[str, Any]:
     """
     try:
         return get_type_hints(cls, include_extras=True)
-    except Exception:
+    except (NameError, AttributeError, TypeError) as exc:
+        logger.debug("get_type_hints(%s) failed, falling back to __annotations__: %s", cls.__name__, exc)
         return getattr(cls, "__annotations__", {})
 
 
@@ -73,8 +77,11 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         # Determine CQL type — pass full annotation so markers are visible
         try:
             cql_type = python_type_to_cql_type_str(annotation)
-        except Exception:
-            continue
+        except Exception as exc:
+            raise InvalidQueryError(
+                f"Cannot determine CQL type for field {field_name!r} on {doc_cls.__name__!r}: {exc}. "
+                "If this type is not supported, please open an issue."
+            ) from exc
 
         # Defaults
         is_primary_key = False

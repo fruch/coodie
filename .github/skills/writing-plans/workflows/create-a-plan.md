@@ -2,6 +2,10 @@
 
 A step-by-step process for creating a new plan in `docs/plans/`.
 
+**Before starting:** Ensure pre-commit hooks are installed (`uv run pre-commit install`).
+No commits should be made before hooks are active.
+See [setup-environment.md](../../setup-environment.md).
+
 ---
 
 ## Phase 1: Determine Plan Type

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from coodie.drivers.base import AbstractDriver, _is_ddl
+
+logger = logging.getLogger("coodie")
 
 
 class CassandraDriver(AbstractDriver):
@@ -26,7 +29,10 @@ class CassandraDriver(AbstractDriver):
 
             session.row_factory = dict_factory
         except ImportError:
-            pass
+            logger.warning(
+                "Could not import cassandra.query.dict_factory; "
+                "session will use its default row_factory (rows may not be dicts)"
+            )
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -133,9 +139,6 @@ class CassandraDriver(AbstractDriver):
         # 3. Schema drift detection — warn on DB columns not in model
         drift_cols = existing - model_col_names
         if drift_cols:
-            import logging
-
-            logger = logging.getLogger("coodie")
             logger.warning(
                 "Schema drift detected: columns %s exist in %s.%s but are not defined in the model",
                 drift_cols,
@@ -341,9 +344,6 @@ class CassandraDriver(AbstractDriver):
         # 3. Schema drift detection — warn on DB columns not in model
         drift_cols = existing - model_col_names
         if drift_cols:
-            import logging
-
-            logger = logging.getLogger("coodie")
             logger.warning(
                 "Schema drift detected: columns %s exist in %s.%s but are not defined in the model",
                 drift_cols,

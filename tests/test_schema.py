@@ -314,3 +314,87 @@ def test_pk_columns_cached():
     first = _pk_columns(SimpleDoc)
     second = _pk_columns(SimpleDoc)
     assert first is second
+
+
+# ------------------------------------------------------------------
+# frozenset column support
+# ------------------------------------------------------------------
+
+
+def test_build_schema_frozenset_column():
+    """frozenset[X] columns should map to frozen<set<cql_type>>."""
+
+    class FrozenSetDoc(BaseModel):
+        id: Annotated[UUID, PrimaryKey()]
+        tags: frozenset[str]
+
+        class Settings:
+            name = "frozenset_docs"
+            keyspace = "test_ks"
+
+    schema = build_schema(FrozenSetDoc)
+    col = next(c for c in schema if c.name == "tags")
+    assert col.cql_type == "frozen<set<text>>"
+
+
+# ------------------------------------------------------------------
+# Unsupported type raises InvalidQueryError (no silent skip)
+# ------------------------------------------------------------------
+
+
+def test_build_schema_unsupported_type_raises():
+    """build_schema() must raise InvalidQueryError for unsupported column types."""
+
+    class BadDoc(BaseModel):
+        id: Annotated[UUID, PrimaryKey()]
+        bad_col: object  # not a valid CQL type
+
+        class Settings:
+            name = "bad_docs"
+            keyspace = "test_ks"
+
+    with pytest.raises(InvalidQueryError, match="bad_col"):
+        build_schema(BadDoc)
+
+
+# ------------------------------------------------------------------
+# _cached_type_hints — narrowed exception handling
+# ------------------------------------------------------------------
+
+
+def test_cached_type_hints_falls_back_on_name_error(monkeypatch):
+    """_cached_type_hints falls back to __annotations__ on NameError."""
+    from coodie import schema as _schema_mod
+    from coodie.schema import _cached_type_hints
+
+    _cached_type_hints.cache_clear()
+
+    class Dummy:
+        __annotations__ = {"x": int}
+
+    def _raise_name_error(*a, **kw):
+        raise NameError("boom")
+
+    monkeypatch.setattr(_schema_mod, "get_type_hints", _raise_name_error)
+    result = _cached_type_hints(Dummy)
+    assert result == {"x": int}
+    _cached_type_hints.cache_clear()
+
+
+def test_cached_type_hints_propagates_recursion_error(monkeypatch):
+    """_cached_type_hints must NOT silently swallow RecursionError."""
+    from coodie import schema as _schema_mod
+    from coodie.schema import _cached_type_hints
+
+    _cached_type_hints.cache_clear()
+
+    class Dummy:
+        __annotations__ = {"x": int}
+
+    def _raise_recursion_error(*a, **kw):
+        raise RecursionError("deep")
+
+    monkeypatch.setattr(_schema_mod, "get_type_hints", _raise_recursion_error)
+    with pytest.raises(RecursionError, match="deep"):
+        _cached_type_hints(Dummy)
+    _cached_type_hints.cache_clear()

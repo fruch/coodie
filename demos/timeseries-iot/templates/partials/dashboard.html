@@ -5,7 +5,14 @@
            hx-get="/ui/sensor/{{ sensor_id }}?days=3"
            hx-target="#sensor-grid"
            hx-swap="innerHTML">
-        <div class="sensor-name">📡 {{ sensor_id }}</div>
+        <div class="sensor-name">
+          📡 {{ sensor_id }}
+          {% if device_active %}
+            <span style="float: right;" title="Live — background device transmitting">
+              <span class="live-dot" style="vertical-align: middle;"></span>
+            </span>
+          {% endif %}
+        </div>
 
         {% if readings %}
           {% set latest = readings[0] %}

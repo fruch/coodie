@@ -258,7 +258,41 @@
     .refresh-notice {
       font-size: 0.65rem; color: var(--dim); text-align: right;
       margin-bottom: 0.5rem; letter-spacing: 0.05em;
+      display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;
     }
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px;
+      background: var(--success); border-radius: 50%;
+      animation: live-pulse 2s ease-in-out infinite;
+      box-shadow: 0 0 6px rgba(16,185,129,0.6);
+    }
+    @keyframes live-pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(16,185,129,0.6); }
+      50% { opacity: 0.4; box-shadow: 0 0 2px rgba(16,185,129,0.2); }
+    }
+
+    /* --- Filter bar --- */
+    .filter-bar {
+      display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end;
+      margin-bottom: 1rem; padding: 0.75rem 1rem;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .filter-label {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--dim);
+    }
+    .filter-input {
+      font-family: inherit; font-size: 0.75rem;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 0.4rem 0.6rem; outline: none; min-width: 150px;
+    }
+    .filter-input:focus { border-color: var(--accent-dim); box-shadow: 0 0 8px rgba(56,189,248,0.2); }
+    .filter-input option { background: var(--surface); color: var(--text); }
+    /* Style the date input for dark theme */
+    .filter-input::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
 
     /* --- Empty state --- */
     .empty {
@@ -268,11 +302,24 @@
     .empty .empty-icon { font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4; }
     .empty p { font-style: italic; }
 
-    /* --- Load more trigger --- */
+    /* --- Load more / infinite scroll --- */
     .load-more {
       text-align: center; padding: 1rem; color: var(--dim);
       font-size: 0.75rem;
     }
+    .scroll-sentinel {
+      height: 1px; width: 100%;
+    }
+    .loading-indicator {
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 1rem; color: var(--dim); font-size: 0.75rem;
+    }
+    .loading-spinner {
+      width: 16px; height: 16px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* --- Scanline overlay --- */
     body::after {

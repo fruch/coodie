@@ -1,63 +1,53 @@
-{% if readings %}
-  <table class="readings-table">
-    <thead>
-      <tr>
-        <th>Sensor</th>
-        <th>Timestamp</th>
-        <th>Bucket</th>
-        <th>Temp (°C)</th>
-        <th>Humidity (%)</th>
-        <th>Pressure (hPa)</th>
-        <th>Battery</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in readings %}
-        {# Temperature color #}
-        {% if r.temperature > 60 %}
-          {% set temp_class = "temp-hot" %}
-        {% elif r.temperature > 30 %}
-          {% set temp_class = "temp-warm" %}
-        {% elif r.temperature > 0 %}
-          {% set temp_class = "temp-cool" %}
-        {% else %}
-          {% set temp_class = "temp-cold" %}
-        {% endif %}
+{% for r in readings %}
+  {# Temperature color #}
+  {% if r.temperature > 60 %}
+    {% set temp_class = "temp-hot" %}
+  {% elif r.temperature > 30 %}
+    {% set temp_class = "temp-warm" %}
+  {% elif r.temperature > 0 %}
+    {% set temp_class = "temp-cool" %}
+  {% else %}
+    {% set temp_class = "temp-cold" %}
+  {% endif %}
 
-        <tr>
-          <td style="color: var(--accent);">{{ r.sensor_id }}</td>
-          <td>{{ r.ts.strftime('%Y-%m-%d %H:%M:%S') if r.ts else '—' }}</td>
-          <td style="color: var(--dim);">{{ r.date_bucket }}</td>
-          <td class="{{ temp_class }}">{{ "%.2f"|format(r.temperature) }}</td>
-          <td>{{ "%.1f"|format(r.humidity) }}</td>
-          <td>{{ "%.1f"|format(r.pressure) }}</td>
-          <td>{{ r.battery_pct }}%</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% endif %}
+  <tr>
+    <td style="color: var(--accent);">{{ r.sensor_id }}</td>
+    <td>{{ r.ts.strftime('%Y-%m-%d %H:%M:%S') if r.ts else '—' }}</td>
+    <td style="color: var(--dim);">{{ r.date_bucket }}</td>
+    <td class="{{ temp_class }}">{{ "%.2f"|format(r.temperature) }}</td>
+    <td>{{ "%.1f"|format(r.humidity) }}</td>
+    <td>{{ "%.1f"|format(r.pressure) }}</td>
+    <td>{{ r.battery_pct }}%</td>
+  </tr>
+{% endfor %}
 
 {% if next_cursor %}
-  <div class="load-more">
-    <button class="btn btn-primary btn-sm"
-            hx-get="/ui/paged?page_size={{ page_size }}&cursor={{ next_cursor }}"
-            hx-target="closest .load-more"
-            hx-swap="outerHTML">
-      📄 Load More
-      <span class="htmx-indicator">⏳</span>
-    </button>
-    <div style="margin-top: 0.3rem; font-size: 0.6rem; color: var(--dim);">
-      paged_all() · cursor-based pagination · fetch_size({{ page_size }})
-    </div>
-  </div>
+  {# Infinite scroll sentinel — triggers next page load when scrolled into view #}
+  <tr class="scroll-sentinel"
+      hx-get="/ui/paged?page_size={{ page_size }}&cursor={{ next_cursor }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if sensor_id %}&sensor_id={{ sensor_id }}{% endif %}"
+      hx-trigger="revealed"
+      hx-swap="outerHTML"
+      hx-indicator=".loading-indicator">
+    <td colspan="7">
+      <div class="loading-indicator">
+        <div class="loading-spinner"></div>
+        Loading more readings · paged_all() · fetch_size({{ page_size }})
+      </div>
+    </td>
+  </tr>
 {% elif readings %}
-  <div class="load-more" style="color: var(--muted);">
-    ✓ All readings loaded — no more pages
-  </div>
+  <tr>
+    <td colspan="7" style="text-align: center; padding: 1rem; color: var(--muted);">
+      ✓ All readings loaded — no more pages
+    </td>
+  </tr>
 {% else %}
-  <div class="empty">
-    <span class="empty-icon">📄</span>
-    <p>No readings found — seed data with <code style="color: var(--accent);">make seed</code></p>
-  </div>
+  <tr>
+    <td colspan="7">
+      <div class="empty">
+        <span class="empty-icon">📄</span>
+        <p>No readings found — seed data with <code style="color: var(--accent);">make seed</code> or wait for background device</p>
+      </div>
+    </td>
+  </tr>
 {% endif %}

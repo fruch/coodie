@@ -39,6 +39,7 @@ def main() -> None:
         [sys.executable, "-m", "uvicorn", "main:app", "--port", "8001", "--log-level", "warning"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env={**os.environ, "DISABLE_BACKGROUND_DEVICE": "1"},
     )
     try:
         print(f"  Waiting for app at {APP_HOST}...")
@@ -79,6 +80,19 @@ def main() -> None:
         # --- Paged UI endpoint ---
         r = client.get("/ui/paged", params={"page_size": 5})
         assert r.status_code == 200, f"GET /ui/paged returned {r.status_code}"
+
+        # --- Paged UI with date filter ---
+        r = client.get("/ui/paged", params={"page_size": 5, "start_date": "2026-01-01"})
+        assert r.status_code == 200, f"GET /ui/paged with start_date returned {r.status_code}"
+
+        # --- Device status endpoint ---
+        r = client.get("/device/status")
+        assert r.status_code == 200, f"GET /device/status returned {r.status_code}"
+        status = r.json()
+        assert "running" in status, "Device status missing 'running' key"
+        assert "sensors" in status, "Device status missing 'sensors' key"
+        # Background device is disabled in test mode
+        assert status["running"] is False, "Background device should be disabled in test mode"
 
         print("  ✓ All endpoint checks passed")
 

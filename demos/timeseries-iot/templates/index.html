@@ -4,8 +4,8 @@
 <div class="lore-panel" style="margin-top: 1.5rem;">
   <div class="lore-title">📡 STATION LOG — ARGOS-7 // SCYLLA NEBULA</div>
   Deep in the <em>Scylla Nebula</em>, Station <em>Argos-7</em> monitors environmental conditions
-  across all decks. Each sensor transmits telemetry every few minutes, stored in
-  <em>time-bucketed partitions</em> — one partition per sensor per day.
+  across all decks. Sensors transmit telemetry <em>continuously</em> — a background device
+  generates new readings every few seconds, stored in <em>time-bucketed partitions</em>.
   The <em>DESC clustering order</em> ensures the crew always sees the newest readings first.
 </div>
 
@@ -22,30 +22,28 @@ ts: Annotated[<span class="kw">datetime</span>, ClusteringKey(order=<span class=
 readings = <span class="kw">await</span> SensorReading.find(sensor_id=sid, date_bucket=today) \
     .per_partition_limit(<span class="num">5</span>).all()
 
-<span class="cm"># 4. paged_all() — cursor-based pagination</span>
-result = <span class="kw">await</span> SensorReading.find().fetch_size(<span class="num">10</span>).paged_all()
-<span class="cm"># result.data → list[SensorReading]</span>
-<span class="cm"># result.paging_state → bytes | None (cursor for next page)</span></div>
+<span class="cm"># 4. paged_all() — cursor-based pagination with infinite scroll</span>
+result = <span class="kw">await</span> SensorReading.find().fetch_size(<span class="num">15</span>).paged_all()
+
+<span class="cm"># 5. Background device — new readings every 3s (real-time)</span>
+<span class="cm"># Dashboard auto-refreshes to show live data</span></div>
 </div>
 
 <!-- Tab navigation -->
 <div class="tabs">
-  <button class="tab active" onclick="showTab('dashboard', this)">📊 Dashboard</button>
-  <button class="tab" onclick="showTab('paged', this)">📄 Paginated Feed</button>
+  <button class="tab active" onclick="showTab('dashboard', this)">📊 Live Dashboard</button>
+  <button class="tab" onclick="showTab('paged', this)">📄 Infinite Scroll Feed</button>
 </div>
 
-<!-- Dashboard tab -->
+<!-- Dashboard tab — real-time updates every 3s -->
 <div id="tab-dashboard">
-  <p class="refresh-notice"
-     hx-get="/ui/dashboard"
-     hx-trigger="every 10s"
-     hx-target="#sensor-grid"
-     hx-swap="innerHTML">
-    ↻ auto-refreshes every 10s
-  </p>
+  <div class="refresh-notice" id="live-status">
+    <span class="live-dot"></span>
+    LIVE — auto-refreshes every 3s · background device transmitting
+  </div>
   <div id="sensor-grid"
        hx-get="/ui/dashboard"
-       hx-trigger="load"
+       hx-trigger="load, every 3s"
        hx-swap="innerHTML">
     <div class="empty">
       <span class="empty-icon">📡</span>
@@ -54,21 +52,57 @@ result = <span class="kw">await</span> SensorReading.find().fetch_size(<span cla
   </div>
 </div>
 
-<!-- Paged feed tab -->
+<!-- Paged feed tab — infinite scroll with date filtering -->
 <div id="tab-paged" style="display: none;">
   <div class="card">
-    <h2>📄 Paginated Reading Feed</h2>
+    <h2>📄 Infinite Scroll Reading Feed</h2>
     <p style="font-size: 0.75rem; color: var(--muted); margin-bottom: 1rem;">
       Demonstrates <code style="color: var(--accent);">paged_all()</code> with cursor-based pagination.
-      Click "Load More" to fetch the next page using the paging state cursor.
+      Scroll down to automatically load more pages. Use the date picker to start from a specific date.
     </p>
-    <div id="paged-content"
-         hx-get="/ui/paged?page_size=10"
-         hx-trigger="intersect once"
-         hx-swap="innerHTML">
-      <div class="empty">
-        <span class="empty-icon">📄</span>
-        <p>Switch to this tab to load paginated data...</p>
+
+    <!-- Filter controls -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label class="filter-label" for="filter-date">📅 Start Date</label>
+        <input type="date" id="filter-date" class="filter-input"
+               onchange="applyFilters()">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label" for="filter-sensor">📡 Sensor</label>
+        <select id="filter-sensor" class="filter-input"
+                hx-get="/sensors"
+                hx-trigger="load"
+                hx-target="#filter-sensor"
+                hx-swap="innerHTML"
+                hx-on::after-request="populateSensorSelect(event)"
+                onchange="applyFilters()">
+          <option value="">All Sensors</option>
+        </select>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="resetFilters()">↻ Reset</button>
+    </div>
+
+    <div id="paged-content">
+      <div id="paged-table-container">
+        <table class="readings-table" id="paged-table">
+          <thead>
+            <tr>
+              <th>Sensor</th>
+              <th>Timestamp</th>
+              <th>Bucket</th>
+              <th>Temp (°C)</th>
+              <th>Humidity (%)</th>
+              <th>Pressure (hPa)</th>
+              <th>Battery</th>
+            </tr>
+          </thead>
+          <tbody id="paged-tbody"
+                 hx-get="/ui/paged?page_size=15"
+                 hx-trigger="load"
+                 hx-swap="beforeend">
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -80,12 +114,53 @@ function showTab(name, btn) {
   btn.classList.add('active');
   document.getElementById('tab-dashboard').style.display = name === 'dashboard' ? '' : 'none';
   document.getElementById('tab-paged').style.display = name === 'paged' ? '' : 'none';
+}
 
-  if (name === 'paged') {
-    var el = document.getElementById('paged-content');
-    if (el.querySelector('.empty')) {
-      htmx.trigger(el, 'intersect');
-    }
+function buildPagedUrl() {
+  var params = new URLSearchParams();
+  params.set('page_size', '15');
+  var dateVal = document.getElementById('filter-date').value;
+  if (dateVal) params.set('start_date', dateVal);
+  var sensorVal = document.getElementById('filter-sensor').value;
+  if (sensorVal) params.set('sensor_id', sensorVal);
+  return '/ui/paged?' + params.toString();
+}
+
+function applyFilters() {
+  var tbody = document.getElementById('paged-tbody');
+  tbody.innerHTML = '';
+  var url = buildPagedUrl();
+  tbody.setAttribute('hx-get', url);
+  tbody.setAttribute('hx-trigger', 'load');
+  tbody.setAttribute('hx-swap', 'beforeend');
+  htmx.process(tbody);
+  htmx.trigger(tbody, 'load');
+}
+
+function resetFilters() {
+  document.getElementById('filter-date').value = '';
+  document.getElementById('filter-sensor').value = '';
+  applyFilters();
+}
+
+function populateSensorSelect(event) {
+  // The /sensors endpoint returns a JSON list, but HTMX put it as innerHTML.
+  // We need to rebuild it as <option> elements.
+  var select = document.getElementById('filter-sensor');
+  var savedValue = select.value;
+  try {
+    var sensors = JSON.parse(select.textContent || select.innerText);
+    select.innerHTML = '<option value="">All Sensors</option>';
+    sensors.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = '📡 ' + s;
+      select.appendChild(opt);
+    });
+    if (savedValue) select.value = savedValue;
+  } catch(e) {
+    // If parsing fails, just reset
+    select.innerHTML = '<option value="">All Sensors</option>';
   }
 }
 </script>

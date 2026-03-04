@@ -15,6 +15,9 @@
 | **`per_partition_limit()`** | Latest *N* readings per sensor in a single query |
 | **`paged_all()`** | Cursor-based pagination across large result sets |
 | **`Indexed()`** | Secondary index on `battery_pct` for low-battery alerts |
+| **Background Device** | Continuously generates new sensor readings in real-time |
+| **Infinite Scroll** | Scroll-triggered pagination with HTMX `revealed` trigger |
+| **Date Filtering** | Browse time-series data starting from a specific date |
 
 ## Quick Start
 
@@ -28,6 +31,7 @@ This single command:
 2. Creates the `iot` keyspace
 3. Seeds 5 sensors × 3 days × 50 readings/day = **750 readings**
 4. Launches the dashboard at **http://127.0.0.1:8000**
+5. Starts a **background device** that generates new readings every 3 seconds
 
 ## Data Model
 
@@ -61,6 +65,34 @@ CREATE TABLE iot.sensor_readings (
 ) WITH CLUSTERING ORDER BY (ts DESC);
 ```
 
+## Real-Time Features
+
+### Background Device
+The app starts a background async task that continuously generates new
+sensor readings every 3 seconds (configurable via `DEVICE_INTERVAL` env var).
+The dashboard auto-refreshes every 3 seconds to show the latest data.
+
+```bash
+# Customize the background device interval (seconds)
+DEVICE_INTERVAL=5 uv run uvicorn main:app --reload
+
+# Disable the background device
+DISABLE_BACKGROUND_DEVICE=1 uv run uvicorn main:app --reload
+```
+
+### Live Dashboard
+The sensor grid refreshes every 3 seconds using HTMX polling, showing
+real-time updates as new readings arrive from the background device.
+
+### Infinite Scroll
+The paginated feed uses HTMX's `revealed` trigger on a sentinel element.
+When the user scrolls to the bottom, the next page is automatically loaded
+without clicking any button.
+
+### Date Filtering
+The paginated feed includes a date picker to start browsing from a specific
+date — a natural requirement for time-series data exploration.
+
 ## API Reference
 
 ### JSON Endpoints
@@ -70,15 +102,17 @@ CREATE TABLE iot.sensor_readings (
 | `GET` | `/sensors` | List distinct sensor IDs |
 | `GET` | `/sensors/{id}/latest?days=1&limit=5` | Latest readings using `per_partition_limit()` |
 | `GET` | `/readings/paged?page_size=10&cursor=...` | Paginated readings using `paged_all()` |
+| `GET` | `/readings/paged?start_date=2026-01-15` | Readings from a specific start date |
+| `GET` | `/device/status` | Background device status (running, sensors, interval) |
 
 ### HTMX UI Endpoints
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/` | Dashboard index page |
-| `GET` | `/ui/dashboard` | Sensor grid partial (auto-refresh) |
+| `GET` | `/ui/dashboard` | Sensor grid partial (auto-refresh every 3s) |
 | `GET` | `/ui/sensor/{id}?days=3` | Sensor detail with reading history |
-| `GET` | `/ui/paged?page_size=10&cursor=...` | Paginated feed with "Load More" |
+| `GET` | `/ui/paged?page_size=15&start_date=...&sensor_id=...` | Infinite scroll feed with filters |
 
 ## Makefile Targets
 
@@ -128,26 +162,50 @@ readings = await SensorReading.find(
 ).per_partition_limit(5).all()
 ```
 
-### 4. paged_all() — Cursor-Based Pagination
+### 4. paged_all() — Cursor-Based Pagination with Infinite Scroll
 
 ```python
 # First page
-result = await SensorReading.find().fetch_size(10).paged_all()
+result = await SensorReading.find().fetch_size(15).paged_all()
 # result.data         → list[SensorReading]
 # result.paging_state → bytes | None
 
 # Next page (pass the cursor back)
 if result.paging_state:
     next_page = await SensorReading.find() \
-        .fetch_size(10) \
+        .fetch_size(15) \
         .page(result.paging_state) \
         .paged_all()
 ```
 
+### 5. Background Device — Real-Time Data Generation
+
+```python
+# Runs in an asyncio background task during app lifespan
+async def _background_device_loop():
+    while True:
+        sensor_id = random.choice(DEVICE_SENSORS)
+        reading = SensorReading(**_generate_live_reading(sensor_id))
+        await reading.save()
+        await asyncio.sleep(DEVICE_INTERVAL)
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCYLLA_HOSTS` | `127.0.0.1` | Comma-separated ScyllaDB hosts |
+| `SCYLLA_KEYSPACE` | `iot` | Keyspace name |
+| `DEVICE_INTERVAL` | `3` | Seconds between background device readings |
+| `DISABLE_BACKGROUND_DEVICE` | *(unset)* | Set to `1` to disable the background device |
+
 ## Manual Testing
 
-1. **Dashboard auto-refresh**: Watch the sensor grid update every 10 seconds
-2. **Sensor drill-down**: Click any sensor card to see its reading history
-3. **Paginated feed**: Switch to the "Paginated Feed" tab and click "Load More"
-4. **JSON API**: `curl http://localhost:8000/readings/paged?page_size=5`
-5. **Large dataset**: Run `make seed-large` for a bigger pagination demo
+1. **Real-time dashboard**: Watch sensor cards update every 3 seconds with live data
+2. **Live indicator**: Green pulsing dot shows when background device is active
+3. **Sensor drill-down**: Click any sensor card to see its reading history
+4. **Infinite scroll**: Switch to the "Infinite Scroll Feed" tab and scroll down
+5. **Date filter**: Pick a date in the feed tab to browse historical data
+6. **Sensor filter**: Select a specific sensor in the feed dropdown
+7. **JSON API**: `curl http://localhost:8000/device/status`
+8. **Large dataset**: Run `make seed-large` for a bigger pagination demo

@@ -15,7 +15,8 @@
 | **`per_partition_limit()`** | Latest *N* readings per sensor in a single query |
 | **`paged_all()`** | Cursor-based pagination across large result sets |
 | **`Indexed()`** | Secondary index on `battery_pct` for low-battery alerts |
-| **Background Device** | Continuously generates new sensor readings in real-time |
+| **Background Device** | Continuously generates new sensor readings for ALL sensors |
+| **Live Charts** | Chart.js line charts with auto-updating time-series data |
 | **Infinite Scroll** | Scroll-triggered pagination with HTMX `revealed` trigger |
 | **Date Filtering** | Browse time-series data starting from a specific date |
 
@@ -69,8 +70,9 @@ CREATE TABLE iot.sensor_readings (
 
 ### Background Device
 The app starts a background async task that continuously generates new
-sensor readings every 3 seconds (configurable via `DEVICE_INTERVAL` env var).
-The dashboard auto-refreshes every 3 seconds to show the latest data.
+sensor readings for **ALL sensors** every 3 seconds (configurable via
+`DEVICE_INTERVAL` env var). Every sensor gets a new reading each cycle,
+making changes immediately visible on the dashboard.
 
 ```bash
 # Customize the background device interval (seconds)
@@ -79,6 +81,11 @@ DEVICE_INTERVAL=5 uv run uvicorn main:app --reload
 # Disable the background device
 DISABLE_BACKGROUND_DEVICE=1 uv run uvicorn main:app --reload
 ```
+
+### Live Charts
+The "📈 Live Charts" tab shows Chart.js line charts for temperature,
+humidity, and pressure for each sensor. Charts auto-update every 3 seconds,
+pulling the last 5 minutes of data from the `/sensors/{id}/chart` endpoint.
 
 ### Live Dashboard
 The sensor grid refreshes every 3 seconds using HTMX polling, showing
@@ -101,6 +108,7 @@ date — a natural requirement for time-series data exploration.
 |---|---|---|
 | `GET` | `/sensors` | List distinct sensor IDs |
 | `GET` | `/sensors/{id}/latest?days=1&limit=5` | Latest readings using `per_partition_limit()` |
+| `GET` | `/sensors/{id}/chart?minutes=5` | Time-series chart data for Chart.js |
 | `GET` | `/readings/paged?page_size=10&cursor=...` | Paginated readings using `paged_all()` |
 | `GET` | `/readings/paged?start_date=2026-01-15` | Readings from a specific start date |
 | `GET` | `/device/status` | Background device status (running, sensors, interval) |
@@ -111,6 +119,7 @@ date — a natural requirement for time-series data exploration.
 |---|---|---|
 | `GET` | `/` | Dashboard index page |
 | `GET` | `/ui/dashboard` | Sensor grid partial (auto-refresh every 3s) |
+| `GET` | `/ui/charts` | Live Chart.js charts partial (auto-refresh every 3s) |
 | `GET` | `/ui/sensor/{id}?days=3` | Sensor detail with reading history |
 | `GET` | `/ui/paged?page_size=15&start_date=...&sensor_id=...` | Infinite scroll feed with filters |
 
@@ -182,12 +191,29 @@ if result.paging_state:
 
 ```python
 # Runs in an asyncio background task during app lifespan
+# Writes to ALL sensors each cycle for visible real-time movement
 async def _background_device_loop():
     while True:
-        sensor_id = random.choice(DEVICE_SENSORS)
-        reading = SensorReading(**_generate_live_reading(sensor_id))
-        await reading.save()
+        for sensor_id in DEVICE_SENSORS:
+            reading = SensorReading(**_generate_live_reading(sensor_id))
+            await reading.save()
         await asyncio.sleep(DEVICE_INTERVAL)
+```
+
+### 6. Live Charts — Chart.js with Auto-Refresh
+
+```python
+# Chart endpoint returns time-series arrays for Chart.js
+@app.get("/sensors/{sensor_id}/chart")
+async def get_chart_data(sensor_id: str, minutes: int = 5) -> dict:
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    readings = ...  # query today's partition
+    recent = [r for r in readings if r.ts >= cutoff]
+    return {
+        "labels": [r.ts.strftime("%H:%M:%S") for r in recent],
+        "temperature": [r.temperature for r in recent],
+        ...
+    }
 ```
 
 ## Environment Variables
@@ -201,11 +227,13 @@ async def _background_device_loop():
 
 ## Manual Testing
 
-1. **Real-time dashboard**: Watch sensor cards update every 3 seconds with live data
-2. **Live indicator**: Green pulsing dot shows when background device is active
-3. **Sensor drill-down**: Click any sensor card to see its reading history
-4. **Infinite scroll**: Switch to the "Infinite Scroll Feed" tab and scroll down
-5. **Date filter**: Pick a date in the feed tab to browse historical data
-6. **Sensor filter**: Select a specific sensor in the feed dropdown
-7. **JSON API**: `curl http://localhost:8000/device/status`
-8. **Large dataset**: Run `make seed-large` for a bigger pagination demo
+1. **Real-time dashboard**: Watch sensor cards update every 3 seconds with live data — all sensors get new readings each cycle
+2. **Seconds-ago indicator**: Each card shows "Ns ago" in green for recent data
+3. **Live charts**: Switch to "📈 Live Charts" tab to see Chart.js line charts updating in real time
+4. **Live indicator**: Green pulsing dot shows when background device is active
+5. **Sensor drill-down**: Click any sensor card to see its reading history
+6. **Infinite scroll**: Switch to the "Infinite Scroll Feed" tab and scroll down
+7. **Date filter**: Pick a date in the feed tab to browse historical data
+8. **Sensor filter**: Select a specific sensor in the feed dropdown
+9. **JSON API**: `curl http://localhost:8000/sensors/reactor-core-A1/chart?minutes=5`
+10. **Large dataset**: Run `make seed-large` for a bigger pagination demo

@@ -63,7 +63,7 @@
 
           <div style="font-size: 0.6rem; color: var(--dim); margin-top: 0.5rem; display: flex; justify-content: space-between;">
             <span>Last: {{ latest.ts.strftime('%H:%M:%S') if latest.ts else '—' }}</span>
-            <span>{{ readings | length }} readings loaded</span>
+            <span class="live-age" data-ts="{{ latest.ts.isoformat() if latest.ts else '' }}">{{ readings | length }} readings</span>
           </div>
         {% else %}
           <div class="empty" style="padding: 1rem;">

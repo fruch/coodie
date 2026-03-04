@@ -94,6 +94,19 @@ def main() -> None:
         # Background device is disabled in test mode
         assert status["running"] is False, "Background device should be disabled in test mode"
 
+        # --- Chart data endpoint ---
+        r = client.get("/sensors/reactor-core-A1/chart", params={"minutes": 5})
+        assert r.status_code == 200, f"GET /sensors/.../chart returned {r.status_code}"
+        chart_data = r.json()
+        assert "labels" in chart_data, "Chart response missing 'labels' key"
+        assert "temperature" in chart_data, "Chart response missing 'temperature' key"
+        assert "humidity" in chart_data, "Chart response missing 'humidity' key"
+        assert "pressure" in chart_data, "Chart response missing 'pressure' key"
+
+        # --- Charts UI endpoint ---
+        r = client.get("/ui/charts")
+        assert r.status_code == 200, f"GET /ui/charts returned {r.status_code}"
+
         print("  ✓ All endpoint checks passed")
 
     finally:

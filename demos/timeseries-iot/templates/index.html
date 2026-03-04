@@ -32,6 +32,7 @@ result = <span class="kw">await</span> SensorReading.find().fetch_size(<span cla
 <!-- Tab navigation -->
 <div class="tabs">
   <button class="tab active" onclick="showTab('dashboard', this)">📊 Live Dashboard</button>
+  <button class="tab" onclick="showTab('charts', this)">📈 Live Charts</button>
   <button class="tab" onclick="showTab('paged', this)">📄 Infinite Scroll Feed</button>
 </div>
 
@@ -48,6 +49,23 @@ result = <span class="kw">await</span> SensorReading.find().fetch_size(<span cla
     <div class="empty">
       <span class="empty-icon">📡</span>
       <p>Loading sensor telemetry...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Live Charts tab — Chart.js auto-updating line charts -->
+<div id="tab-charts" style="display: none;">
+  <div class="refresh-notice">
+    <span class="live-dot"></span>
+    LIVE CHARTS — auto-update every 3s · last 5 minutes of data
+  </div>
+  <div id="charts-container"
+       hx-get="/ui/charts"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <div class="empty">
+      <span class="empty-icon">📈</span>
+      <p>Loading chart data...</p>
     </div>
   </div>
 </div>
@@ -113,7 +131,14 @@ function showTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-dashboard').style.display = name === 'dashboard' ? '' : 'none';
+  document.getElementById('tab-charts').style.display = name === 'charts' ? '' : 'none';
   document.getElementById('tab-paged').style.display = name === 'paged' ? '' : 'none';
+  // Start/stop chart refresh when tab is shown/hidden
+  if (name === 'charts') {
+    startChartRefresh();
+  } else {
+    stopChartRefresh();
+  }
 }
 
 function buildPagedUrl() {
@@ -164,6 +189,139 @@ function populateSensorSelect(event) {
     select.innerHTML = '<option value="">All Sensors</option>';
   }
 }
+
+// --- Chart.js live chart management ---
+var chartInstances = {};
+var chartRefreshInterval = null;
+
+function createChart(canvasId, label, color, borderColor) {
+  var ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  return new Chart(ctx.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: label,
+        data: [],
+        borderColor: borderColor,
+        backgroundColor: color,
+        borderWidth: 2,
+        pointRadius: 1,
+        pointHoverRadius: 4,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(56,189,248,0.06)' },
+          ticks: { color: '#3d5575', font: { size: 9, family: 'Courier New' }, maxTicksLimit: 8 }
+        },
+        y: {
+          grid: { color: 'rgba(56,189,248,0.06)' },
+          ticks: { color: '#3d5575', font: { size: 9, family: 'Courier New' } }
+        }
+      }
+    }
+  });
+}
+
+async function refreshCharts() {
+  var containers = document.querySelectorAll('.sensor-charts');
+  for (var container of containers) {
+    var sensorId = container.dataset.sensor;
+    if (!sensorId) continue;
+    try {
+      var resp = await fetch('/sensors/' + encodeURIComponent(sensorId) + '/chart?minutes=5');
+      var data = await resp.json();
+      updateSensorCharts(sensorId, data);
+    } catch(e) {
+      console.error('Chart refresh error for ' + sensorId + ':', e);
+    }
+  }
+}
+
+function updateSensorCharts(sensorId, data) {
+  var metrics = ['temperature', 'humidity', 'pressure'];
+  for (var metric of metrics) {
+    var key = sensorId + '-' + metric;
+    var chart = chartInstances[key];
+    if (chart) {
+      chart.data.labels = data.labels;
+      chart.data.datasets[0].data = data[metric];
+      chart.update('none');
+    }
+  }
+}
+
+function initChartsForSensor(sensorId) {
+  var prefix = sensorId.replace(/[^a-zA-Z0-9]/g, '_');
+  chartInstances[sensorId + '-temperature'] = createChart(
+    'chart-temp-' + prefix, 'Temperature (°C)',
+    'rgba(239,68,68,0.1)', 'rgba(239,68,68,0.8)'
+  );
+  chartInstances[sensorId + '-humidity'] = createChart(
+    'chart-hum-' + prefix, 'Humidity (%)',
+    'rgba(56,189,248,0.1)', 'rgba(56,189,248,0.8)'
+  );
+  chartInstances[sensorId + '-pressure'] = createChart(
+    'chart-pres-' + prefix, 'Pressure (hPa)',
+    'rgba(245,158,11,0.1)', 'rgba(245,158,11,0.8)'
+  );
+}
+
+function startChartRefresh() {
+  if (chartRefreshInterval) return;
+  // Initialize charts after HTMX loads the charts partial
+  setTimeout(function() {
+    var containers = document.querySelectorAll('.sensor-charts');
+    containers.forEach(function(c) { initChartsForSensor(c.dataset.sensor); });
+    refreshCharts();
+  }, 300);
+  chartRefreshInterval = setInterval(refreshCharts, 3000);
+}
+
+function stopChartRefresh() {
+  if (chartRefreshInterval) {
+    clearInterval(chartRefreshInterval);
+    chartRefreshInterval = null;
+  }
+}
+
+// Update "seconds ago" on dashboard cards
+function updateAges() {
+  document.querySelectorAll('.live-age').forEach(function(el) {
+    var ts = el.dataset.ts;
+    if (!ts) return;
+    var then = new Date(ts);
+    var now = new Date();
+    var secs = Math.round((now - then) / 1000);
+    if (secs < 60) {
+      el.textContent = secs + 's ago';
+      el.style.color = secs < 10 ? 'var(--success)' : 'var(--dim)';
+    } else {
+      el.textContent = Math.round(secs / 60) + 'm ago';
+      el.style.color = 'var(--dim)';
+    }
+  });
+}
+setInterval(updateAges, 1000);
+// Re-initialize charts when HTMX swaps in the charts partial
+document.addEventListener('htmx:afterSwap', function(evt) {
+  if (evt.detail.target && evt.detail.target.id === 'charts-container') {
+    var containers = document.querySelectorAll('.sensor-charts');
+    containers.forEach(function(c) { initChartsForSensor(c.dataset.sensor); });
+    refreshCharts();
+  }
+});
 </script>
 
 {% endblock %}

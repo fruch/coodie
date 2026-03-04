@@ -5,14 +5,15 @@ Showcases coodie's time-series capabilities:
 - **ClusteringKey(order="DESC")** — newest readings first within each partition
 - **per_partition_limit()** — latest N readings per sensor in one query
 - **paged_all()** — cursor-based pagination across large result sets
-- **Background device** — continuously generates new sensor telemetry
+- **Background device** — continuously generates new sensor telemetry for ALL sensors
 - **Real-time dashboard** — auto-updates as new data arrives
+- **Live charts** — Chart.js line charts with auto-refreshing time-series data
 - **Infinite scroll** — scroll-triggered pagination with date filtering
 """
 
 from __future__ import annotations
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 import asyncio
 import base64
@@ -66,7 +67,7 @@ def _generate_live_reading(sensor_id: str) -> dict:
 
 
 async def _background_device_loop() -> None:
-    """Continuously generate new sensor readings in the background."""
+    """Continuously generate new sensor readings for ALL sensors each cycle."""
     default_sensors = [
         "reactor-core-A1",
         "coolant-loop-B2",
@@ -88,11 +89,11 @@ async def _background_device_loop() -> None:
     logger.info("Background device started — %d sensors, interval=%ss", len(sensors), DEVICE_INTERVAL)
     while True:
         try:
-            # Pick a random sensor and generate a reading
-            sensor_id = random.choice(DEVICE_SENSORS)
-            data = _generate_live_reading(sensor_id)
-            reading = SensorReading(**data)
-            await reading.save()
+            # Generate a new reading for EVERY sensor each cycle
+            for sensor_id in DEVICE_SENSORS:
+                data = _generate_live_reading(sensor_id)
+                reading = SensorReading(**data)
+                await reading.save()
         except asyncio.CancelledError:
             logger.info("Background device stopped")
             return
@@ -140,7 +141,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="IoT Sensor Dashboard — Station Argos-7",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -245,6 +246,42 @@ async def device_status() -> dict:
     }
 
 
+@app.get("/sensors/{sensor_id}/chart")
+async def get_chart_data(
+    sensor_id: str,
+    minutes: int = Query(default=5, ge=1, le=60),
+) -> dict:
+    """Return recent time-series data for a sensor, formatted for Chart.js.
+
+    Returns the last ``minutes`` of readings with timestamps and metric values
+    as separate arrays suitable for Chart.js line charts.
+    """
+    today = date.today()
+    readings: list[SensorReading] = []
+
+    # Query today's partition (and yesterday if needed for the time window)
+    for day_offset in range(2):
+        bucket = today - timedelta(days=day_offset)
+        day_readings = await SensorReading.find(sensor_id=sensor_id, date_bucket=bucket).per_partition_limit(200).all()
+        readings.extend(day_readings)
+
+    # Filter to the requested time window
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    recent = [r for r in readings if r.ts and r.ts >= cutoff]
+    # Sort chronologically (oldest first) for chart display
+    recent.sort(key=lambda r: r.ts)
+
+    return {
+        "sensor_id": sensor_id,
+        "labels": [r.ts.strftime("%H:%M:%S") for r in recent],
+        "temperature": [round(r.temperature, 2) for r in recent],
+        "humidity": [round(r.humidity, 1) for r in recent],
+        "pressure": [round(r.pressure, 1) for r in recent],
+        "battery_pct": [r.battery_pct for r in recent],
+        "count": len(recent),
+    }
+
+
 # ------------------------------------------------------------------
 # HTMX UI routes
 # ------------------------------------------------------------------
@@ -341,4 +378,15 @@ async def ui_paged_readings(
             "start_date": start_date.isoformat() if start_date else "",
             "sensor_id": sensor_id or "",
         },
+    )
+
+
+@app.get("/ui/charts", response_class=HTMLResponse)
+async def ui_charts(request: Request) -> HTMLResponse:
+    """Return the live charts partial with sensor list for Chart.js."""
+    sensor_ids = await _discover_sensors()
+    device_active = _bg_task is not None and not _bg_task.done()
+    return templates.TemplateResponse(
+        "partials/charts.html",
+        {"request": request, "sensor_ids": sensor_ids, "device_active": device_active},
     )

@@ -245,13 +245,34 @@ jobs:
           # of redirecting stdout, which can include MCP errors and agent
           # noise).  Copilot's own file-writing tool is used, so only
           # intentional content ends up in the file.
-          COPILOT_OUTPUT_FILE=$(mktemp)
+          #
+          # Use RUNNER_TEMP (not /tmp) and do NOT pre-create the file.
+          # Pre-creating the file via mktemp turns the operation into an
+          # "edit", which requires interactive user approval from the Copilot
+          # CLI security model.  By providing only a target path (no
+          # pre-existing file), Copilot performs a "create" operation instead,
+          # which is permitted in non-interactive CI.
+          COPILOT_OUTPUT_FILE="${RUNNER_TEMP}/copilot_squash_body_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.txt"
           export COPILOT_OUTPUT_FILE
 
           echo "::group::Copilot output-file validation (pre)"
           echo "COPILOT_OUTPUT_FILE=$COPILOT_OUTPUT_FILE"
-          ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
-          echo "File writable: $(test -w "$COPILOT_OUTPUT_FILE" && echo yes || echo no)"
+          echo "RUNNER_TEMP=${RUNNER_TEMP}"
+          echo "--- current user ---"
+          whoami; id
+          echo "--- RUNNER_TEMP directory permissions ---"
+          ls -la "${RUNNER_TEMP}" 2>&1 || true
+          echo "--- /tmp directory permissions ---"
+          find /tmp/ -maxdepth 1 -ls 2>&1 | head -10 || true
+          if [ -f "$COPILOT_OUTPUT_FILE" ]; then
+            echo "File exists: yes (unexpected — will be an edit operation)"
+            ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
+            stat "$COPILOT_OUTPUT_FILE" 2>&1 || true
+            echo "File writable by runner: $(test -w "$COPILOT_OUTPUT_FILE" && echo yes || echo no)"
+          else
+            echo "File exists: no (Copilot will create it — create operation, no interactive approval needed)"
+            echo "Parent dir writable by runner: $(test -w "${RUNNER_TEMP}" && echo yes || echo no)"
+          fi
           echo "::endgroup::"
 
           echo "::group::Install Copilot CLI"
@@ -265,18 +286,23 @@ jobs:
              calls, no reasoning steps. Be concise. \
              Write the result to the file $COPILOT_OUTPUT_FILE. \
              Commits: $LOG --- Diff stat: $STAT" \
+            --add-dir "${RUNNER_TEMP}" \
             || true
           echo "::endgroup::"
 
           echo "::group::Copilot output-file validation (post)"
           if [ -f "$COPILOT_OUTPUT_FILE" ]; then
             echo "File exists: yes"
+            ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
+            stat "$COPILOT_OUTPUT_FILE" 2>&1 || true
             echo "File size: $(wc -c < "$COPILOT_OUTPUT_FILE") bytes"
             echo "--- file content (first 20 lines) ---"
             head -20 "$COPILOT_OUTPUT_FILE"
             echo "--- end ---"
           else
             echo "File exists: no (Copilot may have removed or not written to the file)"
+            echo "--- RUNNER_TEMP contents (debug) ---"
+            find "${RUNNER_TEMP}" -maxdepth 1 -ls 2>&1 | head -20 || true
           fi
           echo "::endgroup::"
 

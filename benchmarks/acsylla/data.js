@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772663541064,
+  "lastUpdate": 1772748875006,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11259,6 +11259,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.483055233538775e-7",
             "extra": "mean: 5.6542674980337315 usec\nrounds: 6415"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "6682e90497ebd8810c1d44aeea0e5c676d468ad3",
+          "message": "fix(ci): use RUNNER_TEMP, avoid pre-creating Copilot output file, and add --add-dir to fix /tmp permission errors\n\n- [x] Fix Copilot /tmp permission issue in pr-rebase-squash.yml:\n  - [x] Replace `mktemp` (which pre-creates file in /tmp) with a deterministic path in `$RUNNER_TEMP` that is NOT pre-created\n  - [x] Add `--add-dir \"${RUNNER_TEMP}\"` to the `copilot -p` invocation to pre-authorize directory access\n  - [x] Add comprehensive debug output in pre/post validation groups\n  - [x] Fix shellcheck SC2015: replace `whoami && id || true` with `whoami; id`\n  - [x] Fix shellcheck SC2012: replace `ls -la /tmp/` with `find /tmp/ -maxdepth 1 -ls`\n  - [x] Fix shellcheck SC2012: replace `ls -la \"${RUNNER_TEMP}\"` with `find \"${RUNNER_TEMP}\" -maxdepth 1 -ls` in post-validation block\n\n<!-- START COPILOT CODING AGENT SUFFIX -->\n\n<!-- START COPILOT ORIGINAL PROMPT -->\n\n<details>\n\n<summary>Original prompt</summary>\n\n> copilot have premission issues with the file in /tmp\n>\n> https://github.com/fruch/coodie/actions/runs/22691557238/job/65788042447#step:14:123\n>\n> suggest other ways, and add debug print to understand what the permission situation with the file\n\n</details>\n\n<!-- START COPILOT CODING AGENT TIPS -->\n---\n\n💬 We'd love your input! Share your thoughts on Copilot coding agent in our [2 minute survey](https://gh.io/copilot-coding-agent-survey).",
+          "timestamp": "2026-03-06T00:13:57+02:00",
+          "tree_id": "b8e3b74876c04a8cfe6eb354c4640f29fd1234e9",
+          "url": "https://github.com/fruch/coodie/commit/6682e90497ebd8810c1d44aeea0e5c676d468ad3"
+        },
+        "date": 1772748874107,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53267.95254277705,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000014859033636358497",
+            "extra": "mean: 18.773013646374825 usec\nrounds: 7841"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 561129.6322982792,
+            "unit": "iter/sec",
+            "range": "stddev: 5.726326738575383e-7",
+            "extra": "mean: 1.7821193935244377 usec\nrounds: 40957"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 617998.641903179,
+            "unit": "iter/sec",
+            "range": "stddev: 4.795866396561468e-7",
+            "extra": "mean: 1.6181265332888364 usec\nrounds: 47039"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 830163.6786518687,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3879879812248623e-7",
+            "extra": "mean: 1.2045817297426626 usec\nrounds: 136725"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 841869.5010796832,
+            "unit": "iter/sec",
+            "range": "stddev: 3.244559007305182e-7",
+            "extra": "mean: 1.1878325544725366 usec\nrounds: 72543"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 730347.2475030326,
+            "unit": "iter/sec",
+            "range": "stddev: 4.6722930419852054e-7",
+            "extra": "mean: 1.3692117050059092 usec\nrounds: 100111"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 186767.71512552802,
+            "unit": "iter/sec",
+            "range": "stddev: 8.495310713478529e-7",
+            "extra": "mean: 5.354244438488163 usec\nrounds: 7507"
           }
         ]
       }

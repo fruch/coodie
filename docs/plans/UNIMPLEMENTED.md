@@ -4,10 +4,11 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-04 (post-merge: PR conflict Phases 1–5 all done,
+> **Last reviewed:** 2026-03-05 (post-merge: PR conflict Phases 1–5 all done,
 > sync-api Phases 1–4 all done, silent-exception-pass Phase 1 done;
-> realtime-counters demo WIP in PR #176, vector support WIP in PRs #150/#155,
-> collections-tags demo WIP in PR #147)
+> CQL Phase 1 DML gaps WIP in PR #184, timeseries-iot demo WIP in PR #180,
+> schema-migrations demo WIP in PR #183, realtime-counters demo WIP in PR #176,
+> vector support WIP in PRs #150/#155, collections-tags demo WIP in PR #147)
 
 ---
 
@@ -88,6 +89,8 @@
 
 ### 3.4 Time-Series IoT Demo
 
+> **⚠️ IN PROGRESS — [PR #180](https://github.com/fruch/coodie/pull/180): Timeseries-IoT demo (Phase 7, task 7.1).**
+
 > **Prompt:** Create `demos/timeseries-iot/` — an IoT sensor data demo showcasing time-bucketed partitions, clustering keys with DESC order, `per_partition_limit()`, and `paged_all()` for pagination. Add `seed.py` generating synthetic sensor readings, colorful dashboard UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.1).
 
 ### 3.5 Polymorphic CMS Demo
@@ -103,6 +106,8 @@
 > **Prompt:** Create `demos/migration-guide/` — a side-by-side migration walkthrough from cqlengine to coodie. Include `cqlengine_models.py` and `coodie_models.py` with equivalent models, a `migrate.py` script that syncs tables, and a `verify.py` that checks data round-trip. Reference argus model patterns. Add `README.md` with step-by-step walkthrough. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.3).
 
 ### 3.8 Schema Migrations Demo
+
+> **⚠️ IN PROGRESS — [PR #183](https://github.com/fruch/coodie/pull/183) (draft): Schema migrations demo (Phase 10).**
 
 > **Prompt:** Create `demos/schema-migrations/` — a demo showcasing coodie's Phase B migration framework CLI (`coodie migrate`). Demonstrate `apply`, `rollback`, `dry-run`, and state tracking with the `_coodie_migrations` table. Include sample migration files following the `YYYYMMDD_NNN_description.py` pattern. Add `Makefile` and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 10 reference.
 
@@ -167,6 +172,8 @@
 > *New plan comparing coodie against the ScyllaDB CQL Reference. Identifies 41 missing CQL features across data types, DDL, DML, LWT, and ScyllaDB extensions. 6 implementation phases planned — none started yet.*
 
 ### 7.1 Core DML Gaps (Phase 1)
+
+> **⚠️ IN PROGRESS — [PR #184](https://github.com/fruch/coodie/pull/184): CQL Phase 1 DML gaps — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST, TOKEN.**
 
 > **Prompt:** Implement core DML gaps in coodie: (1) `TRUNCATE TABLE` via `Document.truncate()`. (2) `SELECT DISTINCT` via `QuerySet.distinct()`. (3) `GROUP BY` on clustering columns via `QuerySet.group_by()`. (4) Aggregate functions `SUM()`, `AVG()`, `MIN()`, `MAX()` via `QuerySet.aggregate()`. (5) `CAST()` in SELECT. (6) `IS NOT NULL` filter. (7) `TOKEN()` in SELECT for manual range scans. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 1.
 

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772748875006,
+  "lastUpdate": 1772749828028,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11332,6 +11332,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.495310713478529e-7",
             "extra": "mean: 5.354244438488163 usec\nrounds: 7507"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "9231257a9456a7225f916a125e897404f0cba1ec",
+          "message": "fix(ci): replace raw log dumps in self-heal PR comments with deep-links\n\n- [x] Create `find-error-line.py` — parses a GitHub Actions job log and returns the 1-based line number of the first error within a given step (for deep-links like `#step:N:LM`)\n- [x] Update `collect-failed-logs.sh` — fetches job list once, downloads each log to a temp file, produces `FAILED_LINKS` (markdown deep-links) alongside `FAILED_LOGS` (still fed to AI summariser)\n- [x] Update `self-healing-ci.yml` — writes `FAILED_LINKS` to `/tmp/failed_links.txt`; replaces the `## Failed Job Logs` raw-dump section with a `### Failed Jobs` deep-link section\n- [x] Fix bats tests in `test_collect_failed_logs.bats` to match the new `gh` call pattern (script now fetches full JSON once, tests now mock the jobs endpoint to return proper JSON instead of jq-filtered text); also updated the \"no failed jobs\" mock to return `{\"jobs\":[]}` instead of empty string to prevent jq null-iteration errors\n- [x] All 69 bats tests pass locally\n\n<!-- START COPILOT CODING AGENT SUFFIX -->\n\n<!-- START COPILOT ORIGINAL PROMPT -->\n\n<details>\n\n<summary>Original prompt</summary>\n\n> self heal workflow shouldn't add logs in the comments only links into the failing action, with the exact line in the link if possible\n\n</details>\n\n<!-- START COPILOT CODING AGENT TIPS -->\n---\n\n💡 You can make Copilot smarter by setting up custom instructions, customizing its development environment and configuring Model Context Protocol (MCP) servers. Learn more [Copilot coding agent tips](https://gh.io/copilot-coding-agent-tips) in the docs.",
+          "timestamp": "2026-03-06T00:29:48+02:00",
+          "tree_id": "48877059244fd32dd7621b590ec907ecd9f9a45a",
+          "url": "https://github.com/fruch/coodie/commit/9231257a9456a7225f916a125e897404f0cba1ec"
+        },
+        "date": 1772749826996,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53828.81238564029,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018142358555465506",
+            "extra": "mean: 18.577411532615685 usec\nrounds: 9625"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 585709.7958454955,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1899445535098804e-7",
+            "extra": "mean: 1.7073301609314215 usec\nrounds: 53377"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 610727.2849539518,
+            "unit": "iter/sec",
+            "range": "stddev: 4.4133716845861646e-7",
+            "extra": "mean: 1.6373920481961093 usec\nrounds: 62074"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 822742.9207528948,
+            "unit": "iter/sec",
+            "range": "stddev: 3.429999207811923e-7",
+            "extra": "mean: 1.2154464958323756 usec\nrounds: 157184"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 870087.293001997,
+            "unit": "iter/sec",
+            "range": "stddev: 3.1530358258983107e-7",
+            "extra": "mean: 1.1493099692902937 usec\nrounds: 84660"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 717780.083874507,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0456319398217293e-7",
+            "extra": "mean: 1.393184378427021 usec\nrounds: 124456"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188929.440074224,
+            "unit": "iter/sec",
+            "range": "stddev: 8.174707365337726e-7",
+            "extra": "mean: 5.29298133529181 usec\nrounds: 7340"
           }
         ]
       }

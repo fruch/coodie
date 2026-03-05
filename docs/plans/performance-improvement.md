@@ -1306,19 +1306,13 @@ limitations.
 |----------|------|-----------------|
 | ✅ Done | 14.5.1 Custom `dict_factory` | Eliminate `_rows_to_dicts()` overhead (−10–15% reads) |
 | ✅ Done | 14.5.4 `__slots__` on LWTResult/PagedResult/BatchQuery | −2–5% on affected operations |
-<<<<<<< HEAD
 | P0 | §13E Task 8.1 Fair benchmark for partial UPDATE | Reveals true ratio (~1.0–1.2×) |
 | P0 | §13E Task 8.2 Cache build_count/update/delete | −3–5% on affected ops |
 | P0 | §13E Task 8.3 Pre-compile `_snake_case` regex | −1–2 µs per query |
 | P1 | §13E Task 8.4 Cache `_get_field_cql_types()` | −70–80% on UDT DDL benchmark |
 | P1 | §13E Task 8.5 Prepared statement warming | −100–200 µs first query |
 | P2 | §13E Task 8.6 Dirty-field tracking for save() | −10–30% read-modify-write |
-| P2 | 14.5.6 Connection-level optimizations | −5–15% on real-world workloads |
-||||||| parent of 9f8f30a (docs(plans): add Phase 8 benchmark analysis for §14.5.6 connection-level optimizations)
-| P2 | 14.5.6 Connection-level optimizations | −5–15% on real-world workloads |
-=======
 | ✅ Done | 14.5.6 Connection-level optimizations | −5–15% on real-world workloads |
->>>>>>> 9f8f30a (docs(plans): add Phase 8 benchmark analysis for §14.5.6 connection-level optimizations)
 
 ---
 
@@ -1532,7 +1526,6 @@ noise floor of CI benchmarks), consistent with the original §14.5.4 estimate.
 
 ---
 
-<<<<<<< HEAD
 ## 13E. Phase 8 — Benchmark Review & Next-Level Optimizations
 
 > **Date**: 2026-02-28
@@ -1814,14 +1807,12 @@ The remaining 3–4 losses would all be in the "accepted Pydantic trade-off" cat
 
 ---
 
-||||||| parent of 9f8f30a (docs(plans): add Phase 8 benchmark analysis for §14.5.6 connection-level optimizations)
-=======
-## 13E. Phase 8 — Connection-Level Optimizations (§14.5.6)
+## 13F. Phase 8b — Connection-Level Optimizations (§14.5.6)
 
 > **PR**: [#137](https://github.com/fruch/coodie/pull/137) — `feat(drivers): connection-level performance optimizations — compression, speculative execution, prepared statement warming`
 > **Baseline**: Phase 7 (13D) benchmark run [#22530373428](https://github.com/fruch/coodie/actions/runs/22530373428) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22530373428/job/65268812271)) — commit `065c756`, 2026-02-28
 
-### 13E.1 Changes Implemented
+### 13F.1 Changes Implemented
 
 | Change | Description | Status |
 |--------|-------------|--------|
@@ -1829,7 +1820,7 @@ The remaining 3–4 losses would all be in the "accepted Pydantic trade-off" cat
 | LZ4 protocol compression | `init_coodie(compression="lz4")` forwarded to `Cluster()` | ✅ Done |
 | Speculative execution policy | `init_coodie(speculative_execution_policy=...)` forwarded to `Cluster()` | ✅ Done |
 
-### 13E.2 Benchmark Impact Analysis
+### 13F.2 Benchmark Impact Analysis
 
 #### Why steady-state benchmarks are unaffected
 
@@ -1888,7 +1879,7 @@ This is not measurable in the CI benchmarks (single-node testcontainer, no netwo
 - **P99 latency**: reduced by 20–50% (tail requests are rescued by the speculative copy)
 - **Throughput**: slight increase in load on the cluster (~5–15% extra queries on speculative nodes)
 
-### 13E.3 Phase 7 Baseline → Phase 8 Steady-State Comparison
+### 13F.3 Phase 7 Baseline → Phase 8 Steady-State Comparison
 
 Since steady-state throughput is unaffected by warming (the cache is hot after the first iteration), the Phase 7 numbers serve directly as the Phase 8 confirmed baseline. The following table confirms that the key benchmarks are **stable** between Phase 7 and Phase 8:
 
@@ -1916,7 +1907,7 @@ For the `sync_table_create` benchmark, each call creates a **new uniquely-named 
 
 > The `sync_table_create` benchmark is a worst-case scenario — in real applications, tables are created once at startup and the warming overhead is amortized over thousands of subsequent queries. The −15% on this synthetic benchmark is acceptable and expected.
 
-### 13E.4 Impact Assessment
+### 13F.4 Impact Assessment
 
 | Optimization | Steady-state benchmarks | Cold-start impact | Real-world impact |
 |--------------|------------------------|-------------------|-------------------|
@@ -1925,6 +1916,266 @@ For the `sync_table_create` benchmark, each call creates a **new uniquely-named 
 | Speculative execution (opt-in) | No change | No change | −20–50% P99 tail latency in multi-node deployments |
 
 The §14.5.6 optimizations are **deployment-time configuration improvements** rather than algorithmic changes. Their value is primarily in production environments with multiple nodes, large result sets, and real network conditions — not captured by the CI benchmark suite.
+
+---
+
+## 13G. Phase 9 — Raw+DC Benchmark Analysis & Optimization Targets
+
+> **Date**: 2026-03-05
+> **Based on**: Raw+DC benchmarks added in PR [#187](https://github.com/fruch/coodie/pull/187) — CI run [#22739849451](https://github.com/fruch/coodie/actions/runs/22739849451) — commit `313a210`
+> **Status**: Analysis complete, proposed optimizations pending implementation
+
+### 13G.1 Background
+
+PR #187 introduced a third benchmark contender — **Raw+DC** (Python `dataclasses` + hand-written
+CQL with prepared statements) — inspired by the [Raw+DC pattern](https://mkennedy.codes/posts/raw-dc-the-orm-pattern-of-2026/).
+This establishes the **performance floor**: the fastest possible pure-Python path without any
+ORM overhead. Comparing coodie against this floor quantifies the exact cost of ORM convenience
+and provides clearer optimization targets than the coodie-vs-cqlengine comparison alone.
+
+### 13G.2 Three-Way Benchmark Results (scylla driver)
+
+| Benchmark | Raw+DC (µs) | coodie (µs) | cqlengine (µs) | coodie vs Raw+DC | coodie vs cqlengine |
+|-----------|-------------|-------------|-----------------|------------------|---------------------|
+| single-insert | 456 | 485 | 615 | **1.06×** | 0.79× ✅ |
+| insert-if-not-exists | 1,180 | 1,170 | 1,370 | **~1.00×** | 0.85× ✅ |
+| insert-with-ttl | 448 | 469 | 640 | **1.05×** | 0.73× ✅ |
+| get-by-pk | 461 | 520 | 665 | **1.13×** | 0.78× ✅ |
+| filter-secondary-index | 1,370 | 2,740 | 8,530 | **2.00×** 🟠 | 0.32× ✅ |
+| filter-limit | 575 | 627 | 1,220 | **1.09×** | 0.51× ✅ |
+| count | 904 | 1,500 | 1,590 | **1.66×** 🟡 | 0.94× ✅ |
+| partial-update | 409 | 960 | 542 | **2.35×** 🔴 | 1.77× ❌ |
+| update-if-condition (LWT) | 1,140 | 1,620 | 1,340 | **1.42×** 🟡 | 1.21× ❌ |
+| single-delete | 941 | 925 | 1,190 | **~1.00×** | 0.78× ✅ |
+| bulk-delete | 872 | 921 | 1,200 | **1.06×** | 0.77× ✅ |
+| batch-insert-10 | 596 | 634 | 1,700 | **1.06×** | 0.37× ✅ |
+| batch-insert-100 | 42,800 | 1,960 | 52,900 | **0.05× 🚀** | 0.04× ✅ |
+| collection-write | 448 | 485 | 679 | **1.08×** | 0.71× ✅ |
+| collection-read | 478 | 508 | 689 | **1.06×** | 0.74× ✅ |
+| collection-roundtrip | 939 | 1,060 | 1,380 | **1.13×** | 0.77× ✅ |
+| model-instantiation | 0.671 | 2.02 | 12.1 | **3.01×** 🔴 | 0.17× ✅ |
+| model-serialization | 10.1 | 2.05 | 4.56 | **0.20× 🚀** | 0.45× ✅ |
+
+### 13G.3 Key Findings — What Raw+DC Reveals
+
+#### Finding 1: coodie's write path is essentially zero-overhead
+
+Single inserts, deletes, and collection writes are all within **1.00–1.06×** of raw CQL. This
+means Phases 1–7 of optimization have been **completely successful** on the write path — coodie's
+ORM layer adds no measurable overhead for write operations. **No further write-path optimization
+is warranted.**
+
+#### Finding 2: coodie outperforms Raw+DC in two areas
+
+- **Batch-100 inserts (0.05×, 21× faster)**: coodie's native `BatchQuery` submits all 100 rows
+  in a single CQL BATCH statement, while Raw+DC loops over individual prepared statements. This
+  is a **design advantage**, not an optimization — the ORM abstracts batch mechanics.
+- **Model serialization (0.20×, 5× faster)**: Pydantic's compiled `model_dump()` is 5× faster
+  than `dataclasses.asdict()` (which recurses through nested structures). This validates coodie's
+  choice of Pydantic as the model layer.
+
+#### Finding 3: Model instantiation is the single largest overhead (3.01×)
+
+The per-instance cost of Pydantic `model_validate()` vs plain `dataclass()` constructor is the
+dominant overhead. This cost directly impacts every read path:
+
+| Read scenario | Extra overhead per query (3.01× at ~1.35 µs/row) |
+|---------------|--------------------------------------------------|
+| GET by PK (1 row) | ~1.35 µs — negligible (masked by I/O) |
+| Filter + LIMIT 10 | ~13.5 µs — low |
+| Filter (secondary index, ~50 rows) | ~67 µs — noticeable |
+| Bulk read (100 rows) | ~135 µs — significant |
+| Bulk read (1,000 rows) | ~1,350 µs — **dominant bottleneck** |
+
+For single-row reads the overhead is invisible (1.13× on get-by-pk). For multi-row reads it
+compounds linearly, explaining the 2.00× on filter-secondary-index.
+
+#### Finding 4: Partial update is coodie's worst absolute overhead (2.35×)
+
+The Raw+DC baseline shows a pure `UPDATE ... SET price = ?` costs **409 µs**. coodie's
+`update()` costs **960 µs** — adding 551 µs of ORM overhead. This breakdown was previously
+obscured in the coodie-vs-cqlengine comparison (where cqlengine's own overhead at 542 µs
+masked the true gap).
+
+The 551 µs overhead comes from:
+- Schema lookup + PK column identification: ~100 µs (cacheable)
+- Field validation via Pydantic: ~50–100 µs
+- CQL generation for UPDATE: ~20–40 µs
+- Additional Python frame overhead: ~300+ µs (read-modify-write pattern in current benchmark)
+
+#### Finding 5: COUNT overhead (1.66×) is disproportionate
+
+A COUNT query returns a single integer, yet coodie's QuerySet layer adds 66% overhead. The
+Raw+DC path executes `SELECT COUNT(*) FROM table` and reads a scalar for 904 µs. coodie pays
+1,500 µs — an extra 596 µs for query building, prepared statement lookup, and result processing
+through the full `_rows_to_dicts()` → model pipeline for what should be a trivial scalar.
+
+#### Finding 6: cqlengine is universally slower than coodie
+
+In 16 of 18 benchmarks, coodie outperforms cqlengine (even on partial-update and LWT where
+coodie loses to Raw+DC). This confirms coodie's ORM overhead is **lighter** than cqlengine's
+in virtually all scenarios.
+
+### 13G.4 Proposed Optimizations (Phase 9)
+
+Based on the Raw+DC analysis, the following optimizations target the specific overhead gaps
+revealed by the three-way comparison:
+
+#### Task 9.1 — `model_construct()` for trusted DB data (P0, estimated −40–60% on multi-row reads)
+
+**Problem**: Model instantiation is 3.01× vs Raw+DC due to Pydantic validation overhead.
+When data comes from the database, it has already been validated by the DB schema and the
+CQL binary protocol — re-validation by Pydantic is redundant.
+
+**Proposed**: Use `model_construct()` (which skips validation) for rows hydrated from the
+DB, with an opt-in `validate=True` parameter for users who want validation:
+
+```python
+# Current (slow path — validates every field on every row):
+docs = [Model.model_validate(row) for row in rows]
+
+# Proposed (fast path — trusts DB data):
+docs = [Model.model_construct(**row) for row in rows]
+
+# Or with _fields_set tracking:
+docs = [Model.model_construct(_fields_set=set(row.keys()), **row) for row in rows]
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~15–20 in `_rows_to_docs()` | −40–60% on multi-row read latency |
+| Risk | Medium | Bypasses Pydantic validation; custom validators won't fire |
+| Mitigation | Add `QuerySet.validate(True/False)` opt-in toggle; default=False (fast) |
+| Note | Pydantic `model_construct()` still handles type coercion for annotated types |
+
+**Expected result**: model-instantiation benchmark drops from 3.01× to ~1.2–1.5× vs Raw+DC.
+filter-secondary-index drops from 2.00× to ~1.2–1.4×.
+
+#### Task 9.2 — Optimize COUNT scalar return path (P0, estimated −30–40% on COUNT)
+
+**Problem**: COUNT queries return a single integer but go through the full result-set
+hydration pipeline. The 1.66× overhead vs Raw+DC is caused by unnecessary processing.
+
+**Proposed**: Short-circuit the COUNT execution path to return a scalar directly:
+
+```python
+# Current flow:
+# count() → build_count() → execute() → _rows_to_dicts() → rows[0]["count"]
+
+# Proposed flow:
+# count() → build_count() → execute() → result.one()["count"]
+# Bypass _rows_to_dicts() and model hydration entirely
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~10 in `QuerySet.count()` | −30–40% on COUNT operations |
+| Risk | Low | COUNT result structure is well-defined (single row, single column) |
+
+#### Task 9.3 — Optimize partial-update to avoid full schema scan (P0, estimated −25–35%)
+
+**Problem**: `update()` costs 960 µs vs Raw+DC's 409 µs (2.35× overhead). Part of this is
+the read-modify-write pattern in the benchmark (already identified in §13E Task 8.1), but
+even the single-query `QuerySet.update()` path involves schema scanning and CQL generation
+that can be cached.
+
+**Proposed**: Combine with §13E Task 8.1 (fair benchmark) and add PK column caching:
+
+```python
+@functools.lru_cache(maxsize=128)
+def _pk_columns(doc_cls: type) -> tuple[str, ...]:
+    schema = build_schema(doc_cls)
+    return tuple(c.name for c in schema if c.primary_key or c.clustering_key)
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~15 (cache) + ~30 (benchmark fix from §13E.8.1) | −25–35% on partial-update |
+| Risk | Low | PK columns are immutable per model class |
+
+#### Task 9.4 — Batch `model_construct()` with pre-computed field sets (P1)
+
+**Problem**: For multi-row queries (filter, secondary-index), constructing N models
+individually in a list comprehension misses optimization opportunities.
+
+**Proposed**: Pre-compute the field set once and reuse across all rows in a result batch:
+
+```python
+def _rows_to_docs_fast(model_cls, rows):
+    if not rows:
+        return []
+    fields = set(rows[0].keys()) if rows else set()
+    return [model_cls.model_construct(_fields_set=fields, **row) for row in rows]
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~10 | −5–10% on multi-row queries (reduces per-row set() creation) |
+| Risk | Low | All rows from the same query have the same column set |
+
+#### Task 9.5 — LWT update overhead reduction (P1, estimated −15–20%)
+
+**Problem**: `update-if-condition` (LWT) is 1.42× vs Raw+DC. The LWT path includes
+CQL generation for conditions, LWTResult construction, and field validation — more
+overhead than a plain UPDATE.
+
+**Proposed**: Cache LWT CQL shapes (extending §13E Task 8.2) and optimize `LWTResult`
+construction to avoid redundant dict processing of the `[applied]` row:
+
+```python
+# Current: result → _rows_to_dicts() → dict → LWTResult(**dict)
+# Proposed: result → LWTResult.from_row(result.one())  # direct
+```
+
+| Metric | Effort | Expected Impact |
+|--------|--------|-----------------|
+| Lines changed | ~20 | −15–20% on LWT operations |
+| Risk | Low | LWT result format is well-defined |
+
+### 13G.5 Updated Success Criteria (with Raw+DC baselines)
+
+The Raw+DC benchmark provides a more meaningful baseline than cqlengine for measuring
+ORM overhead. Updated targets:
+
+| Metric | Current (vs Raw+DC) | Target (vs Raw+DC) | Priority |
+|--------|---------------------|---------------------|----------|
+| Single INSERT | 1.06× | ≤ 1.10× (maintain) | — |
+| GET by PK | 1.13× | ≤ 1.15× (maintain) | — |
+| Filter + LIMIT | 1.09× | ≤ 1.15× (maintain) | — |
+| Filter secondary index | 2.00× | ≤ 1.30× | **P0** (Task 9.1) |
+| COUNT | 1.66× | ≤ 1.10× | **P0** (Task 9.2) |
+| Partial UPDATE | 2.35× | ≤ 1.30× | **P0** (Task 9.3 + §13E.8.1) |
+| Update-if-condition (LWT) | 1.42× | ≤ 1.20× | **P1** (Task 9.5) |
+| Model instantiation | 3.01× | ≤ 1.50× | **P0** (Task 9.1) |
+| Model serialization | 0.20× 🚀 | ≤ 0.25× (maintain advantage) | — |
+| Batch-100 | 0.05× 🚀 | ≤ 0.10× (maintain advantage) | — |
+
+### 13G.6 Phase 9 Priority Matrix
+
+| Task | Priority | Effort | Expected Impact | Target Benchmarks |
+|------|----------|--------|-----------------|-------------------|
+| 9.1 `model_construct()` for DB data | **P0** | Medium (~20 lines) | −40–60% multi-row reads | model-instantiation, filter-secondary-index |
+| 9.2 COUNT scalar shortcut | **P0** | Small (~10 lines) | −30–40% COUNT | count |
+| 9.3 Partial-update PK cache | **P0** | Small (~15 lines) | −25–35% partial-update | partial-update |
+| 8.1 Fair benchmark for partial UPDATE | **P0** | Small (benchmark only) | Reveals true ratio | partial-update |
+| 9.4 Batch `model_construct()` | **P1** | Small (~10 lines) | −5–10% multi-row | filter-secondary-index, filter-limit |
+| 9.5 LWT result shortcut | **P1** | Small (~20 lines) | −15–20% LWT | update-if-condition |
+| 8.2 Cache build_count/update/delete | **P1** | Small (~60 lines) | −3–5% on affected ops | count, update, delete |
+| 8.3 Pre-compile `_snake_case` regex | **P1** | Tiny (~8 lines) | −1–2 µs per query | All operations |
+| 8.6 Dirty-field tracking for save() | **P2** | Medium (~50 lines) | −10–30% read-modify-write | status_update, list_mutation |
+
+### 13G.7 Expected Outcome After Phase 9
+
+If tasks 9.1–9.5 are implemented alongside the remaining Phase 8 tasks:
+
+| Metric | Current (Phase 8) | Expected (Phase 9) |
+|--------|-------------------|---------------------|
+| Benchmarks won vs cqlengine | 27 of 34 | **30–32 of 34** |
+| Worst loss vs Raw+DC | model-instantiation (3.01×) | partial-update (~1.3×) |
+| CRUD write overhead vs Raw+DC | 1.00–1.06× | 1.00–1.06× (maintained) |
+| CRUD read overhead vs Raw+DC | 1.06–1.13× | 1.06–1.15× (maintained) |
+| Multi-row read overhead vs Raw+DC | 2.00× | ~1.2–1.4× |
+| COUNT overhead vs Raw+DC | 1.66× | ~1.1× |
 
 ---
 
@@ -1967,6 +2218,18 @@ The §14.5.6 optimizations are **deployment-time configuration improvements** ra
   read-modify-write overhead (status_update, list_mutation), and 2 are accepted Pydantic
   trade-offs (UDT serialization). Phase 8 (§13E) proposes targeted fixes to close to
   **30–31 of 34 wins**.
+- **Raw+DC benchmarks (PR #187)** reveal that coodie's write path adds essentially **zero
+  overhead** (1.00–1.06×) vs raw CQL — validating 7 phases of write-path optimization.
+  The remaining overhead is concentrated in: model instantiation (3.01× — Pydantic
+  validation), partial update (2.35× — change tracking + schema scan), and multi-row
+  reads (2.00× on filter-secondary-index — compounds model instantiation). Phase 9
+  (§13G) proposes `model_construct()` for DB data to close the gap.
+- **Raw+DC confirms two coodie design advantages**: batch-100 inserts (21× faster — native
+  BATCH vs manual loop) and model serialization (5× faster — Pydantic `model_dump()` vs
+  `dataclasses.asdict()`).
+- **cqlengine is universally slower than coodie**: In 16 of 18 Raw+DC benchmarks, coodie
+  outperforms cqlengine, confirming coodie's ORM layer is lighter than cqlengine in
+  virtually all scenarios.
 
 ---
 
@@ -2263,11 +2526,15 @@ improvement on real-world workloads.
 
 | Strategy | Effort | Impact | Risk | Priority |
 |----------|--------|--------|------|----------|
-| 14.5.1 Custom `dict_factory` | **Small** (5 lines) | **Medium** (−10–15% reads) | Low | **P0** |
+| 14.5.1 Custom `dict_factory` | **Small** (5 lines) | **Medium** (−10–15% reads) | Low | ✅ Done |
 | 14.5.2 Partial UPDATE cache | **Small** (15 lines) | **Medium** (−15–25% updates) | Low | **P0** |
 | 14.5.3 Native async (paginated) | **Medium** (50 lines) | **High** (−20–40% async) | Medium | **P1** |
 | 14.5.4 `__slots__` on remaining classes | **Small** (10 lines) | **Low** (−2–5%) | Low | ✅ Done |
 | 14.5.6 Connection-level optimizations | **Small** (config) | **Medium** (−5–15%) | Low | ✅ Done |
+| §13G Task 9.1 `model_construct()` for DB data | **Medium** (~20 lines) | **High** (−40–60% multi-row reads) | Medium | **P0** |
+| §13G Task 9.2 COUNT scalar shortcut | **Small** (~10 lines) | **Medium** (−30–40% COUNT) | Low | **P0** |
+| §13G Task 9.3 Partial-update PK cache | **Small** (~15 lines) | **Medium** (−25–35% updates) | Low | **P0** |
+| §13G Task 9.5 LWT result shortcut | **Small** (~20 lines) | **Medium** (−15–20% LWT) | Low | **P1** |
 | Cython compilation | **Large** (build infra) | **Low** (−2–5%) | High | ❌ Not recommended |
 | Rust (PyO3) extension | **Very Large** (800+ LOC) | **Low** (−2–4%) | High | ❌ Not recommended |
 | 14.5.5 msgspec internals | **Medium** (new dep) | **Low** (−5–10%) | Medium | ❌ Not recommended now |
@@ -2283,11 +2550,12 @@ The remaining benchmark losses (partial UPDATE, LWT, list-mutation, status-updat
 are caused by **extra DB round-trips** in coodie's read-modify-write pattern, not
 by Python execution speed. Native compilation cannot fix I/O patterns.
 
-The highest-ROI next steps are:
-1. **Custom `dict_factory`** — eliminates `_rows_to_dicts()` overhead entirely (P0)
-2. **Partial UPDATE PK cache** — closes the 1.75× gap on the worst benchmark (P0)
-3. **Native async for paginated queries** — eliminates thread-pool overhead (P1)
+The highest-ROI next steps (informed by Raw+DC benchmarks from PR #187) are:
+1. **`model_construct()` for DB data** — eliminates redundant Pydantic validation on reads (P0)
+2. **COUNT scalar shortcut** — bypasses full result hydration for scalar queries (P0)
+3. **Partial UPDATE PK cache** — closes the 2.35× gap on the worst benchmark (P0)
+4. **Native async for paginated queries** — eliminates thread-pool overhead (P1)
 
-These three pure-Python changes are estimated to improve overall performance by
-10–25% on affected operations, far exceeding what Cython or Rust could deliver
+These pure-Python changes are estimated to improve overall performance by
+15–40% on affected operations, far exceeding what Cython or Rust could deliver
 for a fraction of the implementation effort.

@@ -97,7 +97,6 @@ jobs:
           export REPO="${{ github.repository }}"
           export RUN_ID="${run_id}"
           source .github/scripts/collect-failed-logs.sh
-          failed_logs="$FAILED_LOGS"
 
           # Write outputs
           {
@@ -106,8 +105,10 @@ jobs:
             echo "head_sha=${head_sha}"
           } >> "$GITHUB_OUTPUT"
 
-          # Store logs in a file (too large for output variable)
-          echo "${failed_logs}" > /tmp/failed_logs.txt
+          # Store logs in a file for the AI summariser (too large for output variable)
+          echo "${FAILED_LOGS}" > /tmp/failed_logs.txt
+          # Store links in a separate file for the PR comment
+          echo "${FAILED_LINKS}" > /tmp/failed_links.txt
 
       - name: Summarize failure with Copilot
         if: steps.pr.outputs.found == 'true'
@@ -143,10 +144,10 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            echo "@copilot please investigate the failure and suggest a fix."
+            echo "### Failed Jobs"
+            cat /tmp/failed_links.txt
             echo ""
-            echo "## Failed Job Logs"
-            cat /tmp/failed_logs.txt
+            echo "@copilot please investigate the failure and suggest a fix."
           } > /tmp/comment.md
 
           # Use REST API (gh api POST) instead of gh pr comment: the latter uses

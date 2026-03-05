@@ -16,11 +16,12 @@ teardown() {
 }
 
 @test "no failed jobs — empty output" {
-  # Mock gh to return empty result for the failure query
+  # Mock gh to return an empty jobs array for the run-level endpoint;
+  # the log endpoint should never be reached.
   cat > "$MOCK_DIR/gh" <<'MOCK'
 #!/usr/bin/env bash
-# No failed jobs: return empty for the jq query
-echo ""
+# Return empty jobs list for the run-level endpoint
+echo '{"jobs": []}'
 MOCK
   chmod +x "$MOCK_DIR/gh"
 
@@ -29,20 +30,21 @@ MOCK
   export GH_TOKEN="fake"
   source "$SCRIPT_DIR/collect-failed-logs.sh"
   [ -z "$FAILED_LOGS" ]
+  [ -z "$FAILED_LINKS" ]
 }
 
 @test "one failed job — logs collected with job name header" {
-  # Mock gh to return one failed job then its name and logs
+  # Mock gh:
+  #   • run-level jobs endpoint → full JSON with one failed job
+  #   • job-level logs endpoint → log content written to stdout (then redirected to file)
   cat > "$MOCK_DIR/gh" <<'MOCK'
 #!/usr/bin/env bash
-if [[ "$*" == *"/jobs"* && "$*" == *"select(.conclusion"* ]]; then
-  echo "100"
-elif [[ "$*" == *"/jobs"* && "$*" == *"select(.id"* ]]; then
-  echo "Build"
-elif [[ "$*" == *"/logs"* ]]; then
+if [[ "$*" == *"/actions/runs/"*"/jobs"* ]]; then
+  echo '{"jobs": [{"id": 100, "conclusion": "failure", "name": "Build", "html_url": "https://example.com/jobs/100", "steps": [{"number": 1, "conclusion": "failure", "name": "Run build"}]}]}'
+elif [[ "$*" == *"/actions/jobs/100/logs"* ]]; then
+  echo "##[group]Run build"
   echo "Error: test failed on line 42"
-else
-  echo '{"jobs": [{"id": 100, "conclusion": "failure", "name": "Build"}]}'
+  echo "##[endgroup]"
 fi
 MOCK
   chmod +x "$MOCK_DIR/gh"
@@ -53,21 +55,24 @@ MOCK
   source "$SCRIPT_DIR/collect-failed-logs.sh"
   [[ "$FAILED_LOGS" == *"### Job: Build"* ]]
   [[ "$FAILED_LOGS" == *"Error: test failed on line 42"* ]]
+  [[ "$FAILED_LINKS" == *"**Build**"* ]]
+  [[ "$FAILED_LINKS" == *"view in Actions"* ]]
 }
 
 @test "multiple failed jobs — all logs concatenated" {
-  # Mock gh to return two failed jobs
+  # Mock gh:
+  #   • run-level jobs endpoint → two failed jobs
+  #   • per-job log endpoints → distinct log content
   cat > "$MOCK_DIR/gh" <<'MOCK'
 #!/usr/bin/env bash
-if [[ "$*" == *"/jobs"* && "$*" == *"select(.conclusion"* ]]; then
-  printf "100\n200\n"
-elif [[ "$*" == *"/jobs"* && "$*" == *"select(.id == 100"* ]]; then
-  echo "Build"
-elif [[ "$*" == *"/jobs"* && "$*" == *"select(.id == 200"* ]]; then
-  echo "Test"
-elif [[ "$*" == *"jobs/100/logs"* ]]; then
+if [[ "$*" == *"/actions/runs/"*"/jobs"* ]]; then
+  echo '{"jobs": [
+    {"id": 100, "conclusion": "failure", "name": "Build", "html_url": "https://example.com/jobs/100", "steps": [{"number": 1, "conclusion": "failure", "name": "Compile"}]},
+    {"id": 200, "conclusion": "failure", "name": "Test",  "html_url": "https://example.com/jobs/200", "steps": [{"number": 2, "conclusion": "failure", "name": "Run tests"}]}
+  ]}'
+elif [[ "$*" == *"/actions/jobs/100/logs"* ]]; then
   echo "Build error log"
-elif [[ "$*" == *"jobs/200/logs"* ]]; then
+elif [[ "$*" == *"/actions/jobs/200/logs"* ]]; then
   echo "Test error log"
 fi
 MOCK
@@ -79,4 +84,6 @@ MOCK
   source "$SCRIPT_DIR/collect-failed-logs.sh"
   [[ "$FAILED_LOGS" == *"### Job: Build"* ]]
   [[ "$FAILED_LOGS" == *"### Job: Test"* ]]
+  [[ "$FAILED_LINKS" == *"**Build**"* ]]
+  [[ "$FAILED_LINKS" == *"**Test**"* ]]
 }

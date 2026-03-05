@@ -1,6 +1,6 @@
 """Product Catalog models for the schema-migrations demo.
 
-These models represent the *final* state of the schema after all four
+These models represent the *final* state of the schema after all five
 migrations have been applied.  The migration files themselves carry the
 incremental DDL changes — ``models.py`` is used by the seed script and
 FastAPI app layer.
@@ -21,14 +21,14 @@ from coodie.fields import ClusteringKey, Indexed, PrimaryKey
 class Product(Document):
     """A product in the catalog.
 
-    Partition key = ``id``; secondary indexes on ``brand``, ``category``,
-    and ``name`` (added by migration 004).  The ``featured`` column is
-    added by migration 002.
+    Partition key = ``id``; secondary indexes on ``category`` and ``name``
+    (added by migration 004).  The ``featured`` column is added by
+    migration 002.  Migration 005 renames ``brand`` → ``manufacturer``.
     """
 
     id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
     name: Annotated[str, Indexed()]
-    brand: Annotated[str, Indexed()]
+    manufacturer: str
     category: Annotated[str, Indexed()]
     price: float
     description: Optional[str] = None

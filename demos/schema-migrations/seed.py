@@ -29,7 +29,7 @@ console = Console()
 
 # --- Story-themed data pools ---
 
-BRANDS = [
+MANUFACTURERS = [
     "Temporal Industries",
     "Rift Corp",
     "Nexus Labs",
@@ -122,7 +122,7 @@ def _generate_product(*, featured: bool = False) -> Product:
     return Product(
         id=uuid4(),
         name=random.choice(PRODUCT_NAMES) if random.random() < 0.7 else fake.catch_phrase() + " Device",
-        brand=random.choice(BRANDS),
+        manufacturer=random.choice(MANUFACTURERS),
         category=random.choice(CATEGORIES),
         price=round(random.uniform(49.99, 9999.99), 2),
         description=fake.sentence(nb_words=12),

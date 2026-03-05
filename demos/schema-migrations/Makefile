@@ -1,7 +1,7 @@
 COMPOSE  := docker compose -f ../docker-compose.yml
 KEYSPACE := migrations_demo
 
-.PHONY: db-up db-down migrate migrate-dry-run migrate-rollback migrate-status seed run clean
+.PHONY: db-up db-down migrate migrate-dry-run migrate-rollback migrate-status seed run clean demo
 
 db-up:                          ## Start ScyllaDB and create keyspace
 	@echo ""
@@ -57,3 +57,6 @@ run: seed                       ## Install deps, migrate, seed, and start the ap
 clean: db-down                  ## Stop DB and remove data volumes
 	$(COMPOSE) down -v
 	@echo "  ✓ All data purged"
+
+demo:                           ## Run the interactive scripted demo
+	bash demo.sh

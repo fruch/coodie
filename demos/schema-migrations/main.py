@@ -1,6 +1,6 @@
 """Minimal FastAPI app for the schema-migrations demo.
 
-This app assumes all four migrations have already been applied via
+This app assumes all five migrations have already been applied via
 ``coodie migrate``.  It provides two read-only endpoints for querying the
 migrated schema — one for featured products and one for product reviews.
 """

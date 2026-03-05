@@ -8,6 +8,7 @@
 ## Quick Start
 
 ```bash
+make demo       # interactive scripted walkthrough (recommended for first time)
 make run        # start DB → create keyspace → apply migrations → seed → launch app
 ```
 
@@ -16,6 +17,19 @@ make run        # start DB → create keyspace → apply migrations → seed →
 * Python ≥ 3.10
 * [uv](https://docs.astral.sh/uv/) (recommended) or pip
 * Docker & Docker Compose (for ScyllaDB)
+
+## Interactive Demo
+
+Run the scripted walkthrough — it pauses at each step with a brief
+explanation and waits for you to press Enter before continuing:
+
+```bash
+make demo
+```
+
+The demo covers: start DB → list migrations → dry-run → apply → status →
+seed → query state table → rollback → re-apply → data migration notes →
+clean up.
 
 ## Step-by-Step Walkthrough
 
@@ -32,7 +46,7 @@ make migrate
 ```
 
 This runs `coodie migrate --keyspace migrations_demo --migrations-dir migrations`
-which processes the four migration files in order:
+which processes the five migration files in order:
 
 | # | File | What it does |
 |---|---|---|
@@ -40,6 +54,7 @@ which processes the four migration files in order:
 | 2 | `20260203_002_add_featured_column.py` | `ALTER TABLE products ADD "featured" boolean` + index |
 | 3 | `20260220_003_set_reviews_ttl.py` | Sets `default_time_to_live = 31536000` (1 year) on reviews |
 | 4 | `20260310_004_add_search_index.py` | Adds a secondary index on `products.name` |
+| 5 | `20260325_005_rename_brand_to_manufacturer.py` | Renames `brand` → `manufacturer` with data migration |
 
 ### 3. Check migration status
 
@@ -57,6 +72,7 @@ Status     Migration                                          Applied At
 [x]        20260203_002_add_featured_column                   2026-02-03 14:30:00+00:00
 [x]        20260220_003_set_reviews_ttl                       2026-02-20 09:15:00+00:00
 [x]        20260310_004_add_search_index                      2026-03-10 11:45:00+00:00
+[x]        20260325_005_rename_brand_to_manufacturer           2026-03-25 16:00:00+00:00
 ```
 
 ### 4. Dry-run — preview CQL without applying
@@ -116,6 +132,7 @@ make clean
 
 | Target | Description |
 |---|---|
+| `make demo` | Run the interactive scripted walkthrough |
 | `make db-up` | Start ScyllaDB and create the keyspace |
 | `make db-down` | Stop ScyllaDB |
 | `make migrate` | Apply all pending migrations (depends on `db-up`) |
@@ -155,13 +172,60 @@ YYYYMMDD_NNN_description.py
 * **NNN** — sequence number within the same day
 * **description** — short snake_case summary
 
+## Data Migrations & Rollback
+
+Migration 005 demonstrates a **column rename with data migration** — a
+common real-world scenario where a simple DDL change is not enough:
+
+```
+upgrade():
+  1. ALTER TABLE ... ADD "manufacturer" text       ← new column
+  2. scan_table() → copy brand → manufacturer      ← data migration
+  3. ALTER TABLE ... DROP "brand"                   ← remove old column
+
+downgrade():
+  1. ALTER TABLE ... ADD "brand" text               ← re-create old column
+  2. scan_table() → copy manufacturer → brand       ← reverse data migration
+  3. ALTER TABLE ... DROP "manufacturer"             ← remove new column
+```
+
+### Rollback considerations
+
+Rolling back a migration that involves data migration requires care:
+
+* **Data written after upgrade uses the new column.**  If the application
+  starts writing to `manufacturer` immediately after the migration, a
+  rollback copies those values back to `brand`.  However, any rows
+  inserted between upgrade and rollback may have `NULL` in the old column
+  if the app already switched to the new name before rollback completes.
+
+* **Large tables take time.**  `scan_table()` walks the full Cassandra
+  token ring.  For large tables, use the `throttle_seconds` and
+  `resume_token` parameters to control load and support resume-on-failure.
+
+* **Consider marking destructive rollbacks as irreversible.**  If data
+  loss during rollback is unacceptable, set `reversible = False` on the
+  migration class and handle rollback manually with a backup/restore
+  strategy.
+
+* **Test rollbacks in staging first.**  Always validate that `downgrade()`
+  produces the expected schema and data state before running in
+  production.
+
+* **Coordinate application deploys.**  The safest pattern for a column
+  rename is a multi-phase rollout:
+  1. Migration A: add new column + backfill data (keep old column).
+  2. Deploy app code that reads/writes both columns.
+  3. Migration B: drop old column once all nodes use the new code.
+  This avoids any window where data is inaccessible.
+
 ## Writing Your Own Migration
 
 Every migration file must define a `ForwardMigration` class that inherits
 from `coodie.migrations.Migration`:
 
 ```python
-"""Migration 005 — Add a color column to products."""
+"""Migration 006 — Add a color column to products."""
 
 from coodie.migrations import Migration, MigrationContext
 
@@ -181,7 +245,7 @@ class ForwardMigration(Migration):
         )
 ```
 
-Save the file as `migrations/20260401_005_add_color_column.py` and run:
+Save the file as `migrations/20260401_006_add_color_column.py` and run:
 
 ```bash
 coodie migrate --keyspace migrations_demo --migrations-dir migrations
@@ -204,7 +268,7 @@ coodie migrate --keyspace migrations_demo --migrations-dir migrations
 class Product(Document):
     id: Annotated[UUID, PrimaryKey()]
     name: Annotated[str, Indexed()]
-    brand: Annotated[str, Indexed()]
+    manufacturer: str                   # renamed from brand by migration 005
     category: Annotated[str, Indexed()]
     price: float
     description: Optional[str] = None

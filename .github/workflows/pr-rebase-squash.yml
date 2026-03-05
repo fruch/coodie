@@ -45,6 +45,7 @@ jobs:
   rebase-squash:
     name: Rebase / Squash
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -184,14 +185,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
-          COPILOT_TIMEOUT: '120'
+          COPILOT_TIMEOUT: '300'
         run: |
-          npm install -g @github/copilot 2>/dev/null || true
-          timeout 600 bash .github/scripts/resolve-conflicts.sh || {
+          echo "::group::Install Copilot CLI"
+          timeout 60 npm install -g @github/copilot || true
+          echo "::endgroup::"
+          echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
+          echo "Per-file timeout: ${COPILOT_TIMEOUT}s | Overall timeout: 900s"
+          timeout 900 bash .github/scripts/resolve-conflicts.sh || {
             EXIT_CODE=$?
             if [ "$EXIT_CODE" -eq 124 ]; then
               echo "status=unresolved" >> "$GITHUB_OUTPUT"
-              echo "### ⚠️ Conflict resolution exceeded the 10-minute time limit" >> "$GITHUB_STEP_SUMMARY"
+              echo "### ⚠️ Conflict resolution exceeded the 15-minute time limit" >> "$GITHUB_STEP_SUMMARY"
             else
               exit "$EXIT_CODE"
             fi
@@ -240,33 +245,64 @@ jobs:
           # of redirecting stdout, which can include MCP errors and agent
           # noise).  Copilot's own file-writing tool is used, so only
           # intentional content ends up in the file.
-          COPILOT_OUTPUT_FILE=$(mktemp)
+          #
+          # Use RUNNER_TEMP (not /tmp) and do NOT pre-create the file.
+          # Pre-creating the file via mktemp turns the operation into an
+          # "edit", which requires interactive user approval from the Copilot
+          # CLI security model.  By providing only a target path (no
+          # pre-existing file), Copilot performs a "create" operation instead,
+          # which is permitted in non-interactive CI.
+          COPILOT_OUTPUT_FILE="${RUNNER_TEMP}/copilot_squash_body_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.txt"
           export COPILOT_OUTPUT_FILE
 
           echo "::group::Copilot output-file validation (pre)"
           echo "COPILOT_OUTPUT_FILE=$COPILOT_OUTPUT_FILE"
-          ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
-          echo "File writable: $(test -w "$COPILOT_OUTPUT_FILE" && echo yes || echo no)"
+          echo "RUNNER_TEMP=${RUNNER_TEMP}"
+          echo "--- current user ---"
+          whoami; id
+          echo "--- RUNNER_TEMP directory permissions ---"
+          ls -la "${RUNNER_TEMP}" 2>&1 || true
+          echo "--- /tmp directory permissions ---"
+          find /tmp/ -maxdepth 1 -ls 2>&1 | head -10 || true
+          if [ -f "$COPILOT_OUTPUT_FILE" ]; then
+            echo "File exists: yes (unexpected — will be an edit operation)"
+            ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
+            stat "$COPILOT_OUTPUT_FILE" 2>&1 || true
+            echo "File writable by runner: $(test -w "$COPILOT_OUTPUT_FILE" && echo yes || echo no)"
+          else
+            echo "File exists: no (Copilot will create it — create operation, no interactive approval needed)"
+            echo "Parent dir writable by runner: $(test -w "${RUNNER_TEMP}" && echo yes || echo no)"
+          fi
           echo "::endgroup::"
 
-          npm install -g @github/copilot 2>/dev/null || true
-          copilot -p \
+          echo "::group::Install Copilot CLI"
+          timeout 60 npm install -g @github/copilot || true
+          echo "::endgroup::"
+          echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
+          echo "::group::Copilot CLI output (squash message generation)"
+          timeout 5m copilot -p \
             "Write ONLY a git commit body (no subject line) summarising these changes. \
              Output plain text only — no markdown fences, no code blocks, no tool \
              calls, no reasoning steps. Be concise. \
              Write the result to the file $COPILOT_OUTPUT_FILE. \
              Commits: $LOG --- Diff stat: $STAT" \
-            >/dev/null 2>/dev/null || true
+            --add-dir "${RUNNER_TEMP}" \
+            || true
+          echo "::endgroup::"
 
           echo "::group::Copilot output-file validation (post)"
           if [ -f "$COPILOT_OUTPUT_FILE" ]; then
             echo "File exists: yes"
+            ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
+            stat "$COPILOT_OUTPUT_FILE" 2>&1 || true
             echo "File size: $(wc -c < "$COPILOT_OUTPUT_FILE") bytes"
             echo "--- file content (first 20 lines) ---"
             head -20 "$COPILOT_OUTPUT_FILE"
             echo "--- end ---"
           else
             echo "File exists: no (Copilot may have removed or not written to the file)"
+            echo "--- RUNNER_TEMP contents (debug) ---"
+            find "${RUNNER_TEMP}" -maxdepth 1 -ls 2>&1 | head -20 || true
           fi
           echo "::endgroup::"
 

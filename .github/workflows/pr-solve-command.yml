@@ -32,6 +32,7 @@ jobs:
   solve:
     name: Solve Conflicts
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -182,15 +183,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
-          COPILOT_TIMEOUT: '120'
+          COPILOT_TIMEOUT: '300'
           RESOLVE_MODE: merge
         run: |
-          npm install -g @github/copilot 2>/dev/null || true
-          timeout 600 bash .github/scripts/resolve-conflicts.sh || {
+          echo "::group::Install Copilot CLI"
+          timeout 60 npm install -g @github/copilot || true
+          echo "::endgroup::"
+          echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
+          echo "Per-file timeout: ${COPILOT_TIMEOUT}s | Overall timeout: 900s"
+          timeout 900 bash .github/scripts/resolve-conflicts.sh || {
             EXIT_CODE=$?
             if [ "$EXIT_CODE" -eq 124 ]; then
               echo "status=unresolved" >> "$GITHUB_OUTPUT"
-              echo "### ⚠️ Conflict resolution exceeded the 10-minute time limit" >> "$GITHUB_STEP_SUMMARY"
+              echo "### ⚠️ Conflict resolution exceeded the 15-minute time limit" >> "$GITHUB_STEP_SUMMARY"
             else
               exit "$EXIT_CODE"
             fi

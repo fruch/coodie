@@ -45,6 +45,7 @@ jobs:
   continue-plan:
     name: Continue Plan Phase
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Run if: manually dispatched, OR PR was actually merged AND not labelled skip-continuation
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -236,20 +237,30 @@ jobs:
           PHASE_CONTENT=$(cat /tmp/next-phase-content.md)
 
           # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
-          npm install -g @github/copilot 2>/dev/null || true
+          echo "::group::Install Copilot CLI"
+          timeout 60 npm install -g @github/copilot || true
+          echo "::endgroup::"
 
           # Construct the delegation prompt via extracted script
           export PLAN_FILE PHASE TITLE PHASE_CONTENT
           source .github/scripts/build-delegation-prompt.sh
 
           # Delegate via Copilot CLI — capture exit code explicitly
+          # Timeout after 5 minutes to prevent the job from hanging indefinitely
+          # Use tee so output is visible in GitHub Actions log in real-time
           EXIT_CODE=0
-          RESPONSE=$(copilot -p "$PROMPT" 2>&1) || EXIT_CODE=$?
+          echo "::group::Copilot CLI output (delegation)"
+          RESPONSE=$(timeout 5m copilot -p "$PROMPT" 2>&1 | tee /dev/stderr) || EXIT_CODE=$?
+          echo "::endgroup::"
 
-          # Fallback: if Copilot CLI failed or is unavailable, post a PR comment
-          # with the prompt so a developer can pick it up manually.
+          # Fallback: if Copilot CLI failed, timed out, or is unavailable,
+          # post a PR comment with the prompt so a developer can pick it up manually.
           if [ "$EXIT_CODE" -ne 0 ] || [ -z "$RESPONSE" ]; then
-            echo "⚠️ Copilot CLI not available (exit code: ${EXIT_CODE})"
+            if [ "$EXIT_CODE" -eq 124 ]; then
+              echo "⚠️ Copilot CLI timed out after 5 minutes (exit code: 124)"
+            else
+              echo "⚠️ Copilot CLI not available (exit code: ${EXIT_CODE})"
+            fi
             if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${PR_NUMBER}" ]; then
               gh pr comment "${PR_NUMBER}" \
                 --repo "${{ github.repository }}" \

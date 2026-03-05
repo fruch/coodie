@@ -2144,7 +2144,7 @@ ORM overhead. Updated targets:
 | Filter + LIMIT | 1.09× | ≤ 1.15× (maintain) | — |
 | Filter secondary index | 2.00× | ≤ 1.30× | **P0** (Task 9.1) |
 | COUNT | 1.66× | ≤ 1.10× | **P0** (Task 9.2) |
-| Partial UPDATE | 2.35× | ≤ 1.30× | **P0** (Task 9.3 + §13E.8.1) |
+| Partial UPDATE | 2.35× | ≤ 1.30× | **P0** (Task 9.3 + §13E Task 8.1) |
 | Update-if-condition (LWT) | 1.42× | ≤ 1.20× | **P1** (Task 9.5) |
 | Model instantiation | 3.01× | ≤ 1.50× | **P0** (Task 9.1) |
 | Model serialization | 0.20× 🚀 | ≤ 0.25× (maintain advantage) | — |
@@ -2157,12 +2157,12 @@ ORM overhead. Updated targets:
 | 9.1 `model_construct()` for DB data | **P0** | Medium (~20 lines) | −40–60% multi-row reads | model-instantiation, filter-secondary-index |
 | 9.2 COUNT scalar shortcut | **P0** | Small (~10 lines) | −30–40% COUNT | count |
 | 9.3 Partial-update PK cache | **P0** | Small (~15 lines) | −25–35% partial-update | partial-update |
-| 8.1 Fair benchmark for partial UPDATE | **P0** | Small (benchmark only) | Reveals true ratio | partial-update |
+| §13E Task 8.1 Fair benchmark for partial UPDATE | **P0** | Small (benchmark only) | Reveals true ratio | partial-update |
 | 9.4 Batch `model_construct()` | **P1** | Small (~10 lines) | −5–10% multi-row | filter-secondary-index, filter-limit |
 | 9.5 LWT result shortcut | **P1** | Small (~20 lines) | −15–20% LWT | update-if-condition |
-| 8.2 Cache build_count/update/delete | **P1** | Small (~60 lines) | −3–5% on affected ops | count, update, delete |
-| 8.3 Pre-compile `_snake_case` regex | **P1** | Tiny (~8 lines) | −1–2 µs per query | All operations |
-| 8.6 Dirty-field tracking for save() | **P2** | Medium (~50 lines) | −10–30% read-modify-write | status_update, list_mutation |
+| §13E Task 8.2 Cache build_count/update/delete | **P1** | Small (~60 lines) | −3–5% on affected ops | count, update, delete |
+| §13E Task 8.3 Pre-compile `_snake_case` regex | **P1** | Tiny (~8 lines) | −1–2 µs per query | All operations |
+| §13E Task 8.6 Dirty-field tracking for save() | **P2** | Medium (~50 lines) | −10–30% read-modify-write | status_update, list_mutation |
 
 ### 13G.7 Expected Outcome After Phase 9
 

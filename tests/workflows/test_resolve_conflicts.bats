@@ -4,7 +4,7 @@
 # Bats unit tests for .github/scripts/resolve-conflicts.sh
 #
 # Each test creates a fake "bin/" directory on PATH containing mock
-# implementations of `git` and `copilot`, then runs the script and asserts
+# implementations of `git` and `python3`, then runs the script and asserts
 # on the GITHUB_OUTPUT file and exit code.
 
 SCRIPT="${BATS_TEST_DIRNAME}/../../.github/scripts/resolve-conflicts.sh"
@@ -20,7 +20,7 @@ setup() {
 
     export MAX_ROUNDS=10
 
-    # Mock bin takes priority over real git/copilot
+    # Mock bin takes priority over real git/python3
     export PATH="$MOCK_BIN:$PATH"
 
     cd "$WORK_DIR"
@@ -51,15 +51,32 @@ EOF
     chmod +x "$MOCK_BIN/git"
 }
 
-_mock_copilot() {
+_mock_resolver() {
     local output="$1"
-    cat > "$MOCK_BIN/copilot" << EOF
+    cat > "$MOCK_BIN/python3" << EOF
 #!/usr/bin/env bash
-if [ -n "\${COPILOT_OUTFILE:-}" ] && [ -n "$output" ]; then
-    printf '%s\n' "$output" > "\$COPILOT_OUTFILE"
+# Mock python3 that intercepts resolve-conflict-file.py calls
+if echo "\$1" | grep -q "resolve-conflict-file.py"; then
+    # Parse --output-file argument
+    outfile=""
+    while [ \$# -gt 0 ]; do
+        if [ "\$1" = "--output-file" ]; then
+            outfile="\$2"
+            shift 2
+        else
+            shift
+        fi
+    done
+    if [ -n "\$outfile" ] && [ -n "$output" ]; then
+        printf '%s\n' "$output" > "\$outfile"
+    fi
+    exit 0
+else
+    # Fall through to real python3 for other scripts
+    exec /usr/bin/python3 "\$@"
 fi
 EOF
-    chmod +x "$MOCK_BIN/copilot"
+    chmod +x "$MOCK_BIN/python3"
 }
 
 # ---------------------------------------------------------------------------
@@ -78,10 +95,10 @@ EOF
     run bash "$SCRIPT"
 
     [ "$status" -eq 0 ]
-    grep -q "Copilot resolved rebase conflicts" "$GITHUB_STEP_SUMMARY"
+    grep -q "AI resolved rebase conflicts" "$GITHUB_STEP_SUMMARY"
 }
 
-@test "Copilot resolves file → status=clean" {
+@test "Resolver resolves file → status=clean" {
     # Create file with conflict markers in the work dir
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
@@ -111,7 +128,7 @@ fi
 EOF
     chmod +x "$MOCK_BIN/git"
 
-    _mock_copilot "x = 2"
+    _mock_resolver "x = 2"
 
     run bash "$SCRIPT"
 
@@ -119,7 +136,7 @@ EOF
     grep -q "^status=clean$" "$GITHUB_OUTPUT"
 }
 
-@test "Copilot resolves file → resolved content written to file" {
+@test "Resolver resolves file → resolved content written to file" {
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
 x = 1
@@ -145,7 +162,7 @@ fi
 EOF
     chmod +x "$MOCK_BIN/git"
 
-    _mock_copilot "x = 2"
+    _mock_resolver "x = 2"
 
     run bash "$SCRIPT"
 
@@ -154,7 +171,7 @@ EOF
     [ "$(cat "${WORK_DIR}/foo.py")" = "x = 2" ]
 }
 
-@test "Copilot returns empty → status=unresolved" {
+@test "Resolver returns empty → status=unresolved" {
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
 x = 1
@@ -163,7 +180,7 @@ x = 2
 >>>>>>> branch
 EOF
     _mock_git_conflicts "foo.py"
-    _mock_copilot ""
+    _mock_resolver ""
 
     run bash "$SCRIPT"
 
@@ -171,7 +188,7 @@ EOF
     grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
 }
 
-@test "Copilot output still contains conflict marker → status=unresolved" {
+@test "Resolver output still contains conflict marker → status=unresolved" {
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
 x = 1
@@ -180,8 +197,8 @@ x = 2
 >>>>>>> branch
 EOF
     _mock_git_conflicts "foo.py"
-    # Copilot returns output that still has <<<<<<< (bad resolution)
-    _mock_copilot "<<<<<<< HEAD
+    # Resolver returns output that still has <<<<<<< (bad resolution)
+    _mock_resolver "<<<<<<< HEAD
 x = 1
 =======
 x = 2
@@ -193,7 +210,7 @@ x = 2
     grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
 }
 
-@test "Copilot writes resolved content to file → accepted" {
+@test "Resolver writes resolved content to file → accepted" {
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
 x = 1
@@ -219,20 +236,34 @@ fi
 EOF
     chmod +x "$MOCK_BIN/git"
 
-    # Copilot writes resolved content (clean, no fences) to the output file
-    cat > "$MOCK_BIN/copilot" << 'MOCK'
+    # Mock python3 to write resolved content to the output file
+    cat > "$MOCK_BIN/python3" << 'MOCK'
 #!/usr/bin/env bash
-if [ -n "${COPILOT_OUTFILE:-}" ]; then
-    printf 'x = 2\n' > "$COPILOT_OUTFILE"
+if echo "$1" | grep -q "resolve-conflict-file.py"; then
+    outfile=""
+    while [ $# -gt 0 ]; do
+        if [ "$1" = "--output-file" ]; then
+            outfile="$2"
+            shift 2
+        else
+            shift
+        fi
+    done
+    if [ -n "$outfile" ]; then
+        printf 'x = 2\n' > "$outfile"
+    fi
+    exit 0
+else
+    exec /usr/bin/python3 "$@"
 fi
 MOCK
-    chmod +x "$MOCK_BIN/copilot"
+    chmod +x "$MOCK_BIN/python3"
 
     run bash "$SCRIPT"
 
     [ "$status" -eq 0 ]
     grep -q "^status=clean$" "$GITHUB_OUTPUT"
-    # File should contain the resolved content written by Copilot
+    # File should contain the resolved content written by resolver
     [ "$(cat "${WORK_DIR}/foo.py")" = "x = 2" ]
 }
 
@@ -274,7 +305,7 @@ elif [[ "\$1" == "rebase" ]] && [[ "\$2" == "--continue" ]]; then
 fi
 EOF
     chmod +x "$MOCK_BIN/git"
-    _mock_copilot "resolved content"
+    _mock_resolver "resolved content"
 
     run bash "$SCRIPT"
 
@@ -305,7 +336,7 @@ elif [[ "$1" == "rebase" ]] && [[ "$2" == "--continue" ]]; then
 fi
 EOF
     chmod +x "$MOCK_BIN/git"
-    _mock_copilot "resolved content"
+    _mock_resolver "resolved content"
 
     run bash "$SCRIPT"
 
@@ -313,8 +344,8 @@ EOF
     grep -q "^status=unresolved$" "$GITHUB_OUTPUT"
 }
 
-@test "Copilot times out → status=unresolved and timeout logged" {
-    export COPILOT_TIMEOUT=1
+@test "Resolver times out → status=unresolved and timeout logged" {
+    export RESOLVE_TIMEOUT=1
 
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
@@ -326,12 +357,16 @@ EOF
 
     _mock_git_conflicts "foo.py"
 
-    # Slow copilot that outlasts COPILOT_TIMEOUT (never writes to file)
-    cat > "$MOCK_BIN/copilot" << 'MOCK'
+    # Slow python3 that outlasts RESOLVE_TIMEOUT (never writes to file)
+    cat > "$MOCK_BIN/python3" << 'MOCK'
 #!/usr/bin/env bash
-sleep 5
+if echo "$1" | grep -q "resolve-conflict-file.py"; then
+    sleep 5
+else
+    exec /usr/bin/python3 "$@"
+fi
 MOCK
-    chmod +x "$MOCK_BIN/copilot"
+    chmod +x "$MOCK_BIN/python3"
 
     run bash "$SCRIPT"
 
@@ -340,7 +375,7 @@ MOCK
     [[ "$output" == *"timed out"* ]]
 }
 
-@test "Copilot returns empty → empty-output diagnostic logged" {
+@test "Resolver returns empty → empty-output diagnostic logged" {
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
 x = 1
@@ -349,7 +384,7 @@ x = 2
 >>>>>>> branch
 EOF
     _mock_git_conflicts "foo.py"
-    _mock_copilot ""
+    _mock_resolver ""
 
     run bash "$SCRIPT"
 
@@ -358,7 +393,7 @@ EOF
     [[ "$output" == *"empty output"* ]]
 }
 
-@test "file size and conflict marker count logged before Copilot call" {
+@test "file size and conflict marker count logged before resolver call" {
     cat > "${WORK_DIR}/foo.py" << 'EOF'
 <<<<<<< HEAD
 x = 1
@@ -367,7 +402,7 @@ x = 2
 >>>>>>> branch
 EOF
     _mock_git_conflicts "foo.py"
-    _mock_copilot ""
+    _mock_resolver ""
 
     run bash "$SCRIPT"
 
@@ -396,7 +431,7 @@ EOF
     chmod +x "$MOCK_BIN/git"
 }
 
-@test "merge mode: Copilot resolves file → git commit --no-edit → status=clean" {
+@test "merge mode: Resolver resolves file → git commit --no-edit → status=clean" {
     export RESOLVE_MODE=merge
 
     cat > "${WORK_DIR}/foo.py" << 'EOF'
@@ -426,7 +461,7 @@ fi
 EOF
     chmod +x "$MOCK_BIN/git"
 
-    _mock_copilot "x = 2"
+    _mock_resolver "x = 2"
 
     run bash "$SCRIPT"
 
@@ -445,7 +480,7 @@ EOF
     grep -q "^status=clean$" "$GITHUB_OUTPUT"
 }
 
-@test "merge mode: Copilot returns empty → status=unresolved" {
+@test "merge mode: Resolver returns empty → status=unresolved" {
     export RESOLVE_MODE=merge
 
     cat > "${WORK_DIR}/foo.py" << 'EOF'
@@ -456,7 +491,7 @@ x = 2
 >>>>>>> branch
 EOF
     _mock_git_merge_conflicts "foo.py"
-    _mock_copilot ""
+    _mock_resolver ""
 
     run bash "$SCRIPT"
 
@@ -488,7 +523,7 @@ elif [[ "$1" == "commit" ]]; then
 fi
 EOF
     chmod +x "$MOCK_BIN/git"
-    _mock_copilot "resolved content"
+    _mock_resolver "resolved content"
 
     run bash "$SCRIPT"
 
@@ -504,7 +539,7 @@ EOF
     run bash "$SCRIPT"
 
     [ "$status" -eq 0 ]
-    grep -q "Copilot resolved" "$GITHUB_STEP_SUMMARY"
+    grep -q "AI resolved" "$GITHUB_STEP_SUMMARY"
 }
 
 @test "merge mode: rebase --continue is NOT called (mode isolation)" {
@@ -544,7 +579,7 @@ fi
 EOF
     chmod +x "$MOCK_BIN/git"
 
-    _mock_copilot "x = 2"
+    _mock_resolver "x = 2"
 
     run bash "$SCRIPT"
 
@@ -591,7 +626,7 @@ fi
 EOF
     chmod +x "$MOCK_BIN/git"
 
-    _mock_copilot "resolved content"
+    _mock_resolver "resolved content"
 
     run bash "$SCRIPT"
 

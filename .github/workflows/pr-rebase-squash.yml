@@ -5,7 +5,7 @@
 #
 # Slash-commands (via PR comment):
 #   /rebase        — Rebase the PR branch onto the base branch
-#   /squash        — Squash all PR commits into one with a Copilot-generated message
+#   /squash        — Squash all PR commits into one with an AI-generated message
 #   /rebase squash — Rebase first, then squash
 #
 # Manual testing (via Actions tab → "Run workflow"):
@@ -59,6 +59,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      models: read
 
     steps:
       # ── 0. Normalize inputs across triggers ──────────────────
@@ -178,20 +179,15 @@ jobs:
             echo "status=conflict" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── 5b. Resolve conflicts with Copilot CLI ──────────────
-      - name: Resolve conflicts with Copilot CLI
+      # ── 5b. Resolve conflicts with Models API ──────────────
+      - name: Resolve conflicts with Models API
         id: resolve
         if: steps.rebase.outputs.status == 'conflict'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
-          COPILOT_TIMEOUT: '300'
+          RESOLVE_TIMEOUT: '120'
         run: |
-          echo "::group::Install Copilot CLI"
-          timeout 60 npm install -g @github/copilot || true
-          echo "::endgroup::"
-          echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
-          echo "Per-file timeout: ${COPILOT_TIMEOUT}s | Overall timeout: 900s"
+          echo "Per-file timeout: ${RESOLVE_TIMEOUT}s | Overall timeout: 900s"
           timeout 900 bash .github/scripts/resolve-conflicts.sh || {
             EXIT_CODE=$?
             if [ "$EXIT_CODE" -eq 124 ]; then
@@ -206,7 +202,7 @@ jobs:
         if: steps.rebase.outputs.status == 'conflict' && steps.resolve.outputs.status != 'clean'
         run: |
           git rebase --abort
-          echo "Rebase failed: Copilot could not resolve all conflicts automatically. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
+          echo "Rebase failed: could not resolve all conflicts automatically. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
       - name: Push rebased branch
@@ -218,7 +214,6 @@ jobs:
         if: steps.cmd.outputs.do_squash == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           BASE="${{ steps.pr.outputs.base_ref }}"
           git fetch origin "$BASE"
@@ -230,7 +225,7 @@ jobs:
             exit 0
           fi
 
-          # Collect context for Copilot
+          # Collect context for commit message generation
           PR_NUMBER="${{ steps.ctx.outputs.pr_number }}"
           LOG=$(git log --oneline "$MERGE_BASE..HEAD")
           STAT=$(git diff --stat "$MERGE_BASE..HEAD")
@@ -241,72 +236,20 @@ jobs:
             TITLE="chore: squash ${COMMIT_COUNT} commits"
           fi
 
-          # Have Copilot write the commit body directly to a file (instead
-          # of redirecting stdout, which can include MCP errors and agent
-          # noise).  Copilot's own file-writing tool is used, so only
-          # intentional content ends up in the file.
-          #
-          # Use RUNNER_TEMP (not /tmp) and do NOT pre-create the file.
-          # Pre-creating the file via mktemp turns the operation into an
-          # "edit", which requires interactive user approval from the Copilot
-          # CLI security model.  By providing only a target path (no
-          # pre-existing file), Copilot performs a "create" operation instead,
-          # which is permitted in non-interactive CI.
-          COPILOT_OUTPUT_FILE="${RUNNER_TEMP}/copilot_squash_body_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.txt"
+          # Generate commit body using the GitHub Models API (replaces the
+          # Copilot CLI approach that was blocked by permission restrictions).
+          COPILOT_OUTPUT_FILE="${RUNNER_TEMP}/squash_body_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.txt"
           export COPILOT_OUTPUT_FILE
 
-          echo "::group::Copilot output-file validation (pre)"
-          echo "COPILOT_OUTPUT_FILE=$COPILOT_OUTPUT_FILE"
-          echo "RUNNER_TEMP=${RUNNER_TEMP}"
-          echo "--- current user ---"
-          whoami; id
-          echo "--- RUNNER_TEMP directory permissions ---"
-          ls -la "${RUNNER_TEMP}" 2>&1 || true
-          echo "--- /tmp directory permissions ---"
-          find /tmp/ -maxdepth 1 -ls 2>&1 | head -10 || true
-          if [ -f "$COPILOT_OUTPUT_FILE" ]; then
-            echo "File exists: yes (unexpected — will be an edit operation)"
-            ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
-            stat "$COPILOT_OUTPUT_FILE" 2>&1 || true
-            echo "File writable by runner: $(test -w "$COPILOT_OUTPUT_FILE" && echo yes || echo no)"
-          else
-            echo "File exists: no (Copilot will create it — create operation, no interactive approval needed)"
-            echo "Parent dir writable by runner: $(test -w "${RUNNER_TEMP}" && echo yes || echo no)"
-          fi
-          echo "::endgroup::"
-
-          echo "::group::Install Copilot CLI"
-          timeout 60 npm install -g @github/copilot || true
-          echo "::endgroup::"
-          echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
-          echo "::group::Copilot CLI output (squash message generation)"
-          timeout 5m copilot -p \
-            "Write ONLY a git commit body (no subject line) summarising these changes. \
-             Output plain text only — no markdown fences, no code blocks, no tool \
-             calls, no reasoning steps. Be concise. \
-             Write the result to the file $COPILOT_OUTPUT_FILE. \
-             Commits: $LOG --- Diff stat: $STAT" \
-            --add-dir "${RUNNER_TEMP}" \
+          echo "::group::Generate squash commit body (Models API)"
+          python3 .github/scripts/generate-squash-body.py \
+            --log "$LOG" \
+            --stat "$STAT" \
+            --output-file "$COPILOT_OUTPUT_FILE" \
             || true
           echo "::endgroup::"
 
-          echo "::group::Copilot output-file validation (post)"
-          if [ -f "$COPILOT_OUTPUT_FILE" ]; then
-            echo "File exists: yes"
-            ls -la "$COPILOT_OUTPUT_FILE" 2>&1 || true
-            stat "$COPILOT_OUTPUT_FILE" 2>&1 || true
-            echo "File size: $(wc -c < "$COPILOT_OUTPUT_FILE") bytes"
-            echo "--- file content (first 20 lines) ---"
-            head -20 "$COPILOT_OUTPUT_FILE"
-            echo "--- end ---"
-          else
-            echo "File exists: no (Copilot may have removed or not written to the file)"
-            echo "--- RUNNER_TEMP contents (debug) ---"
-            find "${RUNNER_TEMP}" -maxdepth 1 -ls 2>&1 | head -20 || true
-          fi
-          echo "::endgroup::"
-
-          # Clean and validate Copilot output, with PR body fallback
+          # Clean and validate output, with PR body fallback
           PR_BODY=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
             --jq '.body // empty') || true
           export TITLE COPILOT_OUTPUT_FILE PR_BODY

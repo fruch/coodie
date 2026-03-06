@@ -1,6 +1,6 @@
 # Review Local Changes Workflow
 
-Review uncommitted local changes using parallel specialist agents with
+Review uncommitted local changes using specialist agents with
 confidence-based filtering.
 
 ## Phase 1: Preparation
@@ -33,7 +33,7 @@ confidence-based filtering.
 
 **Exit criteria:** Change summary produced, or user informed of no changes.
 
-## Phase 2: Parallel Agent Review
+## Phase 2: Agent Review
 
 **Entry criteria:** Change summary available from Phase 1.
 
@@ -51,7 +51,7 @@ Based on the change summary, select which agents to run:
 
 ### Launch Agents
 
-Launch selected agents in parallel. Provide each agent with:
+Launch selected agents sequentially via the Task tool. Provide each agent with:
 
 - Full list of changed files and the diff
 - Change summary from Phase 1

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772749828028,
+  "lastUpdate": 1772788191328,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11405,6 +11405,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.174707365337726e-7",
             "extra": "mean: 5.29298133529181 usec\nrounds: 7340"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "4a64b049d34ece6cd02685047d08b0c7865764eb",
+          "message": "docs(plans): fix task reference format consistency in Phase 9 priority matrix\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-06T11:09:14+02:00",
+          "tree_id": "16dabc1b7eef5c3f00f4132ebb53e01a790141f6",
+          "url": "https://github.com/fruch/coodie/commit/4a64b049d34ece6cd02685047d08b0c7865764eb"
+        },
+        "date": 1772788190371,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 54111.84238742188,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001882251750264234",
+            "extra": "mean: 18.480243064731553 usec\nrounds: 7570"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 577242.1541511774,
+            "unit": "iter/sec",
+            "range": "stddev: 4.035429011518748e-7",
+            "extra": "mean: 1.7323752134327046 usec\nrounds: 38658"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 618910.9009551514,
+            "unit": "iter/sec",
+            "range": "stddev: 3.85476238646271e-7",
+            "extra": "mean: 1.615741455606489 usec\nrounds: 43625"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 781395.6500343796,
+            "unit": "iter/sec",
+            "range": "stddev: 4.6560236695644106e-7",
+            "extra": "mean: 1.279761411464221 usec\nrounds: 149433"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 842518.3162262302,
+            "unit": "iter/sec",
+            "range": "stddev: 3.810491436948436e-7",
+            "extra": "mean: 1.1869178161955631 usec\nrounds: 70537"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 710206.870919967,
+            "unit": "iter/sec",
+            "range": "stddev: 3.633979879371712e-7",
+            "extra": "mean: 1.408040447010389 usec\nrounds: 90736"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 182557.87390904865,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001030877714312707",
+            "extra": "mean: 5.477714976556999 usec\nrounds: 7238"
           }
         ]
       }

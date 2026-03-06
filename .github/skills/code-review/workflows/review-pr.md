@@ -1,6 +1,6 @@
 # Review PR Workflow
 
-Review a pull request using parallel specialist agents with
+Review a pull request using specialist agents with
 confidence-based filtering. Post findings as inline PR comments.
 
 ## Phase 1: Preparation
@@ -44,7 +44,7 @@ confidence-based filtering. Post findings as inline PR comments.
 
 **Exit criteria:** Change summary produced and PR is eligible.
 
-## Phase 2: Parallel Agent Review
+## Phase 2: Agent Review
 
 **Entry criteria:** Change summary available from Phase 1.
 
@@ -60,7 +60,7 @@ confidence-based filtering. Post findings as inline PR comments.
 
 ### Launch Agents
 
-Launch selected agents in parallel. Provide each agent with:
+Launch selected agents sequentially via the Task tool. Provide each agent with:
 
 - Full list of modified files and the PR diff
 - Change summary from Phase 1

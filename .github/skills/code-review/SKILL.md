@@ -3,9 +3,9 @@ name: code-review
 description: >-
   Multi-agent code review for Python projects. Use when reviewing local
   uncommitted changes, pull request diffs, or when asked to do a code
-  review. Dispatches parallel specialist agents (bug-hunter,
-  security-auditor, test-coverage, code-quality, contracts, historical
-  context) and aggregates results with confidence scoring.
+  review. Dispatches specialist agents (bug-hunter, security-auditor,
+  test-coverage, code-quality, contracts, historical context) and
+  aggregates results with confidence scoring.
 ---
 
 # Code Review
@@ -19,12 +19,12 @@ confidence-scoring phase filters out false positives before reporting.
 
 <essential_principles>
 
-<principle name="parallel-specialists">
-**Run specialist agents in parallel, not sequentially.**
+<principle name="independent-specialists">
+**Run each specialist agent independently.**
 
-Each agent examines a different dimension. Running them in parallel reduces
-wall-clock time and avoids ordering bias (later agents should not be
-influenced by earlier findings).
+Each agent examines a different dimension. Agents run one at a time via
+the Task tool (Copilot does not support parallel sub-agents). Keep agents
+independent so their findings are not influenced by each other's results.
 </principle>
 
 <principle name="confidence-over-volume">
@@ -93,7 +93,7 @@ What are you reviewing?
 
 ## Agent Architecture
 
-Six specialist agents run in parallel during Phase 2 of each workflow:
+Six specialist agents run independently during Phase 2 of each workflow:
 
 | Agent | Focus | Reference |
 |-------|-------|-----------|
@@ -197,7 +197,7 @@ These should be filtered out:
 
 A well-executed code review:
 
-- [ ] Ran all applicable specialist agents in parallel
+- [ ] Ran all applicable specialist agents
 - [ ] Every finding includes file path, line number, and concrete fix
 - [ ] Confidence scoring filtered out false positives (threshold applied)
 - [ ] No issues flagged that ruff/ty/pytest would already catch

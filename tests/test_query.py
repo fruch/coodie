@@ -693,3 +693,181 @@ async def test_full_dml_chain_delete(Item, queryset_cls, registered_mock_driver)
     assert "USING TIMESTAMP 9999" in stmt
     assert registered_mock_driver.last_consistency == "QUORUM"
     assert registered_mock_driver.last_timeout == 2.5
+
+
+# ------------------------------------------------------------------
+# Phase 1: SELECT DISTINCT
+# ------------------------------------------------------------------
+
+
+def test_distinct_returns_new_queryset(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).distinct()
+    assert qs._distinct_val is True
+
+
+def test_distinct_preserved_through_chaining(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).distinct().filter(name="foo").limit(5)
+    assert qs._distinct_val is True
+
+
+async def test_distinct_generates_select_distinct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).distinct().all)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert stmt.startswith("SELECT DISTINCT")
+
+
+# ------------------------------------------------------------------
+# Phase 1: GROUP BY
+# ------------------------------------------------------------------
+
+
+def test_group_by_returns_new_queryset(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).group_by("name")
+    assert qs._group_by_val == ["name"]
+
+
+def test_group_by_preserved_through_chaining(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).group_by("name").filter(rating__gte=3).limit(10)
+    assert qs._group_by_val == ["name"]
+
+
+async def test_group_by_generates_correct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).group_by("name").all)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'GROUP BY "name"' in stmt
+
+
+# ------------------------------------------------------------------
+# Phase 1: Aggregate functions
+# ------------------------------------------------------------------
+
+
+async def test_sum_executes_aggregate(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"system.sum(rating)": 42}])
+    result = await _maybe_await(queryset_cls(Item).sum, "rating")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT SUM("rating") FROM test_ks.items' == stmt
+    assert result == 42
+
+
+async def test_avg_executes_aggregate(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"system.avg(rating)": 3.5}])
+    result = await _maybe_await(queryset_cls(Item).avg, "rating")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT AVG("rating") FROM test_ks.items' == stmt
+    assert result == 3.5
+
+
+async def test_min_executes_aggregate(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"system.min(rating)": 1}])
+    result = await _maybe_await(queryset_cls(Item).min, "rating")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT MIN("rating") FROM test_ks.items' == stmt
+    assert result == 1
+
+
+async def test_max_executes_aggregate(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"system.max(rating)": 10}])
+    result = await _maybe_await(queryset_cls(Item).max, "rating")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT MAX("rating") FROM test_ks.items' == stmt
+    assert result == 10
+
+
+async def test_aggregate_with_filter(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"system.sum(rating)": 20}])
+    result = await _maybe_await(queryset_cls(Item).filter(name="A").sum, "rating")
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'WHERE "name" = ?' in stmt
+    assert params == ["A"]
+    assert result == 20
+
+
+async def test_aggregate_returns_none_on_empty(Item, queryset_cls, registered_mock_driver):
+    result = await _maybe_await(queryset_cls(Item).sum, "rating")
+    assert result is None
+
+
+async def test_aggregate_method(Item, queryset_cls, registered_mock_driver):
+    # Each set_return_rows appends to the queue; first is consumed by sum(), second by avg().
+    registered_mock_driver.set_return_rows([{"system.sum(rating)": 100}])
+    registered_mock_driver.set_return_rows([{"system.avg(rating)": 5.0}])
+    result = await _maybe_await(queryset_cls(Item).aggregate, total="sum(rating)", average="avg(rating)")
+    assert result["total"] == 100
+    assert result["average"] == 5.0
+
+
+# ------------------------------------------------------------------
+# Phase 1: IS NOT NULL / IS NULL filter
+# ------------------------------------------------------------------
+
+
+async def test_is_not_null_generates_correct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).filter(rating__gte=1).is_not_null("name").all)
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"name" IS NOT NULL' in stmt
+    assert params == [1]
+
+
+async def test_is_null_generates_correct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).is_null("name").all)
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"name" IS NULL' in stmt
+    assert params == []
+
+
+def test_is_not_null_preserved_through_chaining(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).is_not_null("name").filter(rating__gte=3).limit(10)
+    assert any(op == "ISNULL" and val is False for _, op, val in qs._where)
+
+
+def test_is_null_preserved_through_chaining(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).is_null("name").filter(rating__gte=3).limit(10)
+    assert any(op == "ISNULL" and val is True for _, op, val in qs._where)
+
+
+async def test_isnull_filter_still_works(Item, queryset_cls, registered_mock_driver):
+    """The __isnull filter kwarg still works as a fallback."""
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).filter(name__isnull=False).all)
+    stmt, params = registered_mock_driver.executed[0]
+    assert '"name" IS NOT NULL' in stmt
+    assert params == []
+
+
+# ------------------------------------------------------------------
+# Phase 1: CAST() in SELECT
+# ------------------------------------------------------------------
+
+
+def test_cast_returns_new_queryset(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).cast("rating", "float")
+    assert qs._cast_val == [("rating", "float")]
+
+
+async def test_cast_generates_correct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).cast("rating", "float").all)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'CAST("rating" AS float)' in stmt
+
+
+# ------------------------------------------------------------------
+# Phase 1: TOKEN() in SELECT
+# ------------------------------------------------------------------
+
+
+def test_select_token_returns_new_queryset(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).select_token("id")
+    assert qs._select_token_val == ["id"]
+
+
+async def test_select_token_generates_correct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).select_token("id").all)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'TOKEN("id")' in stmt

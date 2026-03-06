@@ -900,3 +900,15 @@ async def test_materialized_view_custom_columns(mv_cls, registered_mock_driver):
     await _maybe_await(ColumnsView.sync_view)
     stmt, _ = registered_mock_driver.executed[0]
     assert 'SELECT "brand", "id", "name" FROM test_ks.products' in stmt
+
+
+# ------------------------------------------------------------------
+# Phase 1: Document.truncate()
+# ------------------------------------------------------------------
+
+
+async def test_truncate_executes_truncate_cql(Product, registered_mock_driver):
+    await _maybe_await(Product.truncate)
+    stmt, params = registered_mock_driver.executed[0]
+    assert stmt == "TRUNCATE TABLE test_ks.products"
+    assert params == []

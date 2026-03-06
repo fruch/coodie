@@ -8,6 +8,7 @@ from coodie.cql_builder import (
     build_delete,
     build_update,
     build_insert,
+    build_aggregate,
     parse_filter_kwargs,
     parse_update_kwargs,
 )
@@ -46,6 +47,10 @@ class QuerySet:
         "_per_partition_limit_val",
         "_fetch_size_val",
         "_paging_state_val",
+        "_distinct_val",
+        "_group_by_val",
+        "_select_token_val",
+        "_cast_val",
     )
 
     def __init__(
@@ -68,6 +73,10 @@ class QuerySet:
         per_partition_limit_val: int | None = None,
         fetch_size_val: int | None = None,
         paging_state_val: bytes | None = None,
+        distinct_val: bool = False,
+        group_by_val: list[str] | None = None,
+        select_token_val: list[str] | None = None,
+        cast_val: list[tuple[str, str]] | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -86,6 +95,10 @@ class QuerySet:
         self._per_partition_limit_val = per_partition_limit_val
         self._fetch_size_val = fetch_size_val
         self._paging_state_val = paging_state_val
+        self._distinct_val = distinct_val
+        self._group_by_val: list[str] = group_by_val or []
+        self._select_token_val = select_token_val
+        self._cast_val = cast_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -110,6 +123,10 @@ class QuerySet:
         new._per_partition_limit_val = self._per_partition_limit_val
         new._fetch_size_val = self._fetch_size_val
         new._paging_state_val = self._paging_state_val
+        new._distinct_val = self._distinct_val
+        new._group_by_val = self._group_by_val
+        new._select_token_val = self._select_token_val
+        new._cast_val = self._cast_val
         for key, val in overrides.items():
             setattr(new, f"_{key}", val)
         return new
@@ -186,6 +203,26 @@ class QuerySet:
     def page(self, paging_state: bytes | None) -> QuerySet:
         return self._clone(paging_state_val=paging_state)
 
+    def distinct(self) -> QuerySet:
+        return self._clone(distinct_val=True)
+
+    def group_by(self, *cols: str) -> QuerySet:
+        return self._clone(group_by_val=list(cols))
+
+    def select_token(self, *cols: str) -> QuerySet:
+        return self._clone(select_token_val=list(cols))
+
+    def cast(self, column: str, cql_type: str) -> QuerySet:
+        existing = list(self._cast_val) if self._cast_val else []
+        existing.append((column, cql_type))
+        return self._clone(cast_val=existing)
+
+    def is_not_null(self, column: str) -> QuerySet:
+        return self._clone(where=self._where + [(column, "ISNULL", False)])
+
+    def is_null(self, column: str) -> QuerySet:
+        return self._clone(where=self._where + [(column, "ISNULL", True)])
+
     # ------------------------------------------------------------------
     # Terminal methods
     # ------------------------------------------------------------------
@@ -218,6 +255,10 @@ class QuerySet:
             order_by=self._order_by_val or None,
             allow_filtering=self._allow_filtering_val,
             per_partition_limit=self._per_partition_limit_val,
+            distinct=self._distinct_val,
+            group_by=self._group_by_val or None,
+            select_token=self._select_token_val,
+            cast=self._cast_val,
         )
         rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
         if self._values_list_val is not None:
@@ -298,6 +339,49 @@ class QuerySet:
             row = rows[0]
             return int(next(iter(row.values())))
         return 0
+
+    def _aggregate(self, func: str, column: str) -> Any:
+        """Execute an aggregate function and return the scalar result."""
+        cql, params = build_aggregate(
+            self._table(),
+            self._keyspace(),
+            func,
+            column,
+            where=self._where or None,
+            allow_filtering=self._allow_filtering_val,
+        )
+        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    def aggregate(self, **funcs: str) -> dict[str, Any]:
+        """Execute one or more aggregate functions.
+
+        Each keyword argument maps a result name to a ``"func(column)"``
+        expression.  Example::
+
+            result = qs.aggregate(total="sum(price)", avg_price="avg(price)")
+            # result == {"total": 150.0, "avg_price": 30.0}
+        """
+        results: dict[str, Any] = {}
+        for name, expr in funcs.items():
+            func, _, col = expr.partition("(")
+            col = col.rstrip(")")
+            results[name] = self._aggregate(func.strip(), col.strip())
+        return results
+
+    def sum(self, column: str) -> Any:
+        return self._aggregate("SUM", column)
+
+    def avg(self, column: str) -> Any:
+        return self._aggregate("AVG", column)
+
+    def min(self, column: str) -> Any:
+        return self._aggregate("MIN", column)
+
+    def max(self, column: str) -> Any:
+        return self._aggregate("MAX", column)
 
     def delete(self) -> LWTResult | None:
         cql, params = build_delete(

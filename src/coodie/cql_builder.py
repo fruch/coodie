@@ -114,6 +114,11 @@ def build_alter_table_options(
     return f"ALTER TABLE {keyspace}.{table} WITH " + " AND ".join(parts)
 
 
+def build_truncate(table: str, keyspace: str) -> str:
+    """Build a ``TRUNCATE TABLE`` CQL statement."""
+    return f"TRUNCATE TABLE {keyspace}.{table}"
+
+
 def build_drop_table(table: str, keyspace: str) -> str:
     return f"DROP TABLE IF EXISTS {keyspace}.{table}"
 
@@ -193,6 +198,7 @@ def parse_filter_kwargs(
         "contains_key": "CONTAINS KEY",
         "like": "LIKE",
         "ne": "!=",
+        "isnull": "ISNULL",
     }
     token_operators = {
         "token__gt": "TOKEN >",
@@ -228,7 +234,12 @@ def build_where_clause(
     parts = []
     params: list[Any] = []
     for col, op, value in filter_triples:
-        if op.startswith("TOKEN "):
+        if op == "ISNULL":
+            if value:
+                parts.append(f'"{col}" IS NULL')
+            else:
+                parts.append(f'"{col}" IS NOT NULL')
+        elif op.startswith("TOKEN "):
             actual_op = op[len("TOKEN ") :]
             parts.append(f'TOKEN("{col}") {actual_op} ?')
             params.append(value)
@@ -255,11 +266,23 @@ def build_select(
     order_by: list[str] | None = None,
     allow_filtering: bool = False,
     per_partition_limit: int | None = None,
+    distinct: bool = False,
+    group_by: list[str] | None = None,
+    select_token: list[str] | None = None,
+    cast: list[tuple[str, str]] | None = None,
 ) -> tuple[str, list[Any]]:
     # Build the cache key from the query *shape* (excludes actual values).
     where_shape: tuple = ()
     if where:
-        where_shape = tuple((col, op, len(value)) if op == "IN" else (col, op) for col, op, value in where)
+        shape_parts = []
+        for col, op, value in where:
+            if op == "IN":
+                shape_parts.append((col, op, len(value)))
+            elif op == "ISNULL":
+                shape_parts.append((col, op, value))
+            else:
+                shape_parts.append((col, op))
+        where_shape = tuple(shape_parts)
     cache_key = (
         table,
         keyspace,
@@ -269,13 +292,19 @@ def build_select(
         tuple(order_by) if order_by else None,
         allow_filtering,
         per_partition_limit,
+        distinct,
+        tuple(group_by) if group_by else None,
+        tuple(select_token) if select_token else None,
+        tuple(cast) if cast else None,
     )
 
     # Extract params (always needed regardless of cache hit).
     params: list[Any] = []
     if where:
         for _col, op, value in where:
-            if op == "IN":
+            if op == "ISNULL":
+                pass  # IS [NOT] NULL has no params
+            elif op == "IN":
                 params.extend(value)
             else:
                 params.append(value)
@@ -285,12 +314,28 @@ def build_select(
         return cached_cql, params
 
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else "*"
-    cql = f"SELECT {cols_str} FROM {keyspace}.{table}"
+
+    # Append CAST expressions
+    if cast:
+        cast_parts = [f'CAST("{c}" AS {t})' for c, t in cast]
+        cols_str += ", " + ", ".join(cast_parts)
+
+    # Append TOKEN() in SELECT projection
+    if select_token:
+        token_cols = ", ".join(f'"{c}"' for c in select_token)
+        cols_str += f", TOKEN({token_cols})"
+
+    keyword = "SELECT DISTINCT" if distinct else "SELECT"
+    cql = f"{keyword} {cols_str} FROM {keyspace}.{table}"
 
     if where:
         clause, _wp = build_where_clause(where)
         if clause:
             cql += " " + clause
+
+    if group_by:
+        gb_parts = ", ".join(f'"{c}"' for c in group_by)
+        cql += f" GROUP BY {gb_parts}"
 
     if order_by:
         order_parts = []
@@ -321,6 +366,33 @@ def build_count(
     allow_filtering: bool = False,
 ) -> tuple[str, list[Any]]:
     cql = f"SELECT COUNT(*) FROM {keyspace}.{table}"
+    params: list[Any] = []
+
+    if where:
+        clause, where_params = build_where_clause(where)
+        if clause:
+            cql += " " + clause
+            params.extend(where_params)
+
+    if allow_filtering:
+        cql += " ALLOW FILTERING"
+
+    return cql, params
+
+
+def build_aggregate(
+    table: str,
+    keyspace: str,
+    func: str,
+    column: str,
+    where: list[tuple[str, str, Any]] | None = None,
+    allow_filtering: bool = False,
+) -> tuple[str, list[Any]]:
+    """Build a ``SELECT <func>(<column>)`` CQL statement for aggregation.
+
+    *func* should be one of ``SUM``, ``AVG``, ``MIN``, ``MAX``, ``COUNT``.
+    """
+    cql = f'SELECT {func.upper()}("{column}") FROM {keyspace}.{table}'
     params: list[Any] = []
 
     if where:

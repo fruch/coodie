@@ -39,8 +39,15 @@ for job_id in $(echo "${jobs_response}" | jq -r '.jobs[] | select(.conclusion ==
   job_log_file="/tmp/job_${job_id}.log"
   gh api "repos/${REPO}/actions/jobs/${job_id}/logs" > "${job_log_file}" 2>/dev/null || true
 
-  # Collect tail of the log for the AI summariser (not posted to the PR)
-  logs=$(tail -100 "${job_log_file}")
+  # Extract the most relevant failure snippet for the AI summariser.
+  # Uses extract_log_snippet.py (smart marker-based extraction) with a
+  # fallback to plain tail when the helper is unavailable.
+  snippet_script="$(dirname "${BASH_SOURCE[0]}")/extract_log_snippet.py"
+  if [ -f "${snippet_script}" ]; then
+    logs=$(python3 "${snippet_script}" --log-file "${job_log_file}" --max-lines 120 --context 30)
+  else
+    logs=$(tail -100 "${job_log_file}")
+  fi
   FAILED_LOGS="${FAILED_LOGS}
 ### Job: ${job_name}
 \`\`\`

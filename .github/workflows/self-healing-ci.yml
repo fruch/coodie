@@ -110,6 +110,19 @@ jobs:
           # Store links in a separate file for the PR comment
           echo "${FAILED_LINKS}" > /tmp/failed_links.txt
 
+      - name: Inspect PR checks
+        if: steps.pr.outputs.found == 'true'
+        id: inspect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="${{ steps.pr.outputs.number }}"
+          # Run the diagnostic script and capture its JSON output.
+          # Non-zero exit is expected (it exits 1 when failures exist).
+          python3 .github/scripts/inspect_pr_checks.py \
+            --pr "${pr_number}" --json \
+            > /tmp/inspect_checks.json 2>&1 || true
+
       - name: Summarize failure with Copilot
         if: steps.pr.outputs.found == 'true'
         id: copilot_summary
@@ -146,6 +159,18 @@ jobs:
             echo ""
             echo "### Failed Jobs"
             cat /tmp/failed_links.txt
+            echo ""
+
+            # Append failure snippets from inspect_pr_checks.py when available
+            if [ -s /tmp/inspect_checks.json ]; then
+              snippets=$(python3 .github/scripts/format_snippets.py /tmp/inspect_checks.json) || true
+              if [ -n "$snippets" ]; then
+                echo "### 📋 Failure Snippets"
+                echo ""
+                echo "$snippets"
+              fi
+            fi
+
             echo ""
             echo "@copilot please investigate the failure and suggest a fix."
           } > /tmp/comment.md

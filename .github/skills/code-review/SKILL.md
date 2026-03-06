@@ -69,6 +69,25 @@ Cite the exact location, explain the consequence, and show a code fix.
 - Investigating a specific file or module for issues
 - When asked to "review", "audit", or "check" code
 
+## Example Prompts
+
+These prompts will trigger the code-review skill:
+
+**Review a PR:**
+- `Review PR #42`
+- `Do a code review of this PR`
+- `Run code-review on PR #184`
+- `Audit the changes in PR #42 for bugs and security issues`
+
+**Review local changes:**
+- `Review my local changes`
+- `Code review the uncommitted changes`
+- `Check my changes before I commit`
+
+**Review specific files:**
+- `Review src/coodie/cql_builder.py for bugs`
+- `Security audit the driver module`
+
 ## When NOT to Use
 
 - Running linters or formatters — use `uv run pre-commit run --all-files` directly

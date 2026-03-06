@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772788191328,
+  "lastUpdate": 1772788314392,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11478,6 +11478,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000001030877714312707",
             "extra": "mean: 5.477714976556999 usec\nrounds: 7238"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "fa041013c9cf1d5ab77306bf23298e36b817141b",
+          "message": "fix(ci): replace Copilot CLI with GitHub Models API for squash/conflict resolution\n\nCopilot CLI's permission sandbox blocks file writes, `python3`, `gh`, and most commands in CI with \"Permission denied and could not request permission from user\". The `--add-dir` workaround doesn't help — the sandbox restricts general bash operations, not just directory access. Every `/squash` and `/rebase` invocation silently falls back to defaults.\n\nReplace all `copilot -p` usage with direct GitHub Models API calls — the same pattern `summarize-failure.py` already uses successfully in self-healing CI.\n\n### New scripts\n- **`generate-squash-body.py`** — Models API → commit body from log + diff stat\n- **`resolve-conflict-file.py`** — Models API → resolved file content from conflicted file\n\n### Workflow changes (`pr-rebase-squash.yml`, `pr-solve-command.yml`)\n- Add `models: read` permission\n- Replace `npm install -g @github/copilot` + `copilot -p` with `python3` script calls\n- Remove `COPILOT_PAT` / `COPILOT_GITHUB_TOKEN` env vars and the COPILOT_PAT guard step\n- Remove all pre/post file-validation debug blocks (no longer needed)\n\n### `resolve-conflicts.sh`\n- Calls `python3 \"$SCRIPT_DIR/resolve-conflict-file.py\" --file \"$FILE\" --output-file \"$RESOLVE_OUTFILE\"` instead of `copilot -p`\n- Env var renamed: `COPILOT_TIMEOUT` → `RESOLVE_TIMEOUT` (default 120s, down from 300s)\n\n### Tests\n- 17 new pytest tests for both scripts (mirrors `test_summarize_failure.py` structure)\n- Updated `test_resolve_conflicts.bats` — mocks `python3` instead of `copilot` binary\n- All 69 bats + 95 pytest workflow tests pass\n\n<!-- START COPILOT CODING AGENT TIPS -->\n---\n\n💡 You can make Copilot smarter by setting up custom instructions, customizing its development environment and configuring Model Context Protocol (MCP) servers. Learn more [Copilot coding agent tips](https://gh.io/copilot-coding-agent-tips) in the docs.",
+          "timestamp": "2026-03-06T11:10:43+02:00",
+          "tree_id": "b91916e996542a0f770f0f8147c92c2554e22718",
+          "url": "https://github.com/fruch/coodie/commit/fa041013c9cf1d5ab77306bf23298e36b817141b"
+        },
+        "date": 1772788313583,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 52305.22910673494,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000019071499391480484",
+            "extra": "mean: 19.11854736281497 usec\nrounds: 7527"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 535222.1282964675,
+            "unit": "iter/sec",
+            "range": "stddev: 4.968708567110779e-7",
+            "extra": "mean: 1.8683831387593248 usec\nrounds: 50744"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 599550.9797116412,
+            "unit": "iter/sec",
+            "range": "stddev: 4.539964247539163e-7",
+            "extra": "mean: 1.6679148793668186 usec\nrounds: 46252"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 828219.6286043419,
+            "unit": "iter/sec",
+            "range": "stddev: 3.384036406641201e-7",
+            "extra": "mean: 1.2074092009689874 usec\nrounds: 156962"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 860349.0865193552,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3040848997956256e-7",
+            "extra": "mean: 1.1623188955144002 usec\nrounds: 76605"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 746183.858720753,
+            "unit": "iter/sec",
+            "range": "stddev: 3.9461244245156536e-7",
+            "extra": "mean: 1.3401522805845545 usec\nrounds: 100919"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 186691.1394605249,
+            "unit": "iter/sec",
+            "range": "stddev: 7.698450402405646e-7",
+            "extra": "mean: 5.356440604999607 usec\nrounds: 7408"
           }
         ]
       }

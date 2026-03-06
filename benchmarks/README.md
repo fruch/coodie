@@ -1,8 +1,13 @@
 # Performance Benchmarks
 
 Side-by-side benchmarks comparing **coodie** against **cqlengine** (from
-cassandra-driver / scylla-driver) to ensure coodie introduces no regressions and
-to surface bottlenecks early.
+cassandra-driver / scylla-driver) and **Raw+DC** (plain `dataclasses` + raw CQL)
+to ensure coodie introduces no regressions and to surface bottlenecks early.
+
+The **Raw+DC** pattern (see [Michael Kennedy's blog post](https://mkennedy.codes/posts/raw-dc-the-orm-pattern-of-2026/))
+uses hand-written CQL with prepared statements and maps results to Python
+`dataclasses` — no ORM overhead.  This establishes the performance floor against
+which both coodie and cqlengine are measured.
 
 ## Prerequisites
 
@@ -27,7 +32,7 @@ pytest benchmarks/ -v --benchmark-enable --benchmark-sort=mean
 # Run a specific benchmark file
 pytest benchmarks/bench_insert.py -v --benchmark-enable
 
-# Compare coodie vs cqlengine side by side (grouped)
+# Compare coodie vs cqlengine vs raw-dc side by side (grouped)
 pytest benchmarks/ -v --benchmark-enable --benchmark-group-by=group
 
 # Save results for historical tracking
@@ -89,12 +94,13 @@ pytest-benchmark compare 0001_scylla 0002_acsylla 0003_python-rs --group-by=grou
 | `bench_udt.py` | UDT serialization, instantiation, nested UDT, DDL generation |
 | `bench_serialization.py` | Model instantiation and serialization (no DB) |
 | `bench_argus.py` | Argus-inspired real-world patterns (get-or-create, notification feed, status update, etc.) |
+| `bench_raw_dc.py` | Raw+DC (dataclasses + raw CQL) — INSERT, GET, filter, UPDATE, DELETE, batch, collections, serialization |
 
 ## Interpreting Results
 
 `pytest-benchmark` prints a table with min, max, mean, stddev, and rounds for
-each benchmark.  When using `--benchmark-group-by=group`, coodie and cqlengine
-results are displayed together for easy comparison.
+each benchmark.  When using `--benchmark-group-by=group`, coodie, cqlengine,
+and raw-dc results are displayed together for easy comparison.
 
 Key columns:
 - **Mean** — average time per call

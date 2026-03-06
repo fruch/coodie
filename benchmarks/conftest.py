@@ -1,8 +1,9 @@
-"""Shared fixtures for coodie vs cqlengine benchmarks.
+"""Shared fixtures for coodie vs cqlengine vs raw-dc benchmarks.
 
-Provides a ScyllaDB testcontainer, cqlengine connection setup, and coodie
-driver registration.  All benchmark files share these session-scoped fixtures
-so the database container is started only once.
+Provides a ScyllaDB testcontainer, cqlengine connection setup, coodie
+driver registration, and raw CQL + dataclass (Raw+DC) prepared statements.
+All benchmark files share these session-scoped fixtures so the database
+container is started only once.
 
 Use ``--driver-type`` to choose the coodie driver backend:
 
@@ -13,6 +14,9 @@ Use ``--driver-type`` to choose the coodie driver backend:
 
 The **cqlengine** side always uses cassandra-driver / scylla-driver regardless
 of ``--driver-type`` (cqlengine has no acsylla backend).
+
+The **Raw+DC** side uses the same cassandra-driver session directly, executing
+hand-written CQL and hydrating plain Python ``dataclasses``.
 """
 
 from __future__ import annotations
@@ -173,7 +177,11 @@ def coodie_connection(cql_session: Any, scylla_container: Any, driver_type: str)
 
 @pytest.fixture(scope="session")
 def bench_env(cqlengine_connection: Any, coodie_connection: Any):
-    """Ensure both cqlengine and coodie are fully initialised."""
+    """Ensure cqlengine and coodie are fully initialised.
+
+    Raw+DC benchmarks prepare their own CQL statements lazily via the
+    ``cql_session`` fixture — no separate setup fixture is needed.
+    """
     yield
 
 

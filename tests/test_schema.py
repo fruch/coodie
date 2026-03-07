@@ -10,14 +10,18 @@ from pydantic import BaseModel
 from coodie.fields import (
     BigInt,
     ClusteringKey,
+    Duration,
     Frozen,
     Indexed,
     PrimaryKey,
     Static,
     TimeUUID,
     Counter,
+    Vector,
+    VectorIndex,
 )
 from coodie.schema import ColumnDefinition, build_schema
+from coodie.types import CqlDuration
 from coodie.exceptions import InvalidQueryError
 
 
@@ -398,3 +402,43 @@ def test_cached_type_hints_propagates_recursion_error(monkeypatch):
     with pytest.raises(RecursionError, match="deep"):
         _cached_type_hints(Dummy)
     _cached_type_hints.cache_clear()
+
+
+# ---- build_schema: Duration and Vector type integration ----
+
+
+class _DurationDoc(BaseModel):
+    id: Annotated[UUID, PrimaryKey()]
+    interval: Annotated[CqlDuration, Duration()]
+
+
+class _VectorDoc(BaseModel):
+    id: Annotated[UUID, PrimaryKey()]
+    embedding: Annotated[list[float], Vector(dimensions=5)]
+
+
+class _VectorIdxDoc(BaseModel):
+    id: Annotated[UUID, PrimaryKey()]
+    embedding: Annotated[list[float], Vector(dimensions=3), VectorIndex(similarity_function="euclidean")]
+
+
+def test_build_schema_duration_field():
+    """build_schema should resolve CqlDuration + Duration marker to CQL 'duration'."""
+    cols = build_schema(_DurationDoc)
+    interval_col = next(c for c in cols if c.name == "interval")
+    assert interval_col.cql_type == "duration"
+
+
+def test_build_schema_vector_field():
+    """build_schema should resolve Vector marker to CQL 'vector<float, N>'."""
+    cols = build_schema(_VectorDoc)
+    emb_col = next(c for c in cols if c.name == "embedding")
+    assert emb_col.cql_type == "vector<float, 5>"
+
+
+def test_build_schema_vector_index():
+    """build_schema should detect VectorIndex marker and populate vector_index fields."""
+    cols = build_schema(_VectorIdxDoc)
+    emb_col = next(c for c in cols if c.name == "embedding")
+    assert emb_col.vector_index is True
+    assert emb_col.vector_similarity_function == "euclidean"

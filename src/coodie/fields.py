@@ -94,5 +94,35 @@ class Frozen:
 
 
 @dataclass(frozen=True)
+class Duration:
+    """Annotated marker: maps a ``CqlDuration`` field to CQL ``duration``."""
+
+
+@dataclass(frozen=True)
+class Vector:
+    """Annotated marker: maps ``list[float]`` to CQL ``vector<float, N>``.
+
+    Args:
+        dimensions: The number of dimensions in the vector.
+    """
+
+    dimensions: int
+
+
+@dataclass(frozen=True)
+class VectorIndex:
+    """Annotated marker: create a vector (ANN) index on this column.
+
+    Args:
+        similarity_function: The similarity function to use for ANN searches.
+            Common values: ``"cosine"``, ``"euclidean"``, ``"dot_product"``.
+        index_name: Optional custom index name.
+    """
+
+    similarity_function: str = "cosine"
+    index_name: str | None = None
+
+
+@dataclass(frozen=True)
 class Discriminator:
     """Annotated marker: discriminator column for polymorphic (single-table inheritance) models."""

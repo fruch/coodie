@@ -320,9 +320,13 @@ class QuerySet:
         construct = doc_cls.model_construct
         if not rows:
             return []
+        # All rows from the same CQL query share identical column sets,
+        # so we compute _fields_set once and reuse across the batch.
         fields = set(rows[0].keys())
         if not coll:
             return [construct(_fields_set=fields, **row) for row in rows]
+        # Collection factories replace None→empty container in-place;
+        # they do not add/remove keys, so _fields_set stays correct.
         result = []
         for row in rows:
             for key, factory in coll.items():
@@ -364,7 +368,9 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        val = self._get_driver().execute_scalar(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
+        val = self._get_driver().execute_scalar(
+            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
+        )
         return int(val) if val is not None else 0
 
     def _aggregate(self, func: str, column: str) -> Any:

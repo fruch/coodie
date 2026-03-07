@@ -36,9 +36,7 @@ class LazyDocument:
                 for key, factory in coll.items():
                     if key in raw and raw[key] is None:
                         raw[key] = factory()
-            parsed = self._doc_cls.model_construct(
-                _fields_set=set(self._raw_data.keys()), **self._raw_data
-            )
+            parsed = self._doc_cls.model_construct(_fields_set=set(self._raw_data.keys()), **self._raw_data)
             self._parsed = parsed
         return parsed
 

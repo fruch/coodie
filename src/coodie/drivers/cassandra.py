@@ -277,7 +277,8 @@ class CassandraDriver(AbstractDriver):
         result = await self._wrap_future(future)
         if result is None:
             return None
-        row = result.one() if hasattr(result, "one") else (result[0] if result else None)
+        # The callback bridge receives a ResultSet which supports .one()
+        row = result.one()
         if row is None:
             return None
         if isinstance(row, dict):

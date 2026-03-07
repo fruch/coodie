@@ -35,6 +35,9 @@ class ColumnDefinition:
     index_name: str | None = None
     required: bool = True
     static: bool = False
+    vector_index: bool = False
+    vector_index_name: str | None = None
+    vector_similarity_function: str | None = None
 
 
 def build_schema(doc_cls: type) -> list[ColumnDefinition]:
@@ -47,7 +50,7 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         if "__schema__" in doc_cls.__dict__:
             return doc_cls.__schema__
 
-    from coodie.fields import PrimaryKey, ClusteringKey, Indexed, Counter, Static
+    from coodie.fields import PrimaryKey, ClusteringKey, Indexed, Counter, Static, VectorIndex
     from coodie.types import python_type_to_cql_type_str
     from coodie.exceptions import InvalidQueryError
 
@@ -92,6 +95,9 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         is_indexed = False
         index_name: str | None = None
         is_static = False
+        is_vector_index = False
+        vector_index_name: str | None = None
+        vector_similarity_function: str | None = None
 
         for meta in metadata:
             if isinstance(meta, PrimaryKey):
@@ -108,6 +114,10 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
                 cql_type = "counter"
             elif isinstance(meta, Static):
                 is_static = True
+            elif isinstance(meta, VectorIndex):
+                is_vector_index = True
+                vector_index_name = meta.index_name
+                vector_similarity_function = meta.similarity_function
 
         # Determine required: check pydantic model_fields
         required = True
@@ -129,6 +139,9 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
                 index_name=index_name,
                 required=required,
                 static=is_static,
+                vector_index=is_vector_index,
+                vector_index_name=vector_index_name,
+                vector_similarity_function=vector_similarity_function,
             )
         )
 

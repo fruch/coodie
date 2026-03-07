@@ -22,6 +22,7 @@ from coodie.cql_builder import (
     parse_filter_kwargs,
     parse_update_kwargs,
     _insert_cql_cache,
+    _parse_if_conditions,
     _select_cql_cache,
 )
 from coodie.schema import ColumnDefinition
@@ -1026,3 +1027,245 @@ def test_build_select_token_projection_multiple():
     _select_cql_cache.clear()
     cql, _ = build_select("products", "ks", select_token=["part_a", "part_b"])
     assert 'TOKEN("part_a", "part_b")' in cql
+
+
+# ------------------------------------------------------------------
+# Phase 4: LWT & Collection DML gaps
+# ------------------------------------------------------------------
+
+
+# --- 4.2: build_delete with if_conditions ---
+
+
+def test_build_delete_if_conditions():
+    cql, params = build_delete("products", "ks", [("id", "=", "1")], if_conditions={"name": "X"})
+    assert "DELETE FROM ks.products" in cql
+    assert 'IF "name" = ?' in cql
+    assert params == ["1", "X"]
+
+
+def test_build_delete_if_conditions_multiple():
+    cql, params = build_delete(
+        "products",
+        "ks",
+        [("id", "=", "1")],
+        if_conditions={"name": "X", "brand": "Y"},
+    )
+    assert 'IF "name" = ?' in cql
+    assert 'IF "name" = ? AND "brand" = ?' in cql or '" AND "' in cql
+    assert params == ["1", "X", "Y"]
+
+
+def test_build_delete_if_exists_takes_precedence_over_if_conditions():
+    cql, params = build_delete(
+        "products",
+        "ks",
+        [("id", "=", "1")],
+        if_exists=True,
+        if_conditions={"name": "X"},
+    )
+    assert "IF EXISTS" in cql
+    assert 'IF "name"' not in cql
+    assert params == ["1"]
+
+
+# --- 4.3: _parse_if_conditions with extended operators ---
+
+
+def test_parse_if_conditions_equality():
+    clause, params = _parse_if_conditions({"name": "X"})
+    assert clause == ' IF "name" = ?'
+    assert params == ["X"]
+
+
+def test_parse_if_conditions_ne():
+    clause, params = _parse_if_conditions({"name__ne": "X"})
+    assert clause == ' IF "name" != ?'
+    assert params == ["X"]
+
+
+def test_parse_if_conditions_gt():
+    clause, params = _parse_if_conditions({"price__gt": 10})
+    assert clause == ' IF "price" > ?'
+    assert params == [10]
+
+
+def test_parse_if_conditions_lt():
+    clause, params = _parse_if_conditions({"price__lt": 100})
+    assert clause == ' IF "price" < ?'
+    assert params == [100]
+
+
+def test_parse_if_conditions_gte():
+    clause, params = _parse_if_conditions({"price__gte": 10})
+    assert clause == ' IF "price" >= ?'
+    assert params == [10]
+
+
+def test_parse_if_conditions_lte():
+    clause, params = _parse_if_conditions({"price__lte": 100})
+    assert clause == ' IF "price" <= ?'
+    assert params == [100]
+
+
+def test_parse_if_conditions_in():
+    clause, params = _parse_if_conditions({"status__in": ["active", "pending"]})
+    assert clause == ' IF "status" IN (?, ?)'
+    assert params == ["active", "pending"]
+
+
+def test_parse_if_conditions_mixed_operators():
+    clause, params = _parse_if_conditions({"name": "X", "price__gt": 10})
+    assert '"name" = ?' in clause
+    assert '"price" > ?' in clause
+    assert params == ["X", 10]
+
+
+# --- 4.3: build_update with extended IF operators ---
+
+
+def test_build_update_if_conditions_ne():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        if_conditions={"name__ne": "Z"},
+    )
+    assert 'IF "name" != ?' in cql
+    assert params == ["Y", "1", "Z"]
+
+
+def test_build_update_if_conditions_in():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        if_conditions={"status__in": ["a", "b"]},
+    )
+    assert 'IF "status" IN (?, ?)' in cql
+    assert params == ["Y", "1", "a", "b"]
+
+
+def test_build_update_if_conditions_gt_lt():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={"name": "Y"},
+        where=[("id", "=", "1")],
+        if_conditions={"price__gt": 0, "price__lt": 100},
+    )
+    assert '"price" > ?' in cql
+    assert '"price" < ?' in cql
+    assert params == ["Y", "1", 0, 100]
+
+
+# --- 4.4: Map put operator ---
+
+
+def test_parse_update_kwargs_map_put():
+    set_data, ops = parse_update_kwargs({"meta__put": ("k1", "v1")})
+    assert set_data == {}
+    assert ("meta", "put", ("k1", "v1")) in ops
+
+
+def test_build_update_map_put():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("meta", "put", ("k1", "v1"))],
+    )
+    assert '"meta"[?] = ?' in cql
+    assert params == ["k1", "v1", "1"]
+
+
+# --- 4.5: List set-by-index operator ---
+
+
+def test_parse_update_kwargs_list_setindex():
+    set_data, ops = parse_update_kwargs({"items__setindex": (0, "newval")})
+    assert set_data == {}
+    assert ("items", "setindex", (0, "newval")) in ops
+
+
+def test_build_update_list_setindex():
+    cql, params = build_update(
+        "products",
+        "ks",
+        set_data={},
+        where=[("id", "=", "1")],
+        collection_ops=[("items", "setindex", (2, "val"))],
+    )
+    assert '"items"[?] = ?' in cql
+    assert params == [2, "val", "1"]
+
+
+# --- 4.2: build_delete with collection_elements ---
+
+
+def test_build_delete_collection_element_map():
+    cql, params = build_delete(
+        "products",
+        "ks",
+        [("id", "=", "1")],
+        collection_elements=[("meta", "k1")],
+    )
+    assert 'DELETE "meta"[?] FROM ks.products' in cql
+    assert params == ["k1", "1"]
+
+
+def test_build_delete_collection_element_list():
+    cql, params = build_delete(
+        "products",
+        "ks",
+        [("id", "=", "1")],
+        collection_elements=[("items", 0)],
+    )
+    assert 'DELETE "items"[?] FROM ks.products' in cql
+    assert params == [0, "1"]
+
+
+def test_build_delete_columns_and_collection_elements():
+    cql, params = build_delete(
+        "products",
+        "ks",
+        [("id", "=", "1")],
+        columns=["description"],
+        collection_elements=[("meta", "k1")],
+    )
+    assert '"description"' in cql
+    assert '"meta"[?]' in cql
+    assert params == ["k1", "1"]
+
+
+# --- 4.6: build_batch with timestamp ---
+
+
+def test_build_batch_with_timestamp():
+    stmts = [
+        ("INSERT INTO ks.t (id) VALUES (?)", ["1"]),
+    ]
+    cql, params = build_batch(stmts, timestamp=1234567890)
+    assert "BEGIN BATCH USING TIMESTAMP 1234567890" in cql
+    assert "APPLY BATCH" in cql
+    assert params == ["1"]
+
+
+def test_build_batch_unlogged_with_timestamp():
+    stmts = [
+        ("INSERT INTO ks.t (id) VALUES (?)", ["1"]),
+    ]
+    cql, params = build_batch(stmts, logged=False, timestamp=9999)
+    assert "BEGIN UNLOGGED BATCH USING TIMESTAMP 9999" in cql
+    assert params == ["1"]
+
+
+def test_build_batch_without_timestamp():
+    stmts = [
+        ("INSERT INTO ks.t (id) VALUES (?)", ["1"]),
+    ]
+    cql, params = build_batch(stmts)
+    assert "USING TIMESTAMP" not in cql

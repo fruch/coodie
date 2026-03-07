@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772920952726,
+  "lastUpdate": 1772921306186,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11697,6 +11697,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.028719798561412e-7",
             "extra": "mean: 5.282345061376041 usec\nrounds: 6196"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "762eae4f2966bb2fe4c7289cdb02cd982f2f09e6",
+          "message": "feat(benchmarks): add Raw+DC benchmarks — dataclasses + raw CQL baseline\n\nAdds a third benchmark contender — **Raw+DC** (Python `dataclasses` + hand-written CQL with prepared statements) — inspired by [mkennedy's Raw+DC pattern](https://mkennedy.codes/posts/raw-dc-the-orm-pattern-of-2026/). This establishes the performance floor against which both coodie and cqlengine ORM overhead is measured.\n\n### Changes\n\n- **`benchmarks/models_raw_dc.py`** — `@dataclass` equivalents of Product, Review, Event\n- **`benchmarks/bench_raw_dc.py`** — 20 benchmarks covering every existing group: INSERT (single/INE/TTL), GET by PK, filter (index/limit), COUNT, UPDATE (partial/LWT), DELETE (single/bulk), batch (10/100), collection read/write/roundtrip, model instantiation, serialization\n- **`benchmarks/conftest.py`** — docstring updates; `bench_env` unchanged (Raw+DC lazily prepares its own statements via `cql_session`)\n- **`benchmarks/README.md`** — updated for three-way comparison\n- **`docs/plans/raw-dc-benchmark-plan.md`** — plan document with benchmark results analysis and key takeaways\n\nAll Raw+DC tests join the same `@pytest.mark.benchmark(group=...)` groups, so `--benchmark-group-by=group` shows all three contenders side by side:\n\n```bash\npytest benchmarks/ -v --benchmark-enable --benchmark-group-by=group\n```\n\n### Benchmark Results Summary (CI Run #22739849451)\n\n| Category | coodie vs Raw+DC Overhead |\n|---|---|\n| **CRUD writes** (insert, delete, bulk-delete) | **1.00–1.06×** — near-zero overhead |\n| **CRUD reads** (get-by-pk, filter-limit, collections) | **1.06–1.13×** — very low overhead |\n| **Batch-100 inserts** | **0.05×** 🚀 — coodie 21× faster (native BATCH vs manual loop) |\n| **Model serialization** | **0.20×** 🚀 — Pydantic `model_dump()` 5× faster than `dataclasses.asdict()` |\n| **Filter-secondary-index** | **2.00×** — multi-row hydration overhead |\n| **Partial update** | **2.35×** — change-tracking + validation cost |\n| **Model instantiation** | **3.01×** — Pydantic validation vs plain dataclass |\n\nKey design choices: prepared statements lazily cached at module level (single source of truth), reuses existing tables created by cqlengine/coodie fixtures, `_row_to_product()` hydrates driver `Row` → dataclass using dict key access (since coodie's CassandraDriver sets `dict_factory` on the shared session).\n\nPlan: docs/plans/raw-dc-benchmark-plan.md\nPhase: 1\n\n<!-- START COPILOT CODING AGENT TIPS -->\n---\n\n🔒 GitHub Advanced Security automatically protects Copilot coding agent pull requests. You can protect all pull requests by enabling Advanced Security for your repositories. [Learn more about Advanced Security.](https://gh.io/cca-advanced-security)",
+          "timestamp": "2026-03-08T00:07:52+02:00",
+          "tree_id": "f83f7730c77f19e2ff68469de4168cecbe90146e",
+          "url": "https://github.com/fruch/coodie/commit/762eae4f2966bb2fe4c7289cdb02cd982f2f09e6"
+        },
+        "date": 1772921305462,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53052.422602062674,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000021278922100572297",
+            "extra": "mean: 18.849280597435342 usec\nrounds: 7648"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1722029.9398174053,
+            "unit": "iter/sec",
+            "range": "stddev: 2.2018838496540594e-7",
+            "extra": "mean: 580.7099963116987 nsec\nrounds: 192308"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 153845.7996304958,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008864374839159891",
+            "extra": "mean: 6.500014965646009 usec\nrounds: 14300"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 553628.9655497108,
+            "unit": "iter/sec",
+            "range": "stddev: 4.4780582933960764e-7",
+            "extra": "mean: 1.8062638738691668 usec\nrounds: 43229"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 610244.58902823,
+            "unit": "iter/sec",
+            "range": "stddev: 4.3427848459783887e-7",
+            "extra": "mean: 1.6386872050638368 usec\nrounds: 44323"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 836522.3661366262,
+            "unit": "iter/sec",
+            "range": "stddev: 2.9864573689023383e-7",
+            "extra": "mean: 1.1954252994075636 usec\nrounds: 149410"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 820457.8260997648,
+            "unit": "iter/sec",
+            "range": "stddev: 3.244565765419018e-7",
+            "extra": "mean: 1.2188316915126889 usec\nrounds: 76841"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 729567.8695300232,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3870859033240396e-7",
+            "extra": "mean: 1.3706743974953082 usec\nrounds: 95248"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 190557.6389985334,
+            "unit": "iter/sec",
+            "range": "stddev: 7.821578029787203e-7",
+            "extra": "mean: 5.247756034633156 usec\nrounds: 7665"
           }
         ]
       }

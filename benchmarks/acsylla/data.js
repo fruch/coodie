@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772921306186,
+  "lastUpdate": 1772921343560,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11784,6 +11784,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.821578029787203e-7",
             "extra": "mean: 5.247756034633156 usec\nrounds: 7665"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "b07f1cd6f693478a9e460e61ed7e4551d0eb4588",
+          "message": "feat(cql_builder): implement Phase 1 DML gaps — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST, TOKEN\n\nCloses the highest-priority DML gaps identified in `docs/plans/cql-gap-analysis.md` Phase 1.\n\n### CQL builder (`cql_builder.py`)\n- `build_truncate(table, keyspace)` — `TRUNCATE TABLE`\n- `build_aggregate(table, keyspace, func, column, ...)` — `SELECT SUM/AVG/MIN/MAX`\n- `build_select()` extended with `distinct`, `group_by`, `select_token`, `cast` params\n- `parse_filter_kwargs()` gains `__isnull` operator; `build_where_clause()` emits `IS [NOT] NULL` (no bind params, value baked into cache key)\n\n### Document (`aio/document.py`, `sync/document.py`)\n- `Document.truncate()` classmethod (async + sync)\n\n### QuerySet (`aio/query.py`, `sync/query.py`)\n- **Chain methods:** `distinct()`, `group_by(*cols)`, `select_token(*cols)`, `cast(column, cql_type)`, `is_not_null(column)`, `is_null(column)`\n- **Terminal methods:** `sum(col)`, `avg(col)`, `min(col)`, `max(col)`, `aggregate(**funcs)`\n\n### Usage\n\n```python\n# TRUNCATE\nawait Product.truncate()\n\n# SELECT DISTINCT\npartitions = await Product.find().distinct().only(\"brand\").all()\n\n# GROUP BY + aggregates\nawait SensorReading.find().group_by(\"day\").all()\ntotal = await Product.find(brand=\"Acme\").sum(\"price\")\nstats = await Product.find().aggregate(total=\"sum(price)\", avg=\"avg(price)\")\n\n# IS NOT NULL / IS NULL (composable chain methods)\nawait Product.find().is_not_null(\"name\").all()\nawait Product.find().is_null(\"description\").all()\n\n# CAST in SELECT\nawait Product.find().cast(\"price\", \"int\").all()\n\n# TOKEN in SELECT projection\nawait Product.find().select_token(\"id\").all()\n```\n\n68 new unit tests (parametrized sync/async). All 984 tests pass.\n\nPlan: docs/plans/cql-gap-analysis.md\nPhase: 1\n\n<!-- START COPILOT CODING AGENT TIPS -->\n---\n\n✨ Let Copilot coding agent [set things up for you](https://github.com/fruch/coodie/issues/new?title=✨+Set+up+Copilot+instructions&body=Configure%20instructions%20for%20this%20repository%20as%20documented%20in%20%5BBest%20practices%20for%20Copilot%20coding%20agent%20in%20your%20repository%5D%28https://gh.io/copilot-coding-agent-tips%29%2E%0A%0A%3COnboard%20this%20repo%3E&assignees=copilot) — coding agent works faster and does higher quality work when set up for your repo.",
+          "timestamp": "2026-03-08T00:08:29+02:00",
+          "tree_id": "7572127fe32b95a1c0467b581d42b0cfb8f1826f",
+          "url": "https://github.com/fruch/coodie/commit/b07f1cd6f693478a9e460e61ed7e4551d0eb4588"
+        },
+        "date": 1772921342760,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 54141.11569355992,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001951713959824159",
+            "extra": "mean: 18.470251068707654 usec\nrounds: 8886"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1703303.8929708637,
+            "unit": "iter/sec",
+            "range": "stddev: 2.676894505012549e-7",
+            "extra": "mean: 587.0942960482658 nsec\nrounds: 179212"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 153839.99203403186,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006673382319911644",
+            "extra": "mean: 6.500260346989514 usec\nrounds: 21310"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 582581.3152695018,
+            "unit": "iter/sec",
+            "range": "stddev: 4.497304411274296e-7",
+            "extra": "mean: 1.7164985793226146 usec\nrounds: 48570"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 612118.7732923733,
+            "unit": "iter/sec",
+            "range": "stddev: 3.6782139898560834e-7",
+            "extra": "mean: 1.6336698752455325 usec\nrounds: 59838"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 808362.6436293889,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4123702096416955e-7",
+            "extra": "mean: 1.2370685457583706 usec\nrounds: 155473"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 848297.4100905119,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4478363463590786e-7",
+            "extra": "mean: 1.1788318437672722 usec\nrounds: 86491"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 705321.9040158151,
+            "unit": "iter/sec",
+            "range": "stddev: 3.690069592755525e-7",
+            "extra": "mean: 1.4177923502820597 usec\nrounds: 106304"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 185177.79925505773,
+            "unit": "iter/sec",
+            "range": "stddev: 8.142700919329091e-7",
+            "extra": "mean: 5.40021538231283 usec\nrounds: 7814"
           }
         ]
       }

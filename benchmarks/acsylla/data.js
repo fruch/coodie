@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772788314392,
+  "lastUpdate": 1772920917664,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11551,6 +11551,79 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.698450402405646e-7",
             "extra": "mean: 5.356440604999607 usec\nrounds: 7408"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "340979+fruch@users.noreply.github.com",
+            "name": "fruch",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "da9167e7f3112a5d05d3b6e612242d561f7203ce",
+          "message": "feat: improve self-heal flow with smart snippet extraction and PR check inspection\n\nEnhanced the self-heal flow by adding scripts for log snippet extraction and PR check inspection. Refined existing code based on review feedback and included comprehensive tests for new functionality, improving the reliability and clarity of the self-heal process.",
+          "timestamp": "2026-03-08T00:01:19+02:00",
+          "tree_id": "e9053f391e49b8458ed0581ee4935c50ec847294",
+          "url": "https://github.com/fruch/coodie/commit/da9167e7f3112a5d05d3b6e612242d561f7203ce"
+        },
+        "date": 1772920916170,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 80760.71983258119,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000012083990061367684",
+            "extra": "mean: 12.382257142742446 usec\nrounds: 8225"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 573656.8904952756,
+            "unit": "iter/sec",
+            "range": "stddev: 2.730346431486639e-7",
+            "extra": "mean: 1.7432022809603742 usec\nrounds: 24901"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 642698.927595499,
+            "unit": "iter/sec",
+            "range": "stddev: 3.463507512647569e-7",
+            "extra": "mean: 1.5559384916686507 usec\nrounds: 44433"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 887236.1492029276,
+            "unit": "iter/sec",
+            "range": "stddev: 2.905280238561601e-7",
+            "extra": "mean: 1.127095645165469 usec\nrounds: 97088"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 843447.6899753623,
+            "unit": "iter/sec",
+            "range": "stddev: 2.6519801427703225e-7",
+            "extra": "mean: 1.1856099813720646 usec\nrounds: 74058"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 796289.9356278784,
+            "unit": "iter/sec",
+            "range": "stddev: 2.6357174934971647e-7",
+            "extra": "mean: 1.2558239847794825 usec\nrounds: 80084"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 194068.73710197792,
+            "unit": "iter/sec",
+            "range": "stddev: 4.746981684024983e-7",
+            "extra": "mean: 5.152813456371011 usec\nrounds: 7580"
           }
         ]
       }

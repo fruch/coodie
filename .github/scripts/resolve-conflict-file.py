@@ -32,7 +32,10 @@ from pathlib import Path
 
 MODELS_API_URL = "https://models.inference.ai.azure.com/chat/completions"
 MODEL = "gpt-4o-mini"
-# Allow generous payload for file content (~16 000 chars ≈ 4 000 tokens)
+# Truncation limit for the whole-file payload sent to the Models API.
+# Kept in sync with CHUNK_THRESHOLD; the two are equal today but separated
+# so the whole-file truncation and the chunked-mode routing can be tuned
+# independently if the API limits change.
 MAX_CONTENT_LENGTH = 16000
 # Files larger than this use chunk-by-chunk conflict resolution
 CHUNK_THRESHOLD = 16000

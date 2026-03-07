@@ -99,6 +99,36 @@ class MockDriver:
         self._last_paging_state = self._pop_paging_state()
         return self._pop_rows()
 
+    def execute_scalar(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        self.executed.append((stmt, params))
+        self.last_consistency = consistency
+        self.last_timeout = timeout
+        rows = self._pop_rows()
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    async def execute_scalar_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        self.executed.append((stmt, params))
+        self.last_consistency = consistency
+        self.last_timeout = timeout
+        rows = self._pop_rows()
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
     def sync_table(
         self,
         table: str,

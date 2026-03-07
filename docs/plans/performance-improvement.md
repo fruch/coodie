@@ -1923,7 +1923,7 @@ The §14.5.6 optimizations are **deployment-time configuration improvements** ra
 
 > **Date**: 2026-03-05
 > **Based on**: Raw+DC benchmarks added in PR [#187](https://github.com/fruch/coodie/pull/187) — CI run [#22739849451](https://github.com/fruch/coodie/actions/runs/22739849451) — commit `313a210`
-> **Status**: Analysis complete, proposed optimizations pending implementation
+> **Status**: ✅ Implementation complete (2026-03-07)
 
 ### 13G.1 Background
 
@@ -2176,6 +2176,49 @@ If tasks 9.1–9.5 are implemented alongside the remaining Phase 8 tasks:
 | CRUD read overhead vs Raw+DC | 1.06–1.13× | 1.06–1.15× (maintained) |
 | Multi-row read overhead vs Raw+DC | 2.00× | ~1.2–1.4× |
 | COUNT overhead vs Raw+DC | 1.66× | ~1.1× |
+
+### 13G.8 Implementation Notes (2026-03-07)
+
+#### Task 9.1 + 9.4 — `model_construct()` with batch `_fields_set` ✅
+
+Changed `_rows_to_docs()` in both `aio/query.py` and `sync/query.py` to use
+`model_construct()` (skips Pydantic validation) as the **default fast path** for
+non-polymorphic models.  Pre-computes `_fields_set` once from the first row's keys
+and reuses it across all rows in the batch (Task 9.4 optimization).
+
+Added `QuerySet.validate(True/False)` chain method (default `False`) to opt in
+to the slower `model_validate()` path when custom validators or full type checking
+is required.
+
+Also updated `LazyDocument._resolve()` to use `model_construct()`.
+
+**Files changed**: `src/coodie/aio/query.py`, `src/coodie/sync/query.py`, `src/coodie/lazy.py`
+
+#### Task 9.2 — COUNT / aggregate scalar shortcut ✅
+
+Added `execute_scalar()` and `execute_scalar_async()` methods to `AbstractDriver`
+with default implementations that delegate to `execute`/`execute_async`.  Overrode
+in `CassandraDriver` to use `result.one()` directly, bypassing `_rows_to_dicts()`
+and `list()` allocation entirely.
+
+Updated `count()` and `_aggregate()` in both QuerySet variants to use the scalar path.
+
+**Files changed**: `src/coodie/drivers/base.py`, `src/coodie/drivers/cassandra.py`,
+`src/coodie/aio/query.py`, `src/coodie/sync/query.py`, `tests/conftest.py`
+
+#### Task 9.3 — PK column cache ✅ (previously implemented)
+
+`_pk_columns()` with `@functools.lru_cache(maxsize=128)` was already implemented
+in Phase 5 (§13B.2, Task 14.5.2) in `src/coodie/schema.py`.  No additional changes
+needed.
+
+#### Task 9.5 — LWT result shortcut
+
+The existing `_parse_lwt_result()` implementation is already efficient: it reads
+`rows[0]`, extracts `[applied]`, and builds a dict comprehension for existing
+fields.  The overhead is minimal (single row, single dict operation) and does not
+warrant a new driver-level method.  **No changes made** — the existing
+implementation is adequate.
 
 ---
 

@@ -51,6 +51,7 @@ class QuerySet:
         "_group_by_val",
         "_select_token_val",
         "_cast_val",
+        "_validate_val",
     )
 
     def __init__(
@@ -77,6 +78,7 @@ class QuerySet:
         group_by_val: list[str] | None = None,
         select_token_val: list[str] | None = None,
         cast_val: list[tuple[str, str]] | None = None,
+        validate_val: bool = False,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -99,6 +101,7 @@ class QuerySet:
         self._group_by_val: list[str] = group_by_val or []
         self._select_token_val = select_token_val
         self._cast_val = cast_val
+        self._validate_val = validate_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -127,6 +130,7 @@ class QuerySet:
         new._group_by_val = self._group_by_val
         new._select_token_val = self._select_token_val
         new._cast_val = self._cast_val
+        new._validate_val = self._validate_val
         for key, val in overrides.items():
             setattr(new, f"_{key}", val)
         return new
@@ -223,6 +227,16 @@ class QuerySet:
     def is_null(self, column: str) -> QuerySet:
         return self._clone(where=self._where + [(column, "ISNULL", True)])
 
+    def validate(self, enabled: bool = True) -> QuerySet:
+        """Enable or disable Pydantic validation when hydrating rows.
+
+        By default (``validate=False``), rows from the database are hydrated
+        using ``model_construct()`` which skips validation for speed.  Call
+        ``.validate()`` or ``.validate(True)`` to force ``model_validate()``
+        which runs custom validators and full type checking.
+        """
+        return self._clone(validate_val=enabled)
+
     # ------------------------------------------------------------------
     # Terminal methods (all async)
     # ------------------------------------------------------------------
@@ -292,15 +306,35 @@ class QuerySet:
             return result
         # Fast non-polymorphic path
         coll = _collection_fields(doc_cls)
-        validate = doc_cls.model_validate
+        use_validate = self._validate_val
+        if use_validate:
+            hydrate = doc_cls.model_validate
+            if not coll:
+                return [hydrate(row) for row in rows]
+            result = []
+            for row in rows:
+                for key, factory in coll.items():
+                    if key in row and row[key] is None:
+                        row[key] = factory()
+                result.append(hydrate(row))
+            return result
+        # model_construct() fast path — skip Pydantic validation
+        construct = doc_cls.model_construct
+        if not rows:
+            return []
+        # All rows from the same CQL query share identical column sets,
+        # so we compute _fields_set once and reuse across the batch.
+        fields = set(rows[0].keys())
         if not coll:
-            return [validate(row) for row in rows]
+            return [construct(_fields_set=fields, **row) for row in rows]
+        # Collection factories replace None→empty container in-place;
+        # they do not add/remove keys, so _fields_set stays correct.
         result = []
         for row in rows:
             for key, factory in coll.items():
                 if key in row and row[key] is None:
                     row[key] = factory()
-            result.append(validate(row))
+            result.append(construct(_fields_set=fields, **row))
         return result
 
     async def paged_all(self) -> PagedResult:
@@ -336,13 +370,10 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        rows = await self._get_driver().execute_async(
+        val = await self._get_driver().execute_scalar_async(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val
         )
-        if rows:
-            row = rows[0]
-            return int(next(iter(row.values())))
-        return 0
+        return int(val) if val is not None else 0
 
     async def _aggregate(self, func: str, column: str) -> Any:
         """Execute an aggregate function and return the scalar result."""
@@ -354,12 +385,9 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        rows = await self._get_driver().execute_async(
+        return await self._get_driver().execute_scalar_async(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val
         )
-        if rows:
-            return next(iter(rows[0].values()))
-        return None
 
     async def aggregate(self, **funcs: str) -> dict[str, Any]:
         """Execute one or more aggregate functions.

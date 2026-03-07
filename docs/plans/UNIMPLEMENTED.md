@@ -4,11 +4,14 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-05 (post-merge: PR conflict Phases 1–5 all done,
-> sync-api Phases 1–4 all done, silent-exception-pass Phase 1 done;
-> CQL Phase 1 DML gaps WIP in PR #184, timeseries-iot demo WIP in PR #180,
-> schema-migrations demo WIP in PR #183, realtime-counters demo WIP in PR #176,
-> vector support WIP in PRs #150/#155, collections-tags demo WIP in PR #147)
+> **Last reviewed:** 2026-03-07 (post-merge: CQL Phase 1 DML gaps ✅ Done
+> via PR #184 — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST,
+> TOKEN all implemented with unit + integration tests. LWT integration tests
+> ✅ Done — `test_lwt.py` shipped covering §1.5. CQL Phase 2 data types
+> WIP in PR #193 — duration + vector types. timeseries-iot demo WIP in
+> PR #180, schema-migrations demo WIP in PR #183, realtime-counters demo
+> WIP in PR #176, vector support WIP in PRs #150/#155, collections-tags
+> demo WIP in PR #147)
 
 ---
 
@@ -117,21 +120,17 @@
 
 *Source: `cqlengine-test-coverage-plan.md`*
 
-> *Phase 1 (unit test completeness) is ✅ Done. `map__update` collection operator is ✅ Done. Counter integration tests are ✅ Done. Phase 2 (container mutations) is ✅ Done — `test_extended.py` covers list/set/map mutations, frozen collections. Phase 3 (query operators) is ✅ Done — `__ne` operator in `cql_builder.py`, datetime range filters. Phase 4 (UDT) is ✅ Done — `test_udt.py` covers save/load, nested UDTs, optional UDT. Phase 5 (polymorphism + schema) is ✅ Done — `test_extended.py` covers discriminator hierarchy, drop_table, schema migration. Phases 6–8 remain (LWT conditionals, TTL/timestamp, advanced query features).*
+> *Phase 1 (unit test completeness) is ✅ Done. `map__update` collection operator is ✅ Done. Counter integration tests are ✅ Done. Phase 2 (container mutations) is ✅ Done — `test_extended.py` covers list/set/map mutations, frozen collections. Phase 3 (query operators) is ✅ Done — `__ne` operator in `cql_builder.py`, datetime range filters. Phase 4 (UDT) is ✅ Done — `test_udt.py` covers save/load, nested UDTs, optional UDT. Phase 5 (polymorphism + schema) is ✅ Done — `test_extended.py` covers discriminator hierarchy, drop_table, schema migration. §1.5 LWT conditionals is ✅ Done — `test_lwt.py` covers if_conditions, if_not_exists, if_exists, conditional delete. Phases 7–8 remain (TTL/timestamp, batch writes, advanced query features).*
 
-### 4.1 LWT Conditional Write Integration Tests
-
-> **Prompt:** Add integration tests for `Document.update(if_conditions={...})` — UPDATE with conditional `IF col = ?` clauses. Test: successful conditional update (condition met), failed conditional update (condition not met, returns `[applied]=false`), and the LWT result type. See `docs/plans/cqlengine-test-coverage-plan.md` §1.5.
-
-### 4.2 TTL and Timestamp Modifier Integration Tests
+### 4.1 TTL and Timestamp Modifier Integration Tests
 
 > **Prompt:** Add integration tests for TTL and USING TIMESTAMP modifiers. Test: (1) `save(ttl=N)` causes row to expire. (2) `__default_ttl__` in Settings applies TTL to all saves. (3) `save(timestamp=...)` uses explicit write timestamp. (4) `QuerySet.ttl(N)` on bulk update. See `docs/plans/cqlengine-test-coverage-plan.md` §1.6.
 
-### 4.3 Batch Write Integration Tests
+### 4.2 Batch Write Integration Tests
 
 > **Prompt:** Add integration tests for batch writes against a real ScyllaDB instance. Test: (1) Logged batch with multiple models. (2) Unlogged batch. (3) Counter batch. (4) Batch context manager rollback (exception during batch). See `docs/plans/cqlengine-test-coverage-plan.md` §1.9.
 
-### 4.4 Advanced Query Feature Integration Tests
+### 4.3 Advanced Query Feature Integration Tests
 
 > **Prompt:** Add integration tests for advanced query features. Test: (1) `per_partition_limit(N)` returns exactly N rows per partition. (2) Token-range queries with `__token__gt` / `__token__lt`. (3) `values_list()` returns tuples instead of Documents. (4) `only(*cols)` and `defer(*cols)` column projection. See `docs/plans/cqlengine-test-coverage-plan.md` §1.10.
 
@@ -169,31 +168,27 @@
 
 *Source: `cql-gap-analysis.md`*
 
-> *New plan comparing coodie against the ScyllaDB CQL Reference. Identifies 41 missing CQL features across data types, DDL, DML, LWT, and ScyllaDB extensions. 6 implementation phases planned — none started yet.*
+> *New plan comparing coodie against the ScyllaDB CQL Reference. Identifies 41 missing CQL features across data types, DDL, DML, LWT, and ScyllaDB extensions. Phase 1 (core DML gaps) is ✅ Done — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST, TOKEN all implemented with unit + integration tests (PR #184 merged). 5 phases remain.*
 
-### 7.1 Core DML Gaps (Phase 1)
+### 7.1 Data Type Gaps (Phase 2)
 
-> **⚠️ IN PROGRESS — [PR #184](https://github.com/fruch/coodie/pull/184): CQL Phase 1 DML gaps — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST, TOKEN.**
-
-> **Prompt:** Implement core DML gaps in coodie: (1) `TRUNCATE TABLE` via `Document.truncate()`. (2) `SELECT DISTINCT` via `QuerySet.distinct()`. (3) `GROUP BY` on clustering columns via `QuerySet.group_by()`. (4) Aggregate functions `SUM()`, `AVG()`, `MIN()`, `MAX()` via `QuerySet.aggregate()`. (5) `CAST()` in SELECT. (6) `IS NOT NULL` filter. (7) `TOKEN()` in SELECT for manual range scans. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 1.
-
-### 7.2 Data Type Gaps (Phase 2)
+> **⚠️ IN PROGRESS — [PR #193](https://github.com/fruch/coodie/pull/193) (draft): CQL Phase 2 data types — duration + vector types.**
 
 > **Prompt:** Add missing CQL data types to coodie: (1) `duration` type with a `CqlDuration(months, days, nanoseconds)` dataclass and `Duration()` field marker. (2) `vector<float, N>` type with `Vector(dimensions=N)` field marker, `VectorIndex(similarity_function)`, and `order_by_ann()` QuerySet method. Add type mapping in `types.py`, CQL builder support, DDL generation, and unit tests. See `docs/plans/cql-gap-analysis.md` Phase 2.
 
-### 7.3 DDL & Keyspace Gaps (Phase 3)
+### 7.2 DDL & Keyspace Gaps (Phase 3)
 
 > **Prompt:** Implement DDL gaps: (1) `ALTER TABLE DROP column`, `ALTER TABLE RENAME`. (2) Custom SAI index class support. (3) Index options (`WITH OPTIONS`). (4) Collection element indexes (`KEYS`, `VALUES`, `ENTRIES`, `FULL`). (5) `ALTER MATERIALIZED VIEW`. (6) `ALTER TYPE RENAME field`. (7) `ALTER KEYSPACE` with `durable_writes` and `tablets` options. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 3.
 
-### 7.4 LWT & Collection Operations (Phase 4)
+### 7.3 LWT & Collection Operations (Phase 4)
 
 > **Prompt:** Implement LWT and collection DML gaps: (1) `DELETE ... IF col = ?` conditional deletes. (2) Extended IF operators: `!=`, `IN`, `>`, `<`. (3) Map put `col[key] = val` and list set-by-index `col[idx] = val`. (4) `DELETE col[key] FROM ...` and `DELETE col[idx] FROM ...`. (5) `USING TIMESTAMP` on batches. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 4.
 
-### 7.5 JSON & Metadata Features (Phase 5)
+### 7.4 JSON & Metadata Features (Phase 5)
 
 > **Prompt:** Implement JSON and metadata features: (1) `INSERT INTO ... JSON '{...}'` via `Document.save_json()`. (2) `SELECT JSON` via `QuerySet.json()`. (3) `WRITETIME(col)` via `QuerySet.writetime()`. (4) `TTL(col)` via `QuerySet.column_ttl()`. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 5.
 
-### 7.6 ScyllaDB Extensions & Low-Priority Gaps (Phase 6)
+### 7.5 ScyllaDB Extensions & Low-Priority Gaps (Phase 6)
 
 > **Prompt:** Implement ScyllaDB-specific extensions and low-priority gaps: (1) `BYPASS CACHE` hint. (2) `USING TIMEOUT` in CQL statements. (3) Tablets-enabled keyspace creation. (4) Role/user management DDL (`CREATE ROLE`, `GRANT`, `REVOKE`, etc.) — evaluate if appropriate for an ORM. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 6.
 

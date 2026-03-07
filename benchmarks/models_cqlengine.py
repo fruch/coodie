@@ -47,3 +47,20 @@ class CqlEvent(Model):
     id = columns.UUID(primary_key=True, default=uuid.uuid4)
     event_type = columns.Text(required=True)
     payload = columns.Text(default="")
+
+
+class CqlVectorProduct(Model):
+    """Product with a list<float> embedding column — cqlengine vector benchmark target.
+
+    cqlengine does not support the ``vector<float, N>`` CQL type natively, so
+    the closest equivalent is ``columns.List(columns.Float)``.  This model is
+    used to benchmark coodie's native ANN support against cqlengine's full-scan
+    fallback (cqlengine cannot issue ``ORDER BY … ANN OF`` queries).
+    """
+
+    __table_name__ = "bench_cql_vector_products"
+    __keyspace__ = "bench_ks"
+
+    id = columns.UUID(primary_key=True, default=uuid.uuid4)
+    name = columns.Text(required=True)
+    embedding = columns.List(value_type=columns.Float)

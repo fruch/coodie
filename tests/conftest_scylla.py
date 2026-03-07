@@ -6,6 +6,7 @@ duplicating the container setup, address translator, and session creation.
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -44,6 +45,8 @@ def scylla_container():
 
     with (
         DockerContainer("scylladb/scylla:latest")
+        # --smp 1 --developer-mode 1: single-threaded dev mode for fast CI startup.
+        # --skip-wait-for-gossip-to-settle=0: skip gossip settling wait for faster startup.
         .with_command("--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0")
         .with_exposed_ports(9042) as container
     ):
@@ -51,13 +54,54 @@ def scylla_container():
         yield container
 
 
-def create_cql_session(scylla_container: Any, keyspace: str) -> Any:
+@pytest.fixture(scope="session")
+def vector_store_container(scylla_container):
+    """Start a ScyllaDB vector-store container connected to the scylla container.
+
+    The vector-store service (``scylladb/vector-store:latest``) provides ANN
+    vector search capabilities for ScyllaDB.  It connects to the scylla container
+    via its internal Docker IP using ``VECTOR_STORE_SCYLLADB_URI``.
+
+    Skipped when testcontainers is not installed.
+    """
+    try:
+        from testcontainers.core.container import DockerContainer  # type: ignore[import-untyped]
+        from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore[import-untyped]
+    except ImportError as exc:
+        pytest.skip(f"testcontainers not installed: {exc}")
+
+    # Resolve the scylla container's internal Docker IP so vector-store can connect.
+    container_info = scylla_container.get_wrapped_container()
+    container_info.reload()
+    networks = container_info.attrs["NetworkSettings"]["Networks"]
+    scylla_ip = next(iter(networks.values()))["IPAddress"]
+
+    with (
+        DockerContainer("scylladb/vector-store:latest")
+        .with_env("VECTOR_STORE_SCYLLADB_URI", f"{scylla_ip}:9042")
+        .with_exposed_ports(6080) as container
+    ):
+        wait_for_logs(container, "listening", timeout=120)
+        yield container
+
+
+def create_cql_session(scylla_container: Any, keyspace: str, *, tablets: bool = True) -> Any:
     """Create a cassandra-driver Session connected to the given keyspace.
 
     Handles the retry loop for container startup and creates the keyspace
     if it doesn't exist.
 
-    Returns ``(session, cluster)`` so the caller can shut down the cluster.
+    Args:
+        scylla_container: The testcontainer running ScyllaDB.
+        keyspace: The keyspace name to create and connect to.
+        tablets: If ``True`` (default), create the keyspace with
+            ``NetworkTopologyStrategy + tablets = {'enabled': true}``, which is
+            required by ``vector_index`` on ScyllaDB 6.x+.  Falls back to
+            ``SimpleStrategy`` when tablets are not supported by the server.
+            Pass ``False`` to always use ``SimpleStrategy``.
+
+    Returns:
+        ``(session, cluster)`` so the caller can shut down the cluster.
     """
     from cassandra.cluster import Cluster, NoHostAvailable  # type: ignore[import-untyped]
 
@@ -78,10 +122,30 @@ def create_cql_session(scylla_container: Any, keyspace: str) -> Any:
                 raise
             time.sleep(2)
 
-    session.execute(
-        f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
-        "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}"
-    )
+    if tablets:
+        # Discover the datacenter name (required for NetworkTopologyStrategy).
+        row = session.execute("SELECT datacenter FROM system.local").one()
+        dc = getattr(row, "datacenter", "datacenter1") if row else "datacenter1"
+        # Try NTS + tablets; fall back to SimpleStrategy on older ScyllaDB.
+        try:
+            session.execute(
+                f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
+                f"WITH replication = {{'class': 'NetworkTopologyStrategy', '{dc}': 1}} "
+                f"AND tablets = {{'enabled': true}}"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logging.warning("Tablets not available (%s); creating %s without tablets", exc, keyspace)
+            session.execute(
+                f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
+                "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}"
+            )
+    else:
+        session.execute(
+            f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
+            "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}"
+        )
+
+    session.set_keyspace(keyspace)
     return session, cluster
 
 

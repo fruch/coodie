@@ -498,6 +498,9 @@ def parse_update_kwargs(
     return set_data, collection_ops
 
 
+_IF_OPS: dict[str, str] = {"ne": "!=", "gt": ">", "lt": "<", "gte": ">=", "lte": "<=", "in": "IN"}
+
+
 def _parse_if_conditions(
     conditions: dict[str, Any],
 ) -> tuple[str, list[Any]]:
@@ -507,7 +510,6 @@ def _parse_if_conditions(
     ``col__gt`` (``>``), ``col__lt`` (``<``), ``col__gte`` (``>=``),
     ``col__lte`` (``<=``), ``col__in`` (``IN``).  Plain keys default to ``=``.
     """
-    _IF_OPS: dict[str, str] = {"ne": "!=", "gt": ">", "lt": "<", "gte": ">=", "lte": "<=", "in": "IN"}
     parts: list[str] = []
     params: list[Any] = []
     for key, value in conditions.items():

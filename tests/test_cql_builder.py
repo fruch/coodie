@@ -1052,7 +1052,7 @@ def test_build_delete_if_conditions_multiple():
         if_conditions={"name": "X", "brand": "Y"},
     )
     assert 'IF "name" = ?' in cql
-    assert 'IF "name" = ? AND "brand" = ?' in cql or '" AND "' in cql
+    assert '"brand" = ?' in cql
     assert params == ["1", "X", "Y"]
 
 

@@ -11,6 +11,7 @@ from coodie.cql_builder import (
     build_update,
     build_counter_update,
     build_drop_table,
+    build_truncate,
     build_create_materialized_view,
     build_drop_materialized_view,
     parse_update_kwargs,
@@ -145,6 +146,12 @@ class Document(BaseModel):
     async def drop_table(cls) -> None:
         """Drop the table for this model."""
         cql = build_drop_table(cls._get_table(), cls._get_keyspace())
+        await cls._get_driver().execute_async(cql, [])
+
+    @classmethod
+    async def truncate(cls) -> None:
+        """Truncate (remove all rows from) the table for this model."""
+        cql = build_truncate(cls._get_table(), cls._get_keyspace())
         await cls._get_driver().execute_async(cql, [])
 
     @classmethod

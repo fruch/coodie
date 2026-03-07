@@ -5,7 +5,7 @@
 #
 # Slash-command (via PR comment):
 #   /solve — Merge the base branch into the PR branch; if conflicts arise,
-#            resolve them with Copilot CLI and push the merge commit.
+#            resolve them with the GitHub Models API and push the merge commit.
 #
 # Manual testing (via Actions tab → "Run workflow"):
 #   Provide the PR number.
@@ -43,6 +43,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      models: read
 
     steps:
       # ── 0. Normalize inputs across triggers ──────────────────
@@ -161,36 +162,17 @@ jobs:
           git push
           gh pr edit "${{ steps.ctx.outputs.pr_number }}" --remove-label "conflict" || true
 
-      # ── 6. Resolve conflicts with Copilot CLI ────────────────
+      # ── 6. Resolve conflicts with Models API ──────────────────
 
-      # Guard: abort early if COPILOT_PAT is not configured.
-      - name: Abort if COPILOT_PAT is not configured
-        if: steps.merge.outputs.status == 'conflict'
-        env:
-          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -z "$COPILOT_PAT" ]; then
-            git merge --abort || true
-            gh pr comment "${{ steps.ctx.outputs.pr_number }}" --repo "${{ github.repository }}" \
-              --body "⚠️ **Cannot resolve conflicts automatically:** the \`COPILOT_PAT\` secret is not configured in this repository. Please resolve the conflicts manually and push."
-            exit 1
-          fi
-
-      - name: Resolve conflicts with Copilot CLI
+      - name: Resolve conflicts with Models API
         id: resolve
         if: steps.merge.outputs.status == 'conflict'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
-          COPILOT_TIMEOUT: '300'
+          RESOLVE_TIMEOUT: '120'
           RESOLVE_MODE: merge
         run: |
-          echo "::group::Install Copilot CLI"
-          timeout 60 npm install -g @github/copilot || true
-          echo "::endgroup::"
-          echo "Copilot CLI version: $(copilot --version 2>&1 || echo 'version check failed')"
-          echo "Per-file timeout: ${COPILOT_TIMEOUT}s | Overall timeout: 900s"
+          echo "Per-file timeout: ${RESOLVE_TIMEOUT}s | Overall timeout: 900s"
           timeout 900 bash .github/scripts/resolve-conflicts.sh || {
             EXIT_CODE=$?
             if [ "$EXIT_CODE" -eq 124 ]; then
@@ -213,7 +195,7 @@ jobs:
         if: steps.merge.outputs.status == 'conflict' && steps.resolve.outputs.status != 'clean'
         run: |
           git merge --abort || true
-          echo "Merge failed: Copilot could not resolve all conflicts automatically. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
+          echo "Merge failed: could not resolve all conflicts automatically. Please resolve manually." >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
       # ── 7. Summary comment ──────────────────────────────────

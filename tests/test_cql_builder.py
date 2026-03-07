@@ -845,3 +845,184 @@ def test_build_alter_table_options_string_value():
 
     cql = build_alter_table_options("products", "ks", {"comment": "my table"})
     assert cql == "ALTER TABLE ks.products WITH comment = 'my table'"
+
+
+# -- Phase 1: build_truncate -------------------------------------------------
+
+
+def test_build_truncate():
+    from coodie.cql_builder import build_truncate
+
+    cql = build_truncate("products", "ks")
+    assert cql == "TRUNCATE TABLE ks.products"
+
+
+# -- Phase 1: SELECT DISTINCT ------------------------------------------------
+
+
+def test_build_select_distinct():
+    _select_cql_cache.clear()
+    cql, params = build_select("products", "ks", distinct=True)
+    assert cql.startswith("SELECT DISTINCT")
+    assert "FROM ks.products" in cql
+    assert params == []
+
+
+def test_build_select_distinct_with_columns():
+    _select_cql_cache.clear()
+    cql, _ = build_select("products", "ks", columns=["brand"], distinct=True)
+    assert 'SELECT DISTINCT "brand" FROM ks.products' == cql
+
+
+# -- Phase 1: GROUP BY -------------------------------------------------------
+
+
+def test_build_select_group_by():
+    _select_cql_cache.clear()
+    cql, _ = build_select("events", "ks", group_by=["day"])
+    assert 'GROUP BY "day"' in cql
+
+
+def test_build_select_group_by_multiple():
+    _select_cql_cache.clear()
+    cql, _ = build_select("events", "ks", group_by=["year", "month"])
+    assert 'GROUP BY "year", "month"' in cql
+
+
+def test_build_select_group_by_before_order_by():
+    _select_cql_cache.clear()
+    cql, _ = build_select("events", "ks", group_by=["day"], order_by=["-ts"])
+    gb_idx = cql.index("GROUP BY")
+    ob_idx = cql.index("ORDER BY")
+    assert gb_idx < ob_idx
+
+
+# -- Phase 1: build_aggregate ------------------------------------------------
+
+
+def test_build_aggregate_sum():
+    from coodie.cql_builder import build_aggregate
+
+    cql, params = build_aggregate("products", "ks", "SUM", "price")
+    assert cql == 'SELECT SUM("price") FROM ks.products'
+    assert params == []
+
+
+def test_build_aggregate_avg():
+    from coodie.cql_builder import build_aggregate
+
+    cql, _ = build_aggregate("products", "ks", "AVG", "price")
+    assert cql == 'SELECT AVG("price") FROM ks.products'
+
+
+def test_build_aggregate_min():
+    from coodie.cql_builder import build_aggregate
+
+    cql, _ = build_aggregate("products", "ks", "MIN", "price")
+    assert cql == 'SELECT MIN("price") FROM ks.products'
+
+
+def test_build_aggregate_max():
+    from coodie.cql_builder import build_aggregate
+
+    cql, _ = build_aggregate("products", "ks", "MAX", "price")
+    assert cql == 'SELECT MAX("price") FROM ks.products'
+
+
+def test_build_aggregate_with_where():
+    from coodie.cql_builder import build_aggregate
+
+    cql, params = build_aggregate("products", "ks", "SUM", "price", where=[("brand", "=", "Acme")])
+    assert 'WHERE "brand" = ?' in cql
+    assert params == ["Acme"]
+
+
+def test_build_aggregate_with_allow_filtering():
+    from coodie.cql_builder import build_aggregate
+
+    cql, _ = build_aggregate("products", "ks", "SUM", "price", allow_filtering=True)
+    assert "ALLOW FILTERING" in cql
+
+
+# -- Phase 1: IS NOT NULL / IS NULL filter -----------------------------------
+
+
+@pytest.mark.parametrize(
+    "kwargs, expected_op",
+    [
+        pytest.param({"name__isnull": False}, "IS NOT NULL", id="is-not-null"),
+        pytest.param({"name__isnull": True}, "IS NULL", id="is-null"),
+    ],
+)
+def test_parse_filter_isnull(kwargs, expected_op):
+    result = parse_filter_kwargs(kwargs)
+    assert len(result) == 1
+    col, op, val = result[0]
+    assert col == "name"
+    assert op == "ISNULL"
+    if expected_op == "IS NOT NULL":
+        assert val is False
+    else:
+        assert val is True
+
+
+def test_build_where_clause_is_not_null():
+    clause, params = build_where_clause([("name", "ISNULL", False)])
+    assert clause == 'WHERE "name" IS NOT NULL'
+    assert params == []
+
+
+def test_build_where_clause_is_null():
+    clause, params = build_where_clause([("name", "ISNULL", True)])
+    assert clause == 'WHERE "name" IS NULL'
+    assert params == []
+
+
+def test_build_select_with_isnull_no_params():
+    """IS [NOT] NULL should not add any bind parameters."""
+    _select_cql_cache.clear()
+    cql, params = build_select("products", "ks", where=[("name", "ISNULL", False)])
+    assert '"name" IS NOT NULL' in cql
+    assert params == []
+
+
+def test_build_select_isnull_combined_with_eq():
+    """IS NOT NULL combined with equality filter."""
+    _select_cql_cache.clear()
+    cql, params = build_select("products", "ks", where=[("brand", "=", "Acme"), ("name", "ISNULL", False)])
+    assert '"brand" = ?' in cql
+    assert '"name" IS NOT NULL' in cql
+    assert params == ["Acme"]
+
+
+# -- Phase 1: CAST() in SELECT -----------------------------------------------
+
+
+def test_build_select_cast():
+    _select_cql_cache.clear()
+    cql, _ = build_select("products", "ks", cast=[("price", "int")])
+    assert 'CAST("price" AS int)' in cql
+    assert "FROM ks.products" in cql
+
+
+def test_build_select_cast_with_columns():
+    _select_cql_cache.clear()
+    cql, _ = build_select("products", "ks", columns=["name"], cast=[("price", "int")])
+    assert '"name"' in cql
+    assert 'CAST("price" AS int)' in cql
+
+
+# -- Phase 1: TOKEN() in SELECT ----------------------------------------------
+
+
+def test_build_select_token_projection():
+    _select_cql_cache.clear()
+    cql, _ = build_select("products", "ks", select_token=["id"])
+    assert 'TOKEN("id")' in cql
+    assert "FROM ks.products" in cql
+
+
+def test_build_select_token_projection_multiple():
+    _select_cql_cache.clear()
+    cql, _ = build_select("products", "ks", select_token=["part_a", "part_b"])
+    assert 'TOKEN("part_a", "part_b")' in cql

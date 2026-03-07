@@ -78,6 +78,36 @@ class AbstractDriver(ABC):
     ) -> list[str]:
         """Async version of :meth:`sync_table`."""
 
+    # ------------------------------------------------------------------
+    # Scalar helpers (default implementations; drivers may override)
+    # ------------------------------------------------------------------
+
+    def execute_scalar(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        """Execute *stmt* and return the first column of the first row, or ``None``."""
+        rows = self.execute(stmt, params, consistency=consistency, timeout=timeout)
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    async def execute_scalar_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        """Async version of :meth:`execute_scalar`."""
+        rows = await self.execute_async(stmt, params, consistency=consistency, timeout=timeout)
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
     @abstractmethod
     async def close_async(self) -> None:
         """Release async resources."""

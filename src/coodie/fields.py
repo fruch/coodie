@@ -96,3 +96,28 @@ class Frozen:
 @dataclass(frozen=True)
 class Discriminator:
     """Annotated marker: discriminator column for polymorphic (single-table inheritance) models."""
+
+
+@dataclass(frozen=True)
+class Vector:
+    """Annotated marker: maps ``list[float]`` to CQL ``vector<float, N>``.
+
+    Args:
+        dimensions: The fixed number of dimensions for the vector.
+    """
+
+    dimensions: int
+
+
+@dataclass(frozen=True)
+class VectorIndex:
+    """Annotated marker: create a vector similarity index on this column.
+
+    Emits ``CREATE CUSTOM INDEX … USING 'StorageAttachedIndex'`` with the
+    configured similarity function.
+
+    Args:
+        similarity_function: ``"COSINE"`` (default), ``"DOT_PRODUCT"``, or ``"EUCLIDEAN"``.
+    """
+
+    similarity_function: str = "COSINE"

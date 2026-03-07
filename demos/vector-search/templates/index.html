@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Vector Search — coodie Demo</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-dim: #8b949e;
+            --accent: #58a6ff;
+            --accent-glow: rgba(88, 166, 255, 0.15);
+            --green: #3fb950;
+            --orange: #d29922;
+            --purple: #bc8cff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
+        h1 { color: var(--accent); font-size: 1.8rem; margin-bottom: 0.3rem; }
+        .subtitle { color: var(--text-dim); margin-bottom: 2rem; }
+        .search-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .search-box label { color: var(--accent); font-weight: 600; display: block; margin-bottom: 0.5rem; }
+        .search-row { display: flex; gap: 0.5rem; }
+        .search-row input[type="text"] {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            padding: 0.7rem 1rem;
+            font-size: 1rem;
+        }
+        .search-row input[type="text"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .search-row button {
+            background: var(--accent);
+            color: #0d1117;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .search-row button:hover { opacity: 0.9; }
+        .cql-hint {
+            margin-top: 0.8rem;
+            padding: 0.6rem 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            white-space: pre-wrap;
+        }
+        .cql-hint .kw { color: var(--orange); }
+        .cql-hint .fn { color: var(--purple); }
+        .stat-bar {
+            display: flex; gap: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+        .stat-bar span strong { color: var(--accent); }
+        #results { min-height: 200px; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline; }
+        .spinner { color: var(--accent); }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .footer { margin-top: 3rem; color: var(--text-dim); font-size: 0.85rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Vector Search</h1>
+        <p class="subtitle">
+            Semantic product search powered by coodie's ANN queries
+            &nbsp;·&nbsp; <strong>{{ total }}</strong> products indexed
+        </p>
+
+        <div class="search-box">
+            <label for="query">Search by meaning — type a description, not just keywords</label>
+            <form hx-post="/ui/search" hx-target="#results" hx-indicator="#search-spinner">
+                <div class="search-row">
+                    <input type="text" name="query" id="query"
+                           placeholder="e.g. &quot;something for my morning workout&quot;"
+                           autocomplete="off" autofocus>
+                    <input type="hidden" name="limit" value="10">
+                    <button type="submit">Search</button>
+                </div>
+            </form>
+            <div class="cql-hint">
+                <span class="kw">SELECT</span> * <span class="kw">FROM</span> product_embeddings
+                <span class="kw">ORDER BY</span> embedding <span class="fn">ANN OF</span> ?
+                <span class="kw">LIMIT</span> 10
+            </div>
+        </div>
+
+        <div class="stat-bar">
+            <span>📐 Dimensions: <strong>16</strong></span>
+            <span>📊 Similarity: <strong>COSINE</strong></span>
+            <span>🧠 Index: <strong>StorageAttachedIndex</strong></span>
+            <span id="search-spinner" class="htmx-indicator spinner">⏳ Searching...</span>
+        </div>
+
+        <div id="results">
+            <!-- search results injected here via HTMX -->
+            <p style="color: var(--text-dim); text-align: center; padding: 3rem 0;">
+                Type a query above to search products by semantic similarity.
+            </p>
+        </div>
+
+        <div class="footer">
+            coodie vector search demo &nbsp;·&nbsp;
+            <code>ORDER BY embedding ANN OF [...]</code> &nbsp;·&nbsp;
+            <a href="https://github.com/fruch/coodie">github.com/fruch/coodie</a>
+        </div>
+    </div>
+</body>
+</html>

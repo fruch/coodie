@@ -18,6 +18,7 @@ from coodie.fields import (
     TimeUUID,
     TinyInt,
     VarInt,
+    Vector,
 )
 from coodie.schema import _cached_type_hints
 
@@ -58,12 +59,17 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
     if origin is typing.Annotated:
         has_frozen = False
         cql_override = None
+        vector_marker = None
         for meta in args[1:]:
             if isinstance(meta, Frozen):
                 has_frozen = True
+            if isinstance(meta, Vector):
+                vector_marker = meta
             override = _MARKER_CQL_OVERRIDES.get(type(meta))
             if override is not None:
                 cql_override = override
+        if vector_marker is not None:
+            return f"vector<float, {vector_marker.dimensions}>"
         if cql_override is not None:
             return f"frozen<{cql_override}>" if has_frozen else cql_override
         inner = python_type_to_cql_type_str(args[0])

@@ -46,6 +46,7 @@ class QuerySet:
         "_per_partition_limit_val",
         "_fetch_size_val",
         "_paging_state_val",
+        "_ann_of_val",
     )
 
     def __init__(
@@ -68,6 +69,7 @@ class QuerySet:
         per_partition_limit_val: int | None = None,
         fetch_size_val: int | None = None,
         paging_state_val: bytes | None = None,
+        ann_of_val: tuple[str, list[float]] | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -86,6 +88,7 @@ class QuerySet:
         self._per_partition_limit_val = per_partition_limit_val
         self._fetch_size_val = fetch_size_val
         self._paging_state_val = paging_state_val
+        self._ann_of_val = ann_of_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -110,6 +113,7 @@ class QuerySet:
         new._per_partition_limit_val = self._per_partition_limit_val
         new._fetch_size_val = self._fetch_size_val
         new._paging_state_val = self._paging_state_val
+        new._ann_of_val = self._ann_of_val
         for key, val in overrides.items():
             setattr(new, f"_{key}", val)
         return new
@@ -186,6 +190,13 @@ class QuerySet:
     def page(self, paging_state: bytes | None) -> QuerySet:
         return self._clone(paging_state_val=paging_state)
 
+    def order_by_ann(self, field: str, query_vector: list[float]) -> QuerySet:
+        """Order by approximate nearest neighbor for a vector column.
+
+        Emits ``ORDER BY "field" ANN OF ?`` in the generated CQL.
+        """
+        return self._clone(ann_of_val=(field, query_vector))
+
     # ------------------------------------------------------------------
     # Terminal methods (all async)
     # ------------------------------------------------------------------
@@ -218,6 +229,7 @@ class QuerySet:
             order_by=self._order_by_val or None,
             allow_filtering=self._allow_filtering_val,
             per_partition_limit=self._per_partition_limit_val,
+            ann_of=self._ann_of_val,
         )
         rows = await self._get_driver().execute_async(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val

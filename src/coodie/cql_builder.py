@@ -94,6 +94,32 @@ def build_create_index(
     return f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
 
 
+def build_create_custom_index(
+    table: str,
+    keyspace: str,
+    col: ColumnDefinition,
+    index_class: str = "org.apache.cassandra.index.sai.StorageAttachedIndex",
+    options: dict[str, str] | None = None,
+) -> str:
+    """Build a ``CREATE CUSTOM INDEX`` CQL statement.
+
+    Used for vector (ANN) indexes and other custom index types.
+
+    Args:
+        table: Table name.
+        keyspace: Keyspace name.
+        col: Column definition with vector index metadata.
+        index_class: Fully-qualified index class name.
+        options: Optional index options (e.g. ``{"similarity_function": "cosine"}``).
+    """
+    index_name = col.vector_index_name or f"{table}_{col.name}_idx"
+    cql = f"CREATE CUSTOM INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} (\"{col.name}\") USING '{index_class}'"
+    if options:
+        opts_str = ", ".join(f"'{k}': '{v}'" for k, v in options.items())
+        cql += f" WITH OPTIONS = {{{opts_str}}}"
+    return cql
+
+
 def build_drop_index(index_name: str, keyspace: str) -> str:
     """Build a ``DROP INDEX IF EXISTS`` CQL statement."""
     return f"DROP INDEX IF EXISTS {keyspace}.{index_name}"
@@ -255,11 +281,15 @@ def build_select(
     order_by: list[str] | None = None,
     allow_filtering: bool = False,
     per_partition_limit: int | None = None,
+    ann_of: tuple[str, list[float]] | None = None,
 ) -> tuple[str, list[Any]]:
     # Build the cache key from the query *shape* (excludes actual values).
     where_shape: tuple = ()
     if where:
         where_shape = tuple((col, op, len(value)) if op == "IN" else (col, op) for col, op, value in where)
+    ann_shape: tuple | None = None
+    if ann_of is not None:
+        ann_shape = (ann_of[0], len(ann_of[1]))
     cache_key = (
         table,
         keyspace,
@@ -269,6 +299,7 @@ def build_select(
         tuple(order_by) if order_by else None,
         allow_filtering,
         per_partition_limit,
+        ann_shape,
     )
 
     # Extract params (always needed regardless of cache hit).
@@ -279,6 +310,10 @@ def build_select(
                 params.extend(value)
             else:
                 params.append(value)
+
+    # ANN vector param is appended after WHERE params.
+    if ann_of is not None:
+        params.append(ann_of[1])
 
     cached_cql = _select_cql_cache.get(cache_key)
     if cached_cql is not None:
@@ -292,7 +327,9 @@ def build_select(
         if clause:
             cql += " " + clause
 
-    if order_by:
+    if ann_of is not None:
+        cql += f' ORDER BY "{ann_of[0]}" ANN OF ?'
+    elif order_by:
         order_parts = []
         for col in order_by:
             if col.startswith("-"):

@@ -37,6 +37,7 @@ from coodie.fields import (
     Counter,
     Discriminator,
     Double,
+    Duration,
     Frozen,
     Indexed,
     PrimaryKey,
@@ -46,9 +47,12 @@ from coodie.fields import (
     TimeUUID,
     TinyInt,
     VarInt,
+    Vector,
+    VectorIndex,
 )
 from coodie.lazy import LazyDocument
 from coodie.results import LWTResult, PagedResult
+from coodie.types import CqlDuration
 from coodie.usertype import UserType
 
 __all__ = [
@@ -83,7 +87,11 @@ __all__ = [
     "Ascii",
     "TimeUUID",
     "Time",
+    "Duration",
     "Frozen",
+    "Vector",
+    "VectorIndex",
+    "CqlDuration",
     "LWTResult",
     "PagedResult",
     "UserType",

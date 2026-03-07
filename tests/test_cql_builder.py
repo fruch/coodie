@@ -845,3 +845,113 @@ def test_build_alter_table_options_string_value():
 
     cql = build_alter_table_options("products", "ks", {"comment": "my table"})
     assert cql == "ALTER TABLE ks.products WITH comment = 'my table'"
+
+
+# ---- build_create_custom_index tests ----
+
+
+def test_build_create_custom_index_basic():
+    from coodie.cql_builder import build_create_custom_index
+
+    col = make_col(name="embedding", cql_type="vector<float, 5>", vector_index=True)
+    cql = build_create_custom_index("products", "ks", col)
+    assert "CREATE CUSTOM INDEX IF NOT EXISTS products_embedding_idx" in cql
+    assert 'ON ks.products ("embedding")' in cql
+    assert "USING 'org.apache.cassandra.index.sai.StorageAttachedIndex'" in cql
+
+
+def test_build_create_custom_index_with_options():
+    from coodie.cql_builder import build_create_custom_index
+
+    col = make_col(
+        name="embedding",
+        cql_type="vector<float, 5>",
+        vector_index=True,
+        vector_index_name="my_ann_idx",
+    )
+    cql = build_create_custom_index(
+        "products",
+        "ks",
+        col,
+        options={"similarity_function": "cosine"},
+    )
+    assert "CREATE CUSTOM INDEX IF NOT EXISTS my_ann_idx" in cql
+    assert 'ON ks.products ("embedding")' in cql
+    assert "WITH OPTIONS = {'similarity_function': 'cosine'}" in cql
+
+
+def test_build_create_custom_index_custom_class():
+    from coodie.cql_builder import build_create_custom_index
+
+    col = make_col(name="text_col", cql_type="text", vector_index=True)
+    cql = build_create_custom_index(
+        "docs",
+        "ks",
+        col,
+        index_class="com.example.CustomIndex",
+    )
+    assert "USING 'com.example.CustomIndex'" in cql
+
+
+# ---- build_select with ann_of tests ----
+
+
+def test_build_select_ann_of():
+    cql, params = build_select(
+        "products",
+        "ks",
+        ann_of=("embedding", [0.1, 0.2, 0.3]),
+        limit=5,
+    )
+    assert 'ORDER BY "embedding" ANN OF ?' in cql
+    assert "LIMIT 5" in cql
+    assert [0.1, 0.2, 0.3] in params
+
+
+def test_build_select_ann_of_with_where():
+    cql, params = build_select(
+        "products",
+        "ks",
+        where=[("category", "=", "electronics")],
+        ann_of=("embedding", [0.1, 0.2]),
+        limit=10,
+    )
+    assert 'WHERE "category" = ?' in cql
+    assert 'ORDER BY "embedding" ANN OF ?' in cql
+    assert params == ["electronics", [0.1, 0.2]]
+
+
+def test_build_select_ann_overrides_order_by():
+    """When ann_of is provided, regular order_by should be ignored."""
+    cql, params = build_select(
+        "products",
+        "ks",
+        order_by=["name"],
+        ann_of=("embedding", [0.5, 0.5]),
+    )
+    assert 'ORDER BY "embedding" ANN OF ?' in cql
+    assert '"name" ASC' not in cql
+
+
+# ---- build_create_table with vector column ----
+
+
+def test_create_table_with_vector_column():
+    cols = [
+        make_col(name="id", cql_type="uuid", primary_key=True),
+        make_col(name="embedding", cql_type="vector<float, 5>"),
+    ]
+    cql = build_create_table("products", "ks", cols)
+    assert '"embedding" vector<float, 5>' in cql
+
+
+# ---- build_create_table with duration column ----
+
+
+def test_create_table_with_duration_column():
+    cols = [
+        make_col(name="id", cql_type="uuid", primary_key=True),
+        make_col(name="ttl_duration", cql_type="duration"),
+    ]
+    cql = build_create_table("events", "ks", cols)
+    assert '"ttl_duration" duration' in cql

@@ -97,7 +97,11 @@ class QuerySet:
         self._per_partition_limit_val = per_partition_limit_val
         self._fetch_size_val = fetch_size_val
         self._paging_state_val = paging_state_val
-        new._ann_of_val = self._ann_of_val
+        self._distinct_val = distinct_val
+        self._group_by_val: list[str] = group_by_val or []
+        self._select_token_val = select_token_val
+        self._cast_val = cast_val
+        self._ann_of_val = ann_of_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides

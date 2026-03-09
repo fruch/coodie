@@ -57,7 +57,7 @@ jobs:
             --benchmark-json=benchmark-results-${{ matrix.driver.name }}.json
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results-${{ matrix.driver.name }}
           path: benchmark-results-${{ matrix.driver.name }}.json

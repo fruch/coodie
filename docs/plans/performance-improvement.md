@@ -2181,16 +2181,17 @@ If tasks 9.1–9.5 are implemented alongside the remaining Phase 8 tasks:
 
 #### Task 9.1 + 9.4 — `model_construct()` with batch `_fields_set` ✅
 
-Changed `_rows_to_docs()` in both `aio/query.py` and `sync/query.py` to use
-`model_construct()` (skips Pydantic validation) as the **default fast path** for
-non-polymorphic models.  Pre-computes `_fields_set` once from the first row's keys
-and reuses it across all rows in the batch (Task 9.4 optimization).
+Added `model_construct()` fast path to `_rows_to_docs()` in both `aio/query.py`
+and `sync/query.py`.  When enabled, skips Pydantic validation and pre-computes
+`_fields_set` once from the first row's keys, reusing it across all rows in the
+batch (Task 9.4 optimization).
 
-Added `QuerySet.validate(True/False)` chain method (default `False`) to opt in
-to the slower `model_validate()` path when custom validators or full type checking
-is required.
+The default remains `model_validate()` (safe — performs full type coercion) because
+some drivers (e.g. acsylla) return raw types (UUIDs as strings) that require
+Pydantic coercion.  Added `QuerySet.validate(False)` chain method to opt in to
+the `model_construct()` fast path when driver-returned types match exactly.
 
-Also updated `LazyDocument._resolve()` to use `model_construct()`.
+`LazyDocument._resolve()` uses `model_validate()` for correctness.
 
 **Files changed**: `src/coodie/aio/query.py`, `src/coodie/sync/query.py`, `src/coodie/lazy.py`
 

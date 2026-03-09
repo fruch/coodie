@@ -78,7 +78,7 @@ class QuerySet:
         group_by_val: list[str] | None = None,
         select_token_val: list[str] | None = None,
         cast_val: list[tuple[str, str]] | None = None,
-        validate_val: bool = False,
+        validate_val: bool = True,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -230,10 +230,11 @@ class QuerySet:
     def validate(self, enabled: bool = True) -> QuerySet:
         """Enable or disable Pydantic validation when hydrating rows.
 
-        By default (``validate=False``), rows from the database are hydrated
-        using ``model_construct()`` which skips validation for speed.  Call
-        ``.validate()`` or ``.validate(True)`` to force ``model_validate()``
-        which runs custom validators and full type checking.
+        By default, rows from the database are hydrated using
+        ``model_validate()`` which performs full type coercion and runs
+        custom validators.  Call ``.validate(False)`` to switch to
+        ``model_construct()`` which skips validation for speed — only safe
+        when driver-returned types match the model field types exactly.
         """
         return self._clone(validate_val=enabled)
 
@@ -306,35 +307,36 @@ class QuerySet:
             return result
         # Fast non-polymorphic path
         coll = _collection_fields(doc_cls)
-        use_validate = self._validate_val
-        if use_validate:
-            hydrate = doc_cls.model_validate
+        use_construct = not self._validate_val
+        if use_construct:
+            # model_construct() fast path — skip Pydantic validation
+            construct = doc_cls.model_construct
+            if not rows:
+                return []
+            # All rows from the same CQL query share identical column sets,
+            # so we compute _fields_set once and reuse across the batch.
+            fields = set(rows[0].keys())
             if not coll:
-                return [hydrate(row) for row in rows]
+                return [construct(_fields_set=fields, **row) for row in rows]
+            # Collection factories replace None→empty container in-place;
+            # they do not add/remove keys, so _fields_set stays correct.
             result = []
             for row in rows:
                 for key, factory in coll.items():
                     if key in row and row[key] is None:
                         row[key] = factory()
-                result.append(hydrate(row))
+                result.append(construct(_fields_set=fields, **row))
             return result
-        # model_construct() fast path — skip Pydantic validation
-        construct = doc_cls.model_construct
-        if not rows:
-            return []
-        # All rows from the same CQL query share identical column sets,
-        # so we compute _fields_set once and reuse across the batch.
-        fields = set(rows[0].keys())
+        # Default path — model_validate() with full type coercion
+        validate = doc_cls.model_validate
         if not coll:
-            return [construct(_fields_set=fields, **row) for row in rows]
-        # Collection factories replace None→empty container in-place;
-        # they do not add/remove keys, so _fields_set stays correct.
+            return [validate(row) for row in rows]
         result = []
         for row in rows:
             for key, factory in coll.items():
                 if key in row and row[key] is None:
                     row[key] = factory()
-            result.append(construct(_fields_set=fields, **row))
+            result.append(validate(row))
         return result
 
     async def paged_all(self) -> PagedResult:

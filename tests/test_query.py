@@ -888,38 +888,38 @@ def test_validate_false_returns_new_queryset(Item, queryset_cls, registered_mock
     assert qs._validate_val is False
 
 
-def test_default_validate_is_false(Item, queryset_cls, registered_mock_driver):
+def test_default_validate_is_true(Item, queryset_cls, registered_mock_driver):
     qs = queryset_cls(Item)
-    assert qs._validate_val is False
+    assert qs._validate_val is True
 
 
-async def test_all_default_uses_model_construct(Item, queryset_cls, registered_mock_driver):
-    """Default path uses model_construct (no validation) — result is still an Item instance."""
+async def test_all_default_uses_model_validate(Item, queryset_cls, registered_mock_driver):
+    """Default path uses model_validate (with type coercion) — result is an Item instance."""
     uid = uuid4()
-    registered_mock_driver.set_return_rows([{"id": uid, "name": "Constructed", "rating": 5}])
+    registered_mock_driver.set_return_rows([{"id": uid, "name": "Validated", "rating": 5}])
     results = await _maybe_await(queryset_cls(Item).all)
     assert len(results) == 1
     assert isinstance(results[0], Item)
     assert results[0].id == uid
-    assert results[0].name == "Constructed"
+    assert results[0].name == "Validated"
     assert results[0].rating == 5
 
 
-async def test_all_validate_true_uses_model_validate(Item, queryset_cls, registered_mock_driver):
-    """validate(True) forces model_validate path — result is still an Item instance."""
+async def test_all_validate_false_uses_model_construct(Item, queryset_cls, registered_mock_driver):
+    """validate(False) forces model_construct path — result is still an Item instance."""
     uid = uuid4()
-    registered_mock_driver.set_return_rows([{"id": uid, "name": "Validated", "rating": 3}])
-    results = await _maybe_await(queryset_cls(Item).validate(True).all)
+    registered_mock_driver.set_return_rows([{"id": uid, "name": "Constructed", "rating": 3}])
+    results = await _maybe_await(queryset_cls(Item).validate(False).all)
     assert len(results) == 1
     assert isinstance(results[0], Item)
-    assert results[0].name == "Validated"
+    assert results[0].name == "Constructed"
 
 
 async def test_model_construct_preserves_fields_set(Item, queryset_cls, registered_mock_driver):
     """model_construct sets _fields_set correctly from row keys."""
     uid = uuid4()
     registered_mock_driver.set_return_rows([{"id": uid, "name": "Test", "rating": 1}])
-    results = await _maybe_await(queryset_cls(Item).all)
+    results = await _maybe_await(queryset_cls(Item).validate(False).all)
     assert results[0].model_fields_set == {"id", "name", "rating"}
 
 

@@ -79,10 +79,10 @@ class AbstractDriver(ABC):
         """Async version of :meth:`sync_table`."""
 
     # ------------------------------------------------------------------
-    # Scalar helpers (default implementations; drivers may override)
+    # One-row helpers (default implementations; drivers may override)
     # ------------------------------------------------------------------
 
-    def execute_scalar(
+    def execute_one(
         self,
         stmt: str,
         params: list[Any],
@@ -95,14 +95,14 @@ class AbstractDriver(ABC):
             return next(iter(rows[0].values()))
         return None
 
-    async def execute_scalar_async(
+    async def execute_one_async(
         self,
         stmt: str,
         params: list[Any],
         consistency: str | None = None,
         timeout: float | None = None,
     ) -> Any:
-        """Async version of :meth:`execute_scalar`."""
+        """Async version of :meth:`execute_one`."""
         rows = await self.execute_async(stmt, params, consistency=consistency, timeout=timeout)
         if rows:
             return next(iter(rows[0].values()))

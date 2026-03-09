@@ -929,21 +929,21 @@ async def test_model_construct_empty_rows_returns_empty(Item, queryset_cls, regi
     assert results == []
 
 
-async def test_count_uses_scalar_path(Item, queryset_cls, registered_mock_driver):
-    """count() uses the execute_scalar path."""
+async def test_count_uses_one_path(Item, queryset_cls, registered_mock_driver):
+    """count() uses the execute_one path."""
     registered_mock_driver.set_return_rows([{"count": 99}])
     count = await _maybe_await(queryset_cls(Item).count)
     assert count == 99
 
 
 async def test_count_returns_zero_on_none(Item, queryset_cls, registered_mock_driver):
-    """count() returns 0 when scalar returns None (empty result)."""
+    """count() returns 0 when execute_one returns None (empty result)."""
     count = await _maybe_await(queryset_cls(Item).count)
     assert count == 0
 
 
-async def test_aggregate_uses_scalar_path(Item, queryset_cls, registered_mock_driver):
-    """_aggregate/sum/avg use the execute_scalar path."""
+async def test_aggregate_uses_one_path(Item, queryset_cls, registered_mock_driver):
+    """_aggregate/sum/avg use the execute_one path."""
     registered_mock_driver.set_return_rows([{"system.sum(rating)": 42}])
     result = await _maybe_await(lambda: queryset_cls(Item).sum("rating"))
     assert result == 42

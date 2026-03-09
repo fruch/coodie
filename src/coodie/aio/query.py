@@ -372,7 +372,7 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        val = await self._get_driver().execute_scalar_async(
+        val = await self._get_driver().execute_one_async(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val
         )
         return int(val) if val is not None else 0
@@ -387,7 +387,7 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        return await self._get_driver().execute_scalar_async(
+        return await self._get_driver().execute_one_async(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val
         )
 

@@ -228,10 +228,10 @@ class CassandraDriver(AbstractDriver):
         return {r["index_name"] for r in self._rows_to_dicts(rows)}
 
     # ------------------------------------------------------------------
-    # Scalar shortcut — bypasses _rows_to_dicts() and list() allocation
+    # One-row shortcut — bypasses _rows_to_dicts() and list() allocation
     # ------------------------------------------------------------------
 
-    def execute_scalar(
+    def execute_one(
         self,
         stmt: str,
         params: list[Any],
@@ -257,7 +257,7 @@ class CassandraDriver(AbstractDriver):
             return next(iter(row._asdict().values()))
         return row[0]
 
-    async def execute_scalar_async(
+    async def execute_one_async(
         self,
         stmt: str,
         params: list[Any],

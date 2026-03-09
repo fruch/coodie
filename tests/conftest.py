@@ -99,7 +99,7 @@ class MockDriver:
         self._last_paging_state = self._pop_paging_state()
         return self._pop_rows()
 
-    def execute_scalar(
+    def execute_one(
         self,
         stmt: str,
         params: list[Any],
@@ -114,7 +114,7 @@ class MockDriver:
             return next(iter(rows[0].values()))
         return None
 
-    async def execute_scalar_async(
+    async def execute_one_async(
         self,
         stmt: str,
         params: list[Any],

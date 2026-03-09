@@ -2195,14 +2195,14 @@ the `model_construct()` fast path when driver-returned types match exactly.
 
 **Files changed**: `src/coodie/aio/query.py`, `src/coodie/sync/query.py`, `src/coodie/lazy.py`
 
-#### Task 9.2 — COUNT / aggregate scalar shortcut ✅
+#### Task 9.2 — COUNT / aggregate one-row shortcut ✅
 
-Added `execute_scalar()` and `execute_scalar_async()` methods to `AbstractDriver`
+Added `execute_one()` and `execute_one_async()` methods to `AbstractDriver`
 with default implementations that delegate to `execute`/`execute_async`.  Overrode
 in `CassandraDriver` to use `result.one()` directly, bypassing `_rows_to_dicts()`
 and `list()` allocation entirely.
 
-Updated `count()` and `_aggregate()` in both QuerySet variants to use the scalar path.
+Updated `count()` and `_aggregate()` in both QuerySet variants to use the one-row path.
 
 **Files changed**: `src/coodie/drivers/base.py`, `src/coodie/drivers/cassandra.py`,
 `src/coodie/aio/query.py`, `src/coodie/sync/query.py`, `tests/conftest.py`

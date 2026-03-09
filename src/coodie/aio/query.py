@@ -78,7 +78,7 @@ class QuerySet:
         group_by_val: list[str] | None = None,
         select_token_val: list[str] | None = None,
         cast_val: list[tuple[str, str]] | None = None,
-        validate_val: bool = True,
+        validate_val: bool = False,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -231,10 +231,10 @@ class QuerySet:
         """Enable or disable Pydantic validation when hydrating rows.
 
         By default, rows from the database are hydrated using
-        ``model_validate()`` which performs full type coercion and runs
-        custom validators.  Call ``.validate(False)`` to switch to
-        ``model_construct()`` which skips validation for speed — only safe
-        when driver-returned types match the model field types exactly.
+        ``model_construct()`` which skips validation for speed.
+        Call ``.validate()`` to switch to ``model_validate()`` which
+        performs full type coercion and runs custom validators — useful
+        when driver-returned types may not match model field types exactly.
         """
         return self._clone(validate_val=enabled)
 

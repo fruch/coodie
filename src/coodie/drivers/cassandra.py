@@ -277,8 +277,12 @@ class CassandraDriver(AbstractDriver):
         result = await self._wrap_future(future)
         if result is None:
             return None
-        # The callback bridge receives a ResultSet which supports .one()
-        row = result.one()
+        # The callback bridge delivers a plain list (not a ResultSet),
+        # so we index into it directly instead of using .one().
+        if isinstance(result, list):
+            row = result[0] if result else None
+        else:
+            row = result.one()
         if row is None:
             return None
         if isinstance(row, dict):

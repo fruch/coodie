@@ -370,9 +370,7 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        val = self._get_driver().execute_one(
-            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
-        )
+        val = self._get_driver().execute_one(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
         return int(val) if val is not None else 0
 
     def _aggregate(self, func: str, column: str) -> Any:
@@ -385,9 +383,7 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        return self._get_driver().execute_one(
-            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
-        )
+        return self._get_driver().execute_one(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
 
     def aggregate(self, **funcs: str) -> dict[str, Any]:
         """Execute one or more aggregate functions.

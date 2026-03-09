@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772921386780,
+  "lastUpdate": 1773015252329,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -11958,6 +11958,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.897918751017688e-7",
             "extra": "mean: 5.379767262002004 usec\nrounds: 7777"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "198982749+Copilot@users.noreply.github.com",
+            "name": "copilot-swe-agent[bot]",
+            "username": "Copilot"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "91c05cb6fd9901401a7f39e731c423f3afe5691d",
+          "message": "fix(ci): clarify relationship between MAX_CONTENT_LENGTH and CHUNK_THRESHOLD constants\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-03-09T02:13:22+02:00",
+          "tree_id": "c6fe2b9b1a75bf15ef40332826d4b25afc1f93cc",
+          "url": "https://github.com/fruch/coodie/commit/91c05cb6fd9901401a7f39e731c423f3afe5691d"
+        },
+        "date": 1773015251504,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53365.87193148531,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015834686233509498",
+            "extra": "mean: 18.73856762396513 usec\nrounds: 8148"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1758250.4545945306,
+            "unit": "iter/sec",
+            "range": "stddev: 2.1358827325826673e-7",
+            "extra": "mean: 568.7471869476124 nsec\nrounds: 168322"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 155512.60743676202,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007892958760976772",
+            "extra": "mean: 6.430346815493029 usec\nrounds: 18543"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 577183.3375453858,
+            "unit": "iter/sec",
+            "range": "stddev: 4.4506334874550367e-7",
+            "extra": "mean: 1.732551747340362 usec\nrounds: 41606"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 597265.5141684565,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0272081696052164e-7",
+            "extra": "mean: 1.6742972367863076 usec\nrounds: 52258"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 809122.9209336174,
+            "unit": "iter/sec",
+            "range": "stddev: 3.3904864859333104e-7",
+            "extra": "mean: 1.2359061573068977 usec\nrounds: 145307"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 822186.666779877,
+            "unit": "iter/sec",
+            "range": "stddev: 4.6652295413876924e-7",
+            "extra": "mean: 1.2162688114568132 usec\nrounds: 29902"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 702920.6002380255,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5302848733345686e-7",
+            "extra": "mean: 1.4226357851247726 usec\nrounds: 126343"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 184072.1603776322,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010000309120597356",
+            "extra": "mean: 5.432652053132075 usec\nrounds: 6478"
           }
         ]
       }

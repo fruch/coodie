@@ -301,7 +301,15 @@ def build_select(
     # Build the cache key from the query *shape* (excludes actual values).
     where_shape: tuple = ()
     if where:
-        where_shape = tuple((col, op, len(value)) if op == "IN" else (col, op) for col, op, value in where)
+        shape_parts = []
+        for col, op, value in where:
+            if op == "IN":
+                shape_parts.append((col, op, len(value)))
+            elif op == "ISNULL":
+                shape_parts.append((col, op, value))
+            else:
+                shape_parts.append((col, op))
+        where_shape = tuple(shape_parts)
     ann_shape: tuple | None = None
     if ann_of is not None:
         ann_shape = (ann_of[0], len(ann_of[1]))

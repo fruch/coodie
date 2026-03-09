@@ -301,12 +301,6 @@ def build_select(
     # Build the cache key from the query *shape* (excludes actual values).
     where_shape: tuple = ()
     if where:
-    distinct: bool = False,
-    group_by: list[str] | None = None,
-    select_token: list[str] | None = None,
-    cast: list[tuple[str, str]] | None = None,
-    ann_of: tuple[str, list[float]] | None = None,
-    ) -> tuple[str, list[Any]]:
         where_shape = tuple((col, op, len(value)) if op == "IN" else (col, op) for col, op, value in where)
     ann_shape: tuple | None = None
     if ann_of is not None:
@@ -369,9 +363,10 @@ def build_select(
     if group_by:
         gb_parts = ", ".join(f'"{c}"' for c in group_by)
         cql += f" GROUP BY {gb_parts}"
-    elif ann_of is not None:
+
+    if ann_of is not None:
         cql += f' ORDER BY "{ann_of[0]}" ANN OF ?'
-    if order_by:
+    elif order_by:
         order_parts = []
         for col in order_by:
             if col.startswith("-"):

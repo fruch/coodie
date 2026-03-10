@@ -2152,30 +2152,30 @@ ORM overhead. Updated targets:
 
 ### 13G.6 Phase 9 Priority Matrix
 
-| Task | Priority | Effort | Expected Impact | Target Benchmarks |
-|------|----------|--------|-----------------|-------------------|
-| 9.1 `model_construct()` for DB data | **P0** | Medium (~20 lines) | −40–60% multi-row reads | model-instantiation, filter-secondary-index |
-| 9.2 COUNT scalar shortcut | **P0** | Small (~10 lines) | −30–40% COUNT | count |
-| 9.3 Partial-update PK cache | **P0** | Small (~15 lines) | −25–35% partial-update | partial-update |
-| §13E Task 8.1 Fair benchmark for partial UPDATE | **P0** | Small (benchmark only) | Reveals true ratio | partial-update |
-| 9.4 Batch `model_construct()` | **P1** | Small (~10 lines) | −5–10% multi-row | filter-secondary-index, filter-limit |
-| 9.5 LWT result shortcut | **P1** | Small (~20 lines) | −15–20% LWT | update-if-condition |
-| §13E Task 8.2 Cache build_count/update/delete | **P1** | Small (~60 lines) | −3–5% on affected ops | count, update, delete |
-| §13E Task 8.3 Pre-compile `_snake_case` regex | **P1** | Tiny (~8 lines) | −1–2 µs per query | All operations |
-| §13E Task 8.6 Dirty-field tracking for save() | **P2** | Medium (~50 lines) | −10–30% read-modify-write | status_update, list_mutation |
+| Task | Priority | Effort | Expected Impact | Target Benchmarks | Status |
+|------|----------|--------|-----------------|-------------------|--------|
+| 9.1 `model_construct()` for DB data | **P0** | Medium (~20 lines) | −40–60% multi-row reads | model-instantiation, filter-secondary-index | ✅ Done (PR #196) |
+| 9.2 COUNT scalar shortcut | **P0** | Small (~10 lines) | −30–40% COUNT | count | ✅ Done (PR #196) |
+| 9.3 Partial-update PK cache | **P0** | Small (~15 lines) | −25–35% partial-update | partial-update | ✅ Done (Phase 5) |
+| §13E Task 8.1 Fair benchmark for partial UPDATE | **P0** | Small (benchmark only) | Reveals true ratio | partial-update | Pending |
+| 9.4 Batch `model_construct()` | **P1** | Small (~10 lines) | −5–10% multi-row | filter-secondary-index, filter-limit | ✅ Done (PR #196) |
+| 9.5 LWT result shortcut | **P1** | Small (~20 lines) | −15–20% LWT | update-if-condition | Skipped (overhead negligible) |
+| §13E Task 8.2 Cache build_count/update/delete | **P1** | Small (~60 lines) | −3–5% on affected ops | count, update, delete | Pending |
+| §13E Task 8.3 Pre-compile `_snake_case` regex | **P1** | Tiny (~8 lines) | −1–2 µs per query | All operations | Pending |
+| §13E Task 8.6 Dirty-field tracking for save() | **P2** | Medium (~50 lines) | −10–30% read-modify-write | status_update, list_mutation | Pending |
 
-### 13G.7 Expected Outcome After Phase 9
+### 13G.7 Expected vs Actual Outcome After Phase 9
 
-If tasks 9.1–9.5 are implemented alongside the remaining Phase 8 tasks:
+Tasks 9.1, 9.2, 9.4 implemented. Task 9.3 was already done in Phase 5. Task 9.5 not needed.
 
-| Metric | Current (Phase 8) | Expected (Phase 9) |
-|--------|-------------------|---------------------|
-| Benchmarks won vs cqlengine | 27 of 34 | **30–32 of 34** |
-| Worst loss vs Raw+DC | model-instantiation (3.01×) | partial-update (~1.3×) |
-| CRUD write overhead vs Raw+DC | 1.00–1.06× | 1.00–1.06× (maintained) |
-| CRUD read overhead vs Raw+DC | 1.06–1.13× | 1.06–1.15× (maintained) |
-| Multi-row read overhead vs Raw+DC | 2.00× | ~1.2–1.4× |
-| COUNT overhead vs Raw+DC | 1.66× | ~1.1× |
+| Metric | Pre-Phase 9 | Expected (Phase 9) | **Actual (Phase 9)** | Notes |
+|--------|-------------|---------------------|----------------------|-------|
+| Benchmarks won vs cqlengine | 27 of 34 | 30–32 of 34 | **28 of 34** | +1 (batch_insert_10 unmeasured before) |
+| Worst loss vs Raw+DC | model-instantiation (3.01×) | partial-update (~1.3×) | **model-instantiation (3.21×)** | Still dominated by Pydantic overhead in micro-bench |
+| CRUD write overhead vs Raw+DC | 1.00–1.06× | 1.00–1.06× | **1.00–1.09×** | Maintained |
+| CRUD read overhead vs Raw+DC | 1.06–1.13× | 1.06–1.15× | **1.12–1.20×** | Slightly wider range |
+| Multi-row read overhead vs Raw+DC | 2.00× | ~1.2–1.4× | **2.63×** ⚠️ | See analysis below |
+| COUNT overhead vs Raw+DC | 1.66× | ~1.1× | **1.64×** ⚠️ | Marginal improvement |
 
 ### 13G.8 Implementation Notes (2026-03-07)
 
@@ -2186,14 +2186,26 @@ and `sync/query.py`.  When enabled, skips Pydantic validation and pre-computes
 `_fields_set` once from the first row's keys, reusing it across all rows in the
 batch (Task 9.4 optimization).
 
-The default remains `model_validate()` (safe — performs full type coercion) because
-some drivers (e.g. acsylla) return raw types (UUIDs as strings) that require
-Pydantic coercion.  Added `QuerySet.validate(False)` chain method to opt in to
-the `model_construct()` fast path when driver-returned types match exactly.
+The hydration path is **driver-aware** via `needs_row_validation` flag on
+`AbstractDriver`:
+- **CassandraDriver** (`needs_row_validation = False`): uses `model_construct()`
+  by default — fast, skips Pydantic validation, because `dict_factory` returns
+  properly typed Python values.
+- **AcsyllaDriver** (`needs_row_validation = True`): auto-selects `model_validate()`
+  because acsylla returns UUIDs as strings needing Pydantic coercion.
+- **PythonRsDriver** (`needs_row_validation = True`): auto-selects `model_validate()`
+  because python-rs-driver returns UDTs as plain dicts.
+
+`validate_val` is tri-state (`None` | `True` | `False`):
+- `None` (default): auto-detect from `driver.needs_row_validation`
+- `True` (via `.validate()`): force `model_validate()` regardless of driver
+- `False` (via `.validate(False)`): force `model_construct()` regardless of driver
 
 `LazyDocument._resolve()` uses `model_validate()` for correctness.
 
-**Files changed**: `src/coodie/aio/query.py`, `src/coodie/sync/query.py`, `src/coodie/lazy.py`
+**Files changed**: `src/coodie/aio/query.py`, `src/coodie/sync/query.py`,
+`src/coodie/lazy.py`, `src/coodie/drivers/base.py`, `src/coodie/drivers/acsylla.py`,
+`src/coodie/drivers/python_rs.py`
 
 #### Task 9.2 — COUNT / aggregate one-row shortcut ✅
 
@@ -2220,6 +2232,95 @@ The existing `_parse_lwt_result()` implementation is already efficient: it reads
 fields.  The overhead is minimal (single row, single dict operation) and does not
 warrant a new driver-level method.  **No changes made** — the existing
 implementation is adequate.
+
+### 13G.9 Phase 9 Benchmark Results (2026-03-10)
+
+**Source**: [CI Run #22913626559](https://github.com/fruch/coodie/actions/runs/22913626559/job/66533951477)
+**Commit**: `f6df339` (scylla driver, CassandraDriver with `model_construct()` fast path)
+
+#### Coodie vs cqlengine (higher = coodie faster)
+
+| Benchmark | coodie (iter/sec) | cqlengine (iter/sec) | Ratio | Winner |
+|-----------|-------------------|----------------------|-------|--------|
+| sync_table_noop | 207,048 | 6,008 | **34.46×** | ✅ coodie |
+| sync_table_create | 211,238 | 7,619 | **27.73×** | ✅ coodie |
+| batch_insert_100 | 496 | 20 | **25.30×** | ✅ coodie |
+| model_instantiation | 474,039 | 77,206 | **6.14×** | ✅ coodie |
+| udt_instantiation | 691,632 | 259,742 | **2.66×** | ✅ coodie |
+| model_serialization | 509,881 | 215,540 | **2.37×** | ✅ coodie |
+| filter_secondary_index | 276 | 118 | **2.33×** | ✅ coodie |
+| filter_limit | 1,487 | 868 | **1.71×** | ✅ coodie |
+| collection_write | 2,201 | 1,552 | **1.42×** | ✅ coodie |
+| get_by_pk | 2,070 | 1,508 | **1.37×** | ✅ coodie |
+| collection_read | 2,041 | 1,491 | **1.37×** | ✅ coodie |
+| insert_with_ttl | 2,194 | 1,633 | **1.34×** | ✅ coodie |
+| collection_roundtrip | 986 | 737 | **1.34×** | ✅ coodie |
+| single_insert | 2,171 | 1,632 | **1.33×** | ✅ coodie |
+| bulk_delete | 1,137 | 862 | **1.32×** | ✅ coodie |
+| single_delete | 1,142 | 921 | **1.24×** | ✅ coodie |
+| insert_if_not_exists | 936 | 804 | **1.16×** | ✅ coodie |
+| count | 668 | 606 | **1.10×** | ✅ coodie |
+| udt_serialization | 664,504 | 787,872 | 0.84× | ❌ cqlengine |
+| update_if_condition | 660 | 818 | 0.81× | ❌ cqlengine |
+| partial_update | 1,052 | 1,891 | 0.56× | ❌ cqlengine |
+| nested_udt_serialization | 591,460 | 1,196,064 | 0.49× | ❌ cqlengine |
+| udt_ddl_generation | 119,516 | 622,712 | 0.19× | ❌ cqlengine |
+
+**Score: 18 wins, 5 losses** (out of 23 matched benchmarks; batch_insert_10 has no cqlengine pair).
+
+#### Coodie vs Raw DC overhead (lower = closer to raw CQL)
+
+| Benchmark | coodie (iter/sec) | raw DC (iter/sec) | Overhead | Status |
+|-----------|-------------------|-------------------|----------|--------|
+| single_delete | 1,142 | 1,143 | **1.00×** | ✅ Zero overhead |
+| batch_insert_10 | 1,694 | 1,739 | **1.03×** | ✅ Negligible |
+| insert_if_not_exists | 936 | 967 | **1.03×** | ✅ Negligible |
+| bulk_delete | 1,137 | 1,197 | **1.05×** | ✅ Minimal |
+| collection_write | 2,201 | 2,328 | **1.06×** | ✅ Minimal |
+| insert_with_ttl | 2,194 | 2,351 | **1.07×** | ✅ Minimal |
+| single_insert | 2,171 | 2,374 | **1.09×** | ✅ Good |
+| get_by_pk | 2,070 | 2,318 | **1.12×** | ✅ Good |
+| collection_read | 2,041 | 2,299 | **1.13×** | ✅ Good |
+| collection_roundtrip | 986 | 1,131 | **1.15×** | ✅ Good |
+| filter_limit | 1,487 | 1,783 | **1.20×** | ⚠️ Moderate |
+| update_if_condition | 660 | 1,063 | **1.61×** | ⚠️ High |
+| count | 668 | 1,096 | **1.64×** | ⚠️ High |
+| partial_update | 1,052 | 2,584 | **2.46×** | ❌ High |
+| filter_secondary_index | 276 | 725 | **2.63×** | ❌ High |
+| model_instantiation | 474,039 | 1,522,666 | **3.21×** | ❌ High |
+
+#### Micro-benchmarks (standalone, not DB-backed)
+
+| Benchmark | coodie | raw DC | Ratio |
+|-----------|--------|--------|-------|
+| model_instantiation | 474,039 iter/sec (2.11 µs) | 1,522,666 iter/sec (0.66 µs) | 3.21× overhead |
+| model_serialization | 509,881 iter/sec (1.96 µs) | 96,767 iter/sec (10.33 µs) | **0.19× (coodie 5.27× faster)** 🚀 |
+
+#### Analysis — Phase 9 impact vs pre-Phase 9 targets
+
+**Hits:**
+- ✅ **Write path still zero-overhead** (1.00–1.09× vs raw DC) — maintained from Phase 8
+- ✅ **model_instantiation vs cqlengine improved** from 5.8× → **6.14×** faster
+- ✅ **execute_one() shortcut works** — COUNT now uses one-row path (no list allocation)
+- ✅ **Driver-aware auto-detection** — CassandraDriver uses fast `model_construct()`, acsylla/python-rs auto-use `model_validate()`
+
+**Misses:**
+- ⚠️ **COUNT overhead vs raw DC**: 1.64× (target was ≤1.10×). The `execute_one()` shortcut saves the list allocation but the CQL building + prepared statement overhead remains. The benchmark measures `count()` which still builds CQL, prepares, executes, and extracts the scalar — the DB round-trip dominates.
+- ⚠️ **filter_secondary_index overhead vs raw DC**: 2.63× (target was ≤1.30×). This is worse than pre-Phase 9 (2.00×). Root cause: the raw DC benchmark filters 10 rows from a larger dataset — the overhead is likely Pydantic model hydration for 10 rows even with `model_construct()`, plus CQL building overhead per query.
+- ⚠️ **model_instantiation micro-bench**: 3.21× (target was ≤1.50×). `model_construct()` saves ~60% vs `model_validate()` but Pydantic's `model_construct()` is still 3× slower than raw dataclass construction. This is Pydantic's internal overhead, not coodie's.
+- ⚠️ **partial_update**: 2.46× (target was ≤1.30×). This was expected to improve from PK cache (Task 9.3), but PK cache was already done in Phase 5 and the benchmark still measures the full read-modify-write cycle.
+
+#### Remaining gaps for future phases
+
+| Gap | Current | Root cause | Suggested fix |
+|-----|---------|------------|---------------|
+| partial_update (2.46× vs raw DC) | 0.56× vs cqlengine | coodie does GET+UPDATE (2 round-trips) vs cqlengine's 1 | §13E Task 8.1: Fair benchmark or dirty-field tracking |
+| filter_secondary_index (2.63× vs raw DC) | 2.33× vs cqlengine | 10-row model hydration + CQL overhead | Cache `build_select` for repeated queries (§13E Task 8.2) |
+| COUNT (1.64× vs raw DC) | 1.10× vs cqlengine | CQL building + prepare overhead on scalar path | Cache `build_count` CQL string (§13E Task 8.2) |
+| update_if_condition (1.61× vs raw DC) | 0.81× vs cqlengine | LWT overhead in coodie's update path | §13E Task 8.2: Cache build_update CQL |
+| model_instantiation (3.21× vs raw DC) | 6.14× vs cqlengine | Pydantic `model_construct()` inherent overhead | Not actionable — Pydantic internal cost |
+| nested_udt_serialization (0.49× vs cqlengine) | N/A | Pydantic recursive model_dump vs dataclasses.asdict | Accepted trade-off for type safety |
+| udt_ddl_generation (0.19× vs cqlengine) | N/A | coodie generates full CQL DDL vs cqlengine's simpler path | Accepted — DDL gen is one-time cost |
 
 ---
 
@@ -2274,6 +2375,15 @@ implementation is adequate.
 - **cqlengine is universally slower than coodie**: In 16 of 18 Raw+DC benchmarks, coodie
   outperforms cqlengine, confirming coodie's ORM layer is lighter than cqlengine in
   virtually all scenarios.
+- **After Phase 9 (PR #196), coodie wins 18 of 23 matched benchmarks vs cqlengine** on the
+  scylla (CassandraDriver) path. The `model_construct()` fast path + `execute_one()` shortcut
+  deliver: model instantiation **6.14× faster** (vs 5.8× pre-Phase 9), write path maintains
+  **zero overhead** (1.00–1.09× vs raw DC). COUNT improved marginally (1.10× vs cqlengine,
+  still 1.64× vs raw DC). The main gaps remain: partial UPDATE (0.56× vs cqlengine — extra
+  DB round-trip), filter-secondary-index (2.63× vs raw DC — multi-row hydration), and
+  3 UDT/DDL micro-benchmarks (accepted Pydantic trade-offs). Driver-aware auto-detection
+  via `needs_row_validation` flag ensures acsylla/python-rs drivers auto-use `model_validate()`
+  while CassandraDriver gets the fast `model_construct()` path.
 
 ---
 
@@ -2575,10 +2685,10 @@ improvement on real-world workloads.
 | 14.5.3 Native async (paginated) | **Medium** (50 lines) | **High** (−20–40% async) | Medium | **P1** |
 | 14.5.4 `__slots__` on remaining classes | **Small** (10 lines) | **Low** (−2–5%) | Low | ✅ Done |
 | 14.5.6 Connection-level optimizations | **Small** (config) | **Medium** (−5–15%) | Low | ✅ Done |
-| §13G Task 9.1 `model_construct()` for DB data | **Medium** (~20 lines) | **High** (−40–60% multi-row reads) | Medium | **P0** |
-| §13G Task 9.2 COUNT scalar shortcut | **Small** (~10 lines) | **Medium** (−30–40% COUNT) | Low | **P0** |
-| §13G Task 9.3 Partial-update PK cache | **Small** (~15 lines) | **Medium** (−25–35% updates) | Low | **P0** |
-| §13G Task 9.5 LWT result shortcut | **Small** (~20 lines) | **Medium** (−15–20% LWT) | Low | **P1** |
+| §13G Task 9.1 `model_construct()` for DB data | **Medium** (~20 lines) | **High** (−40–60% multi-row reads) | Medium | ✅ Done (PR #196) |
+| §13G Task 9.2 COUNT scalar shortcut | **Small** (~10 lines) | **Medium** (−30–40% COUNT) | Low | ✅ Done (PR #196) |
+| §13G Task 9.3 Partial-update PK cache | **Small** (~15 lines) | **Medium** (−25–35% updates) | Low | ✅ Done (Phase 5) |
+| §13G Task 9.5 LWT result shortcut | **Small** (~20 lines) | **Medium** (−15–20% LWT) | Low | Skipped (negligible) |
 | Cython compilation | **Large** (build infra) | **Low** (−2–5%) | High | ❌ Not recommended |
 | Rust (PyO3) extension | **Very Large** (800+ LOC) | **Low** (−2–4%) | High | ❌ Not recommended |
 | 14.5.5 msgspec internals | **Medium** (new dep) | **Low** (−5–10%) | Medium | ❌ Not recommended now |
@@ -2595,10 +2705,11 @@ are caused by **extra DB round-trips** in coodie's read-modify-write pattern, no
 by Python execution speed. Native compilation cannot fix I/O patterns.
 
 The highest-ROI next steps (informed by Raw+DC benchmarks from PR #187) are:
-1. **`model_construct()` for DB data** — eliminates redundant Pydantic validation on reads (P0)
-2. **COUNT scalar shortcut** — bypasses full result hydration for scalar queries (P0)
-3. **Partial UPDATE PK cache** — closes the 2.35× gap on the worst benchmark (P0)
+1. ~~**`model_construct()` for DB data**~~ ✅ Done (PR #196) — driver-aware auto-detection
+2. ~~**COUNT scalar shortcut**~~ ✅ Done (PR #196) — `execute_one()` bypasses list allocation
+3. **Partial UPDATE PK cache** — ✅ Done (Phase 5), but 2.46× gap remains due to extra round-trip; needs fair benchmark (§13E Task 8.1) or dirty-field tracking (§13E Task 8.6)
 4. **Native async for paginated queries** — eliminates thread-pool overhead (P1)
+5. **Cache build_count/update/delete CQL** — §13E Task 8.2, would close COUNT 1.64× gap
 
 These pure-Python changes are estimated to improve overall performance by
 15–40% on affected operations, far exceeding what Cython or Rust could deliver

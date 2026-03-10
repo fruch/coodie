@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773178603567,
+  "lastUpdate": 1773183805682,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -12306,6 +12306,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.265297814212797e-7",
             "extra": "mean: 5.565321582997754 usec\nrounds: 7631"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "8e27db80d5e8fd158aef7f58bbf282e52a45a4aa",
+          "message": "docs(plans): add Phase 10 performance improvement plan with 9 targeted optimizations\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-11T01:02:46+02:00",
+          "tree_id": "88b5fcd9e423f5b004a4eba27fdffdf583ad9c8f",
+          "url": "https://github.com/fruch/coodie/commit/8e27db80d5e8fd158aef7f58bbf282e52a45a4aa"
+        },
+        "date": 1773183804647,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53419.55937128613,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016617542107921262",
+            "extra": "mean: 18.719735088970353 usec\nrounds: 7025"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1693135.617368042,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7756420234062286e-7",
+            "extra": "mean: 590.6201427352213 nsec\nrounds: 182150"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 151094.9667709403,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008286372452028547",
+            "extra": "mean: 6.618354147534235 usec\nrounds: 18529"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 571197.2625461939,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0283574897703647e-7",
+            "extra": "mean: 1.7507086703153238 usec\nrounds: 39814"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 611404.2357970023,
+            "unit": "iter/sec",
+            "range": "stddev: 4.148480162390017e-7",
+            "extra": "mean: 1.6355791168120377 usec\nrounds: 45041"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 845745.1678159372,
+            "unit": "iter/sec",
+            "range": "stddev: 3.469128791627076e-7",
+            "extra": "mean: 1.182389256308035 usec\nrounds: 139412"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 800216.0434448923,
+            "unit": "iter/sec",
+            "range": "stddev: 3.4907429372714665e-7",
+            "extra": "mean: 1.2496625232544043 usec\nrounds: 73611"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 736774.1872221694,
+            "unit": "iter/sec",
+            "range": "stddev: 3.186005618469826e-7",
+            "extra": "mean: 1.357267962617231 usec\nrounds: 89199"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 188150.5002667756,
+            "unit": "iter/sec",
+            "range": "stddev: 9.083806382267908e-7",
+            "extra": "mean: 5.314894186207933 usec\nrounds: 7551"
           }
         ]
       }

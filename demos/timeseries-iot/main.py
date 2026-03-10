@@ -51,6 +51,14 @@ def _utc_today() -> date:
 DEVICE_SENSORS: list[str] = []  # populated at startup from DB or defaults
 _bg_task: asyncio.Task[None] | None = None
 
+_DEFAULT_SENSORS = [
+    "reactor-core-A1",
+    "coolant-loop-B2",
+    "exhaust-vent-C3",
+    "cryo-chamber-D4",
+    "engine-bay-E5",
+]
+
 
 def _generate_live_reading(sensor_id: str) -> dict:
     """Generate a single sensor reading with realistic-ish values."""
@@ -59,25 +67,13 @@ def _generate_live_reading(sensor_id: str) -> dict:
 
 async def _background_device_loop() -> None:
     """Continuously generate new sensor readings for ALL sensors each cycle."""
-    default_sensors = [
-        "reactor-core-A1",
-        "coolant-loop-B2",
-        "exhaust-vent-C3",
-        "cryo-chamber-D4",
-        "engine-bay-E5",
-    ]
-
     # Wait briefly for startup to complete
     await asyncio.sleep(2)
 
-    # Discover existing sensors or use defaults
-    sensors = await _discover_sensors()
-    if not sensors:
-        sensors = default_sensors
-    DEVICE_SENSORS.clear()
-    DEVICE_SENSORS.extend(sensors)
+    # Discover existing sensors or use defaults; cache the result
+    await _ensure_sensors_loaded()
 
-    logger.info("Background device started — %d sensors, interval=%ss", len(sensors), DEVICE_INTERVAL)
+    logger.info("Background device started — %d sensors, interval=%ss", len(DEVICE_SENSORS), DEVICE_INTERVAL)
     while True:
         try:
             # Generate a new reading for EVERY sensor each cycle
@@ -93,8 +89,16 @@ async def _background_device_loop() -> None:
         await asyncio.sleep(DEVICE_INTERVAL)
 
 
-async def _discover_sensors() -> list[str]:
-    """Find existing sensor IDs from recent data."""
+async def _ensure_sensors_loaded() -> list[str]:
+    """Return cached sensor list, discovering from DB once if needed.
+
+    Populates ``DEVICE_SENSORS`` on the first call and reuses the cache
+    afterwards — avoids the ``ALLOW FILTERING`` full-table scan on every
+    dashboard refresh.
+    """
+    if DEVICE_SENSORS:
+        return DEVICE_SENSORS
+
     today = _utc_today()
     sensor_ids: set[str] = set()
     for day_offset in range(3):
@@ -102,7 +106,11 @@ async def _discover_sensors() -> list[str]:
         readings = await SensorReading.find(date_bucket=bucket).per_partition_limit(1).allow_filtering().all()
         for r in readings:
             sensor_ids.add(r.sensor_id)
-    return sorted(sensor_ids)
+
+    sensors = sorted(sensor_ids) if sensor_ids else list(_DEFAULT_SENSORS)
+    DEVICE_SENSORS.clear()
+    DEVICE_SENSORS.extend(sensors)
+    return DEVICE_SENSORS
 
 
 @asynccontextmanager
@@ -145,7 +153,7 @@ app = FastAPI(
 @app.get("/sensors")
 async def list_sensors() -> list[str]:
     """Return distinct sensor IDs found in the data."""
-    return DEVICE_SENSORS or await _discover_sensors()
+    return await _ensure_sensors_loaded()
 
 
 @app.get("/sensors/{sensor_id}/latest")
@@ -184,24 +192,42 @@ async def get_paged_readings(
     If ``start_date`` is given, queries partitions from that date forward to today.
     """
     if start_date and not bucket:
-        # Query across date range: collect from start_date to today (max 30 days)
+        # Query across date range: collect from start_date to today (max 30 days).
+        # Uses offset-based cursors (the offset is encoded in the cursor).
         today = _utc_today()
         max_range = timedelta(days=30)
         if today - start_date > max_range:
             start_date = today - max_range
+
+        offset = 0
+        if cursor:
+            try:
+                offset = int(base64.urlsafe_b64decode(cursor.encode()).decode())
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid cursor")
+
+        # Collect readings across all date partitions in the range
         all_readings: list[SensorReading] = []
         current = start_date
         while current <= today:
             qs = SensorReading.find(date_bucket=current)
             if sensor_id:
                 qs = qs.filter(sensor_id=sensor_id)
-            readings = await qs.per_partition_limit(page_size).allow_filtering().all()
+            readings = await qs.allow_filtering().all()
             all_readings.extend(readings)
             current += timedelta(days=1)
+
+        # Apply offset-based pagination
+        page_data = all_readings[offset : offset + page_size]
+        has_more = len(all_readings) > offset + page_size
+        next_cursor = None
+        if has_more:
+            next_cursor = base64.urlsafe_b64encode(str(offset + page_size).encode()).decode()
+
         return {
-            "data": [r.model_dump(mode="json") for r in all_readings[:page_size]],
-            "next_cursor": None,
-            "has_more": len(all_readings) > page_size,
+            "data": [r.model_dump(mode="json") for r in page_data],
+            "next_cursor": next_cursor,
+            "has_more": has_more,
         }
 
     qs = SensorReading.find()
@@ -298,7 +324,7 @@ async def ui_dashboard(request: Request) -> HTMLResponse:
     today = _utc_today()
     sensors: dict[str, list[SensorReading]] = {}
 
-    sensor_ids = DEVICE_SENSORS or await _discover_sensors()
+    sensor_ids = await _ensure_sensors_loaded()
 
     # Get latest 5 readings per sensor (today's partition)
     for sid in sensor_ids:
@@ -386,7 +412,7 @@ async def ui_paged_readings(
 @app.get("/ui/charts", response_class=HTMLResponse)
 async def ui_charts(request: Request) -> HTMLResponse:
     """Return the live charts partial with sensor list for Chart.js."""
-    sensor_ids = DEVICE_SENSORS or await _discover_sensors()
+    sensor_ids = await _ensure_sensors_loaded()
     device_active = _bg_task is not None and not _bg_task.done()
     return templates.TemplateResponse(
         "partials/charts.html",

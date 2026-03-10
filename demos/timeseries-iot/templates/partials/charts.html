@@ -1,0 +1,41 @@
+{% if sensor_ids %}
+  <div class="chart-grid">
+    {% for sid in sensor_ids %}
+      {% set prefix = sid | replace('-', '_') | replace('.', '_') %}
+      <div class="chart-card sensor-charts" data-sensor="{{ sid }}">
+        <h3>
+          📡 {{ sid }}
+          {% if device_active %}
+            <span class="live-dot" style="margin-left: auto;" title="Live data"></span>
+          {% endif %}
+        </h3>
+
+        <div style="font-size: 0.6rem; color: var(--dim); margin-bottom: 0.5rem; letter-spacing: 0.08em;">
+          🌡 TEMPERATURE (°C)
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="chart-temp-{{ prefix }}"></canvas>
+        </div>
+
+        <div style="font-size: 0.6rem; color: var(--dim); margin: 0.75rem 0 0.5rem; letter-spacing: 0.08em;">
+          💧 HUMIDITY (%)
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="chart-hum-{{ prefix }}"></canvas>
+        </div>
+
+        <div style="font-size: 0.6rem; color: var(--dim); margin: 0.75rem 0 0.5rem; letter-spacing: 0.08em;">
+          🌀 PRESSURE (hPa)
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="chart-pres-{{ prefix }}"></canvas>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty">
+    <span class="empty-icon">📈</span>
+    <p>No sensors detected — seed data with <code style="color: var(--accent);">make seed</code> or wait for the background device</p>
+  </div>
+{% endif %}

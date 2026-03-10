@@ -20,6 +20,10 @@ def _is_ddl(stmt: str) -> bool:
 class PythonRsDriver(AbstractDriver):
     """Driver backed by `python-rs-driver <https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver>`_.
 
+    .. note::
+       ``needs_row_validation`` is ``True`` because python-rs-driver returns
+       UDT values as plain dicts rather than Pydantic model instances.
+
     ``python-rs-driver`` wraps the Rust-based *scylla-rust-driver* via PyO3 and
     provides a **native async** interface.  Sync methods use an event-loop
     bridge (same pattern as :class:`~coodie.drivers.acsylla.AcsyllaDriver`).
@@ -47,6 +51,8 @@ class PythonRsDriver(AbstractDriver):
         driver = PythonRsDriver(session=session, default_keyspace="catalog")
         register_driver("default", driver, default=True)
     """
+
+    needs_row_validation: bool = True
 
     __slots__ = (
         "_session",

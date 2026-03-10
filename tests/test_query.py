@@ -888,9 +888,9 @@ def test_validate_false_returns_new_queryset(Item, queryset_cls, registered_mock
     assert qs._validate_val is False
 
 
-def test_default_validate_is_false(Item, queryset_cls, registered_mock_driver):
+def test_default_validate_is_none(Item, queryset_cls, registered_mock_driver):
     qs = queryset_cls(Item)
-    assert qs._validate_val is False
+    assert qs._validate_val is None
 
 
 async def test_all_default_uses_model_construct(Item, queryset_cls, registered_mock_driver):

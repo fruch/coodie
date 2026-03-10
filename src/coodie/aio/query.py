@@ -78,7 +78,7 @@ class QuerySet:
         group_by_val: list[str] | None = None,
         select_token_val: list[str] | None = None,
         cast_val: list[tuple[str, str]] | None = None,
-        validate_val: bool = False,
+        validate_val: bool | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -307,7 +307,13 @@ class QuerySet:
             return result
         # Fast non-polymorphic path
         coll = _collection_fields(doc_cls)
-        use_construct = not self._validate_val
+        # Determine whether to use model_construct (fast) or model_validate
+        # (safe).  When validate_val is None (the default), auto-detect
+        # based on the driver's needs_row_validation flag.
+        if self._validate_val is None:
+            use_construct = not getattr(self._get_driver(), "needs_row_validation", False)
+        else:
+            use_construct = not self._validate_val
         if use_construct:
             # model_construct() fast path — skip Pydantic validation
             construct = doc_cls.model_construct

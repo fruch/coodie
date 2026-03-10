@@ -39,6 +39,8 @@ def driver_type(request: pytest.FixtureRequest) -> str:
 class MockDriver:
     """Records CQL statements and params; returns configured rows."""
 
+    needs_row_validation: bool = False
+
     def __init__(self) -> None:
         self.executed: list[tuple[str, list[Any]]] = []
         self._return_rows: list[list[dict[str, Any]]] = []

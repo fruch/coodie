@@ -14,6 +14,12 @@ def _is_ddl(cql: str) -> bool:
 class AbstractDriver(ABC):
     """Abstract base class for coodie execution backends."""
 
+    # Set to ``True`` in driver subclasses whose rows may contain raw
+    # types that require Pydantic coercion (e.g. UUID strings instead of
+    # ``uuid.UUID``).  When ``True`` the QuerySet auto-selects
+    # ``model_validate()`` instead of the fast ``model_construct()`` path.
+    needs_row_validation: bool = False
+
     # ------------------------------------------------------------------
     # Synchronous interface
     # ------------------------------------------------------------------

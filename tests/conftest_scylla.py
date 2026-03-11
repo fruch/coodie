@@ -47,7 +47,9 @@ def scylla_container():
         DockerContainer("scylladb/scylla:2025.4.5")
         # --smp 1 --developer-mode 1: single-threaded dev mode for fast CI startup.
         # --skip-wait-for-gossip-to-settle=0: skip gossip settling wait for faster startup.
-        .with_command("--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0")
+        .with_command(
+            "--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0 --experimental-features=vector-search"
+        )
         .with_exposed_ports(9042) as container
     ):
         wait_for_logs(container, "Starting listening for CQL clients", timeout=120)

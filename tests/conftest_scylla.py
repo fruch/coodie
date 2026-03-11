@@ -44,7 +44,7 @@ def scylla_container():
         pytest.skip(f"testcontainers not installed: {exc}")
 
     with (
-        DockerContainer("scylladb/scylla:latest")
+        DockerContainer("scylladb/scylla:2025.4.5")
         # --smp 1 --developer-mode 1: single-threaded dev mode for fast CI startup.
         # --skip-wait-for-gossip-to-settle=0: skip gossip settling wait for faster startup.
         .with_command("--smp 1 --memory 512M --developer-mode 1 --skip-wait-for-gossip-to-settle=0")

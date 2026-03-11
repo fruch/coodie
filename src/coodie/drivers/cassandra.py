@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import warnings
 from typing import Any
 
 from coodie.drivers.base import AbstractDriver, _is_ddl
@@ -111,6 +112,7 @@ class CassandraDriver(AbstractDriver):
         from coodie.cql_builder import (
             build_create_table,
             build_create_index,
+            build_create_vector_index,
             build_drop_index,
             build_alter_table_options,
         )
@@ -159,7 +161,7 @@ class CassandraDriver(AbstractDriver):
                 if not dry_run:
                     self._session.execute(alter_cql)
 
-        # 5. Create secondary indexes
+        # 5. Create secondary indexes and vector indexes
         model_indexes: dict[str, Any] = {}
         for col in cols:
             if col.index:
@@ -169,6 +171,16 @@ class CassandraDriver(AbstractDriver):
                 planned.append(index_cql)
                 if not dry_run:
                     self._session.execute(index_cql)
+            if getattr(col, "vector_index", False):
+                idx_name = f"{table}_{col.name}_idx"
+                model_indexes[idx_name] = col
+                vec_idx_cql = build_create_vector_index(table, keyspace, col)
+                planned.append(vec_idx_cql)
+                if not dry_run:
+                    try:
+                        self._session.execute(vec_idx_cql)
+                    except Exception as _exc:
+                        self._warn_if_sai_unsupported(_exc)
 
         # 6. Drop removed indexes
         if drop_removed_indexes:
@@ -185,6 +197,35 @@ class CassandraDriver(AbstractDriver):
             self._warm_prepared_cache(table, keyspace, cols)
 
         return planned
+
+    def _warn_if_sai_unsupported(self, exc: Exception) -> None:
+        """Emit a warning when vector index creation is not supported by the database.
+
+        Raises the original exception unchanged for any other ``InvalidRequest`` error.
+        """
+        try:
+            from cassandra import InvalidRequest  # type: ignore[import-untyped]
+
+            if not isinstance(exc, InvalidRequest):
+                raise exc
+        except ImportError:
+            pass
+        _msg = str(exc)
+        # Known patterns indicating vector index creation is not supported in this configuration:
+        # - "Non-supported custom class": index class not available (older ScyllaDB/Cassandra)
+        # - "use tablets": keyspace must be tablets-enabled for vector indexes (newer ScyllaDB).
+        #   Full message: "Vector index requires the base table's keyspace to use tablets."
+        if (
+            "Non-supported custom class" in _msg
+            or "use tablets" in _msg
+            or "not supported on base tables with tablets" in _msg
+        ):
+            warnings.warn(
+                f"Vector index creation skipped: vector search not supported by this database. {exc}",
+                stacklevel=3,
+            )
+        else:
+            raise exc
 
     def _warm_prepared_cache(self, table: str, keyspace: str, cols: list[Any]) -> None:
         """Pre-prepare SELECT-by-PK and INSERT queries to eliminate cold-start latency."""
@@ -316,6 +357,7 @@ class CassandraDriver(AbstractDriver):
         from coodie.cql_builder import (
             build_create_table,
             build_create_index,
+            build_create_vector_index,
             build_drop_index,
             build_alter_table_options,
         )
@@ -364,7 +406,7 @@ class CassandraDriver(AbstractDriver):
                 if not dry_run:
                     await self._execute_cql_async(alter_cql)
 
-        # 5. Create secondary indexes
+        # 5. Create secondary indexes and vector indexes
         model_indexes: dict[str, Any] = {}
         for col in cols:
             if col.index:
@@ -374,6 +416,16 @@ class CassandraDriver(AbstractDriver):
                 planned.append(index_cql)
                 if not dry_run:
                     await self._execute_cql_async(index_cql)
+            if getattr(col, "vector_index", False):
+                idx_name = f"{table}_{col.name}_idx"
+                model_indexes[idx_name] = col
+                vec_idx_cql = build_create_vector_index(table, keyspace, col)
+                planned.append(vec_idx_cql)
+                if not dry_run:
+                    try:
+                        await self._execute_cql_async(vec_idx_cql)
+                    except Exception as _exc:
+                        self._warn_if_sai_unsupported(_exc)
 
         # 6. Drop removed indexes
         if drop_removed_indexes:

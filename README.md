@@ -47,7 +47,8 @@ serialization, and query building — with both **sync** and **async** APIs.
 
 🔄 **Automatic Schema Sync** — `sync_table()` creates & evolves tables\
 🏗️ **Batch & LWT** — `BatchQuery` + `if_not_exists()` support\
-🎯 **Multi-Driver** — scylla-driver · cassandra-driver · acsylla
+🎯 **Multi-Driver** — scylla-driver · cassandra-driver · acsylla\
+🔍 **Vector Search** — `Vector(dimensions=N)` + `order_by_ann()` for ANN queries
 
 </td>
 </tr>
@@ -74,6 +75,7 @@ serialization, and query building — with both **sync** and **async** APIs.
 | **Pagination** | ✅ Token-based `PagedResult` | ✅ Cursor-based | ❌ Manual |
 | **Multiple Drivers** | ✅ 3 drivers | motor only | cassandra-driver only |
 | **Polymorphic Models** | ✅ `Discriminator` | ❌ | ❌ |
+| **Vector Search (ANN)** | ✅ `Vector()` + `order_by_ann()` | ❌ | ❌ |
 | **Python Version** | 3.10+ | 3.8+ | 3.6+ |
 <!-- end-comparison -->
 
@@ -255,6 +257,30 @@ await Product.find(brand="Discontinued").allow_filtering().delete()
 | `Indexed(index_name=None)` | Secondary index |
 | `Counter()` | Counter column |
 | `Discriminator()` | Polymorphic model discriminator |
+| `Vector(dimensions=N)` | Vector column — maps `list[float]` to `vector<float, N>` |
+| `VectorIndex(similarity_function="COSINE")` | SAI vector index for ANN queries |
+
+</details>
+
+<details>
+<summary><b>Vector Search (ANN)</b></summary>
+
+coodie supports ScyllaDB's `vector<float, N>` column type and ANN similarity search via `VectorIndex`.
+
+```python
+class ProductEmbedding(Document):
+    product_id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    embedding: Annotated[
+        list[float],
+        Vector(dimensions=384),
+        VectorIndex(similarity_function="COSINE"),
+    ]
+    ...
+
+results = await ProductEmbedding.find().order_by_ann("embedding", query_vector).limit(10).all()
+```
+
+> 📖 **Full guide:** [Vector Search (ANN)](docs/source/guide/vector-search.md)
 
 </details>
 

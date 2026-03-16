@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773642347713,
+  "lastUpdate": 1773642435348,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -12480,6 +12480,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 7.538864945752134e-7",
             "extra": "mean: 5.537530505860466 usec\nrounds: 7097"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "29139614+renovate[bot]@users.noreply.github.com",
+            "name": "renovate[bot]",
+            "username": "renovate[bot]"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "d037614026b4e77b3385905b147f338d2591de53",
+          "message": "chore(deps): update pre-commit hook astral-sh/ruff-pre-commit to v0.15.5",
+          "timestamp": "2026-03-16T08:25:46+02:00",
+          "tree_id": "a45ac94eed2ac872935576690d19717e3186cbef",
+          "url": "https://github.com/fruch/coodie/commit/d037614026b4e77b3385905b147f338d2591de53"
+        },
+        "date": 1773642432646,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53254.93049478449,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000207776846212492",
+            "extra": "mean: 18.777604077390258 usec\nrounds: 8633"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1714853.699689593,
+            "unit": "iter/sec",
+            "range": "stddev: 2.2497143056322292e-7",
+            "extra": "mean: 583.1401245371607 nsec\nrounds: 180832"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 158202.59505834724,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008649676327382556",
+            "extra": "mean: 6.321008828149668 usec\nrounds: 14952"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 572269.5964444677,
+            "unit": "iter/sec",
+            "range": "stddev: 5.623904085858073e-7",
+            "extra": "mean: 1.747428146127345 usec\nrounds: 45001"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 603090.6127481044,
+            "unit": "iter/sec",
+            "range": "stddev: 4.3646135206944237e-7",
+            "extra": "mean: 1.6581256263354816 usec\nrounds: 47896"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 853500.4692086627,
+            "unit": "iter/sec",
+            "range": "stddev: 3.083952495643582e-7",
+            "extra": "mean: 1.171645518750759 usec\nrounds: 149187"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 843053.4251512617,
+            "unit": "iter/sec",
+            "range": "stddev: 5.548280000421511e-7",
+            "extra": "mean: 1.1861644471945283 usec\nrounds: 76371"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 742391.8098213815,
+            "unit": "iter/sec",
+            "range": "stddev: 3.437239266208038e-7",
+            "extra": "mean: 1.3469976187380066 usec\nrounds: 71809"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 181101.72762592562,
+            "unit": "iter/sec",
+            "range": "stddev: 7.808748222695238e-7",
+            "extra": "mean: 5.521758478558241 usec\nrounds: 7991"
           }
         ]
       }

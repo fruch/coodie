@@ -201,14 +201,20 @@ class PythonRsDriver(AbstractDriver):
     def _rows_to_dicts(result: Any) -> list[dict[str, Any]]:
         """Convert a ``RequestResult`` to a list of dicts.
 
-        python-rs-driver's ``iter_rows()`` already yields dicts.
-        Non-row-returning statements (INSERT/UPDATE/DELETE) raise
-        ``RuntimeError: Result does not have rows`` — return ``[]``.
+        python-rs-driver yields dicts from its row iterators.
+        Supports both the old API (``iter_rows()``) and the new paging API
+        (``iter_current_page()``).  Non-row-returning statements
+        (INSERT/UPDATE/DELETE) raise ``RuntimeError`` — return ``[]``.
         """
         if result is None:
             return []
+        # Prefer iter_current_page (new paging API, 2026-03-13+),
+        # fall back to iter_rows (old API).  We check the *type* rather
+        # than the instance so that unittest MagicMock auto-attributes
+        # don't produce false positives.
+        method_name = "iter_current_page" if hasattr(type(result), "iter_current_page") else "iter_rows"
         try:
-            return list(result.iter_rows())
+            return list(getattr(result, method_name)())
         except RuntimeError as exc:
             if "does not have rows" in str(exc):
                 return []

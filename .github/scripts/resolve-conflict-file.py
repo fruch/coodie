@@ -32,14 +32,31 @@ from pathlib import Path
 
 MODELS_API_URL = "https://models.inference.ai.azure.com/chat/completions"
 MODEL = "gpt-4o-mini"
-# Allow generous payload for file content (~30 000 chars ≈ 7 500 tokens)
-MAX_CONTENT_LENGTH = 30000
+# Truncation limit for the whole-file payload sent to the Models API.
+# Kept in sync with CHUNK_THRESHOLD; the two are equal today but separated
+# so the whole-file truncation and the chunked-mode routing can be tuned
+# independently if the API limits change.
+MAX_CONTENT_LENGTH = 16000
+# Files larger than this use chunk-by-chunk conflict resolution
+CHUNK_THRESHOLD = 16000
+# Lines of context around each conflict block for chunked resolution
+CONTEXT_LINES = 30
+# Max chars of context to include before/after a conflict chunk
+MAX_CHUNK_CONTEXT = 2000
 
 _SYSTEM_PROMPT = (
     "You are a git merge conflict resolver. "
     "Resolve ALL git conflict markers (<<<<<<<, =======, >>>>>>>) in the file below. "
     "Output ONLY the complete resolved file content — no markdown fences, no explanations, "
     "no preamble, no reasoning steps. Produce clean, working code."
+)
+
+_CHUNK_SYSTEM_PROMPT = (
+    "You are a git merge conflict resolver. "
+    "Resolve the git conflict markers (<<<<<<<, =======, >>>>>>>) in the conflict section below. "
+    "The context sections are for reference only — do NOT include them in your output. "
+    "Output ONLY the resolved replacement for the conflict block — no markdown fences, "
+    "no explanations, no context lines."
 )
 
 
@@ -51,6 +68,25 @@ def build_payload(file_content: str, file_path: str, model: str = MODEL) -> dict
         "model": model,
         "messages": [
             {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        "max_tokens": 4000,
+    }
+
+
+def build_chunk_payload(conflict: str, file_path: str, before: str = "", after: str = "", model: str = MODEL) -> dict:
+    """Build payload for resolving a single conflict chunk with context."""
+    parts = [f"File: {file_path}\n"]
+    if before:
+        parts.append(f"\n--- Context before (do NOT include in output) ---\n{before[-MAX_CHUNK_CONTEXT:]}")
+    parts.append(f"\n--- Conflict to resolve ---\n{conflict}")
+    if after:
+        parts.append(f"\n--- Context after (do NOT include in output) ---\n{after[:MAX_CHUNK_CONTEXT]}")
+    user_content = "".join(parts)
+    return {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": _CHUNK_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
         "max_tokens": 4000,
@@ -72,8 +108,97 @@ def call_models_api(token: str, payload: dict, url: str = MODELS_API_URL) -> str
     return result["choices"][0]["message"]["content"]
 
 
+def extract_conflict_blocks(content: str, context_lines: int = CONTEXT_LINES) -> list[dict]:
+    """Parse file into conflict blocks with surrounding context lines.
+
+    Returns a list of dicts with keys:
+      - start: 0-based line index of the <<<<<<< line
+      - end:   0-based line index of the >>>>>>> line (inclusive)
+      - before: context text before the conflict
+      - conflict: the full conflict block text (<<<<<<< through >>>>>>>)
+      - after: context text after the conflict
+    """
+    lines = content.splitlines(keepends=True)
+    blocks: list[dict] = []
+    i = 0
+    while i < len(lines):
+        if lines[i].startswith("<<<<<<<"):
+            start = i
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith(">>>>>>>"):
+                j += 1
+            end = j  # inclusive — the >>>>>>> line
+
+            ctx_start = max(0, start - context_lines)
+            ctx_end = min(len(lines), end + 1 + context_lines)
+
+            blocks.append(
+                {
+                    "start": start,
+                    "end": end,
+                    "before": "".join(lines[ctx_start:start]),
+                    "conflict": "".join(lines[start : end + 1]),
+                    "after": "".join(lines[end + 1 : ctx_end]),
+                }
+            )
+            i = end + 1
+        else:
+            i += 1
+    return blocks
+
+
+def resolve_file_chunked(file_content: str, file_path: str, token: str) -> str:
+    """Resolve conflicts chunk-by-chunk for large files.
+
+    Each conflict block is resolved independently with surrounding context,
+    keeping API payloads small enough to avoid 413 errors.
+    """
+    blocks = extract_conflict_blocks(file_content)
+    if not blocks:
+        return file_content
+
+    lines = file_content.splitlines(keepends=True)
+    resolutions: list[str] = []
+
+    for block in blocks:
+        payload = build_chunk_payload(block["conflict"], file_path, block["before"], block["after"])
+        try:
+            resolved = call_models_api(token, payload)
+        except Exception as exc:
+            print(f"::warning::Chunk conflict resolution failed for {file_path}: {exc}", file=sys.stderr)
+            return ""
+        if not resolved or "<<<<<<<" in resolved:
+            print(f"::warning::Chunk resolution incomplete for {file_path}", file=sys.stderr)
+            return ""
+        resolutions.append(resolved)
+
+    # Reassemble file: replace each conflict block with its resolution
+    result_parts: list[str] = []
+    i = 0
+    for idx, block in enumerate(blocks):
+        # Add clean lines before this conflict
+        result_parts.append("".join(lines[i : block["start"]]))
+        # Add resolved content (ensure trailing newline)
+        resolved_text = resolutions[idx]
+        if resolved_text and not resolved_text.endswith("\n"):
+            resolved_text += "\n"
+        result_parts.append(resolved_text)
+        i = block["end"] + 1
+
+    # Add remaining lines after the last conflict
+    result_parts.append("".join(lines[i:]))
+    return "".join(result_parts)
+
+
 def resolve_file(file_content: str, file_path: str, token: str) -> str:
-    """Return resolved file content, or empty string on error."""
+    """Return resolved file content, or empty string on error.
+
+    For large files (> CHUNK_THRESHOLD chars), conflicts are resolved one
+    chunk at a time to avoid exceeding the Models API payload size limit.
+    """
+    if len(file_content) > CHUNK_THRESHOLD:
+        return resolve_file_chunked(file_content, file_path, token)
+
     payload = build_payload(file_content, file_path)
     try:
         return call_models_api(token, payload)

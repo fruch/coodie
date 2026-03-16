@@ -2714,3 +2714,267 @@ The highest-ROI next steps (informed by Raw+DC benchmarks from PR #187) are:
 These pure-Python changes are estimated to improve overall performance by
 15–40% on affected operations, far exceeding what Cython or Rust could deliver
 for a fraction of the implementation effort.
+
+## 15. Phase 10 — Remaining Quick Wins & Read-Modify-Write Optimization
+
+> **Date**: 2026-03-10
+> **Based on**: Phase 8 analysis (§13E), Phase 9 PR (#196), and code review of current `master`
+> **Status**: Proposed
+
+After 9 phases of optimization, coodie wins **27 of 34** paired benchmarks. The remaining 7 losses
+fall into three categories: unfair benchmarks (2), read-modify-write overhead (2), and accepted
+Pydantic trade-offs (3). Phase 10 addresses the actionable gaps with 9 targeted improvements.
+
+### 15.1 Quick Wins (P0 — Tiny/Small effort, immediate impact)
+
+#### Task 10.1 — Pre-compile `_snake_case` regex + `@lru_cache` (P0, ~8 lines)
+
+`_snake_case()` in `src/coodie/sync/query.py:369` does `import re` **inside the function body**
+on every call, and regex patterns are compiled on every invocation.
+
+**Current:**
+```python
+def _snake_case(name: str) -> str:
+    import re                                           # re-evaluated every call
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)   # regex compiled every call
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+```
+
+**Proposed:**
+```python
+import re
+import functools
+
+_CAMEL_RE1 = re.compile(r"(.)([A-Z][a-z]+)")
+_CAMEL_RE2 = re.compile(r"([a-z0-9])([A-Z])")
+
+@functools.lru_cache(maxsize=128)
+def _snake_case(name: str) -> str:
+    s1 = _CAMEL_RE1.sub(r"\1_\2", name)
+    return _CAMEL_RE2.sub(r"\1_\2", s1).lower()
+```
+
+**Note**: The same fix should be applied to `src/coodie/aio/query.py` if it has a duplicate.
+
+| Metric | Value |
+|--------|-------|
+| Effort | Tiny (~8 lines) |
+| Expected impact | −1–2 µs per table name lookup (every query) |
+| Risk | None — pure function, deterministic output |
+
+#### Task 10.2 — Cache `build_count()`, `build_update()`, `build_delete()` CQL (P0, ~60 lines)
+
+`build_select()` and `build_insert_from_columns()` have shape-based CQL caching in
+`src/coodie/cql_builder.py`. The other three CQL builders reconstruct strings on every call:
+
+| Builder | Cached? | Called by |
+|---------|---------|----------|
+| `build_select()` | ✅ Yes (line 246) | `all()`, `first()`, `get()` |
+| `build_insert_from_columns()` | ✅ Yes (line 371) | `save()`, `insert()` |
+| `build_count()` | ❌ No | `count()` |
+| `build_update()` | ❌ No | `update()` |
+| `build_delete()` | ❌ No | `delete()` |
+
+**Proposed**: Add the same `_xxx_cql_cache: dict[tuple, str] = {}` pattern used by
+`build_select()` to all three builders. Cache key is the query shape (table, keyspace,
+column names, operator types) excluding actual parameter values.
+
+| Metric | Value |
+|--------|-------|
+| Effort | Small (~60 lines) |
+| Expected impact | −3–5% on COUNT, UPDATE, DELETE operations |
+| Risk | Low — cache invalidation is by shape (immutable key) |
+
+#### Task 10.3 — Cache UDT `_get_field_cql_types()` (P0, ~5 lines)
+
+The `udt_ddl_generation` benchmark shows coodie at **0.21×** vs cqlengine — the worst ratio
+of any benchmark. `UserType._get_field_cql_types()` calls `python_type_to_cql_type_str()` for
+each field on every invocation despite type annotations being immutable at runtime.
+
+**Proposed**: Add `@functools.lru_cache(maxsize=128)` and return a tuple instead of a list
+for hashability.
+
+| Metric | Value |
+|--------|-------|
+| Effort | Tiny (~5 lines) |
+| Expected impact | −70–80% on UDT DDL generation benchmark |
+| Risk | Low — immutable input, safe to cache |
+
+#### Task 10.4 — Fair benchmark for partial UPDATE and UPDATE IF (P0, ~30 lines, benchmark-only)
+
+The `partial_update` (0.58×) and `update_if_condition` (0.80×) benchmarks are unfair comparisons:
+coodie does `get() + update()` (2 DB round-trips) while cqlengine does `objects().update()`
+(1 round-trip). coodie already has `QuerySet.update()` which generates a single UPDATE query.
+
+**Proposed**: Add parallel benchmarks `test_coodie_partial_update_queryset` and
+`test_coodie_update_if_condition_queryset` using `CoodieProduct.find(id=X).update(price=42.0)`.
+Keep existing benchmarks as-is (they represent valid usage patterns).
+
+| Metric | Value |
+|--------|-------|
+| Effort | Small (~30 lines, benchmark only) |
+| Expected impact | Reveals true ratio (~1.0–1.2× vs cqlengine) |
+| Risk | None — no source code changes |
+
+### 15.2 Small Refinements (P1 — targeted micro-optimizations)
+
+#### Task 10.5 — Module-level `get_driver` import in Document class (P1, ~5 lines)
+
+In `src/coodie/sync/document.py:71` and `:83`, `from coodie.drivers import get_driver` is inside
+method bodies. While `query.py` was fixed in Phase 1 (Task 3.3), the Document class still pays
+per-call import overhead on every `save()`, `delete()`, `update()`, `get()` call.
+
+The same fix should be applied to `src/coodie/aio/document.py`.
+
+| Metric | Value |
+|--------|-------|
+| Effort | Tiny (~5 lines per file) |
+| Expected impact | −0.5–1 µs per Document method call |
+| Risk | None — import is already used at module level in query.py |
+
+#### Task 10.6 — Class-level discriminator cache on Document (P1, ~15 lines)
+
+Every `save()` call invokes `_find_discriminator_column(cls)` and `_get_discriminator_value(cls)`
+(see `document.py:173-176`). These are `@lru_cache`'d, but the function call + cache lookup
+overhead (~0.1–0.3 µs each) still adds up across millions of writes.
+
+For non-polymorphic models (the common case), the result is always `(None, None)`.
+
+**Proposed**: Set `__discriminator_col__` and `__discriminator_val__` class attributes once
+during `build_schema()` or `_schema()`, then read directly in `save()`:
+
+```python
+def save(self, ...):
+    cls = self.__class__
+    columns = _insert_columns(cls)
+    values = [getattr(self, c) for c in columns]
+    disc_col = cls.__discriminator_col__    # direct attribute access, no function call
+    disc_val = cls.__discriminator_val__
+    if disc_col and disc_val:
+        values[columns.index(disc_col)] = disc_val
+    ...
+```
+
+| Metric | Value |
+|--------|-------|
+| Effort | Small (~15 lines) |
+| Expected impact | −0.3–0.6 µs per `save()` / `insert()` call |
+| Risk | Low — computed once at class setup time |
+
+#### Task 10.7 — Short-circuit `_rows_to_dicts()` for dict_factory rows (P1, ~3 lines)
+
+With `dict_factory` set (Phase 6), rows from `session.execute()` arrive as dicts. However,
+`CassandraDriver._rows_to_dicts()` still materializes the full iterator with `list(result_set)`
+before checking `isinstance(sample, dict)`.
+
+When `result_set` is already a `list` (e.g., from `result.current_rows` in paginated path),
+the `list()` call creates a redundant copy. Add an early return:
+
+```python
+@staticmethod
+def _rows_to_dicts(result_set):
+    if result_set is None:
+        return []
+    if isinstance(result_set, list):
+        return result_set if not result_set or isinstance(result_set[0], dict) else ...
+    rows = list(result_set)
+    ...
+```
+
+| Metric | Value |
+|--------|-------|
+| Effort | Tiny (~3 lines) |
+| Expected impact | −1–2 µs per query (avoids redundant list copy) |
+| Risk | Low — only changes the fast path, fallback unchanged |
+
+### 15.3 Medium-Effort Improvements (P2 — closing the remaining gaps)
+
+#### Task 10.8 — Dirty-field tracking via Pydantic `model_fields_set` (P2, ~40 lines)
+
+coodie's `save()` always re-serializes **all** fields and sends a full INSERT (upsert).
+cqlengine tracks dirty fields and only sends changed columns. This is the root cause of the
+`list_mutation` (0.76×) and `status_update` (0.89×) losses.
+
+Rather than overriding Pydantic's Rust-level `__setattr__` (which would negate performance
+gains), leverage Pydantic's **built-in `model_fields_set`** tracking:
+
+```python
+class Document(BaseModel):
+    _loaded_from_db: bool = False  # set by _rows_to_docs()
+
+    def save(self, ...):
+        if self._loaded_from_db and self.model_fields_set:
+            # Emit partial UPDATE for only modified fields
+            changed = {f: getattr(self, f) for f in self.model_fields_set}
+            pk_names = _pk_columns(self.__class__)
+            where = [(c, "=", getattr(self, c)) for c in pk_names]
+            cql, params = build_update(...)
+            ...
+        else:
+            # Full INSERT for new documents (existing behavior)
+            ...
+```
+
+**Caveat**: `model_fields_set` tracks fields set during `__init__`, not subsequent mutations.
+If the user does `doc.name = "new"`, Pydantic does NOT add "name" to `model_fields_set`.
+A `model_post_init` hook or a thin `__setattr__` wrapper that only does
+`self.__dict__.setdefault('_dirty', set()).add(name)` would be needed. Needs careful
+benchmarking to ensure the tracking overhead doesn't exceed the save-path savings.
+
+| Metric | Value |
+|--------|-------|
+| Effort | Medium (~40 lines) |
+| Expected impact | −10–30% on read-modify-write patterns (list_mutation, status_update) |
+| Risk | **High** — changes `save()` semantics; needs thorough testing |
+| Blocks | May require new `_loaded_from_db` flag on Document instances |
+
+#### Task 10.9 — Native async for paginated queries (P2, ~50 lines)
+
+In `src/coodie/drivers/cassandra.py:260-277`, paginated async queries fall back to
+`run_in_executor()` because cassandra-driver's `execute_async()` callback mechanism delivers
+a plain list (not a `ResultSet`), so `current_rows` / `paging_state` are unavailable.
+
+**Proposed approach**: Use `session.execute()` inside the executor but only for the paginated
+path, while investigating whether the driver's `ResponseFuture` can be extended to expose
+`paging_state` in the callback result. Alternatively, use a two-phase approach:
+
+1. First call: `execute_async()` to get results (no paging state needed for first page)
+2. Subsequent calls: If `paging_state` is needed, use `execute()` via executor
+
+| Metric | Value |
+|--------|-------|
+| Effort | Medium (~50 lines) |
+| Expected impact | −20–40% on async paginated queries |
+| Risk | Medium — cassandra-driver's async API has known limitations |
+
+### 15.4 Priority and Impact Matrix
+
+| Task | Priority | Effort | Expected Impact | Closes Gap |
+|------|----------|--------|-----------------|------------|
+| 10.1 Pre-compile `_snake_case` regex | **P0** | Tiny (8 lines) | −1–2 µs/query | All operations |
+| 10.2 Cache build_count/update/delete | **P0** | Small (60 lines) | −3–5% on affected ops | count, delete, update |
+| 10.3 Cache `_get_field_cql_types()` | **P0** | Tiny (5 lines) | −70–80% UDT DDL | udt_ddl_generation |
+| 10.4 Fair partial UPDATE benchmark | **P0** | Small (30 lines) | Reveals true ratio | partial_update, update_if |
+| 10.5 Module-level get_driver in Document | **P1** | Tiny (5 lines) | −0.5–1 µs/call | All Document methods |
+| 10.6 Class-level discriminator cache | **P1** | Small (15 lines) | −0.3–0.6 µs/save | save(), insert() |
+| 10.7 Short-circuit _rows_to_dicts | **P1** | Tiny (3 lines) | −1–2 µs/query | All read operations |
+| 10.8 Dirty-field tracking | **P2** | Medium (40 lines) | −10–30% R-M-W | list_mutation, status_update |
+| 10.9 Native async paginated | **P2** | Medium (50 lines) | −20–40% async paged | Async paginated queries |
+
+### 15.5 Expected Outcome After Phase 10
+
+If tasks 10.1–10.7 (P0+P1) are implemented:
+
+| Metric | Current (Phase 9) | Expected (Phase 10 P0+P1) |
+|--------|-------------------|---------------------------|
+| Benchmarks won | 27 of 34 | **30–31 of 34** |
+| Worst real loss | list_mutation (0.76×) | list_mutation (0.76×, needs 10.8) |
+| UDT DDL generation | 0.21× (worst ratio) | ~1.0× (competitive) |
+| partial_update (fair) | untested | ~1.0–1.2× (new benchmark) |
+
+If task 10.8 (dirty-field tracking) is also implemented:
+
+| Metric | Expected (Phase 10 full) |
+|--------|--------------------------|
+| Benchmarks won | **31–32 of 34** |
+| Remaining losses | udt_serialization (0.85×), nested_udt (0.48×) — accepted Pydantic trade-offs |

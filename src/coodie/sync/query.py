@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+import re
 from typing import Any, Iterator, TYPE_CHECKING
 
 from coodie.cql_builder import (
@@ -467,8 +469,11 @@ def _parse_lwt_result(rows: list[dict[str, Any]]) -> LWTResult:
     return LWTResult(applied=applied, existing=existing)
 
 
-def _snake_case(name: str) -> str:
-    import re
+_SNAKE_RE1 = re.compile(r"(.)([A-Z][a-z]+)")
+_SNAKE_RE2 = re.compile(r"([a-z0-9])([A-Z])")
 
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+@functools.lru_cache(maxsize=128)
+def _snake_case(name: str) -> str:
+    s1 = _SNAKE_RE1.sub(r"\1_\2", name)
+    return _SNAKE_RE2.sub(r"\1_\2", s1).lower()

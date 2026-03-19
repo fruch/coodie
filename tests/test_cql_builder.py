@@ -18,16 +18,11 @@ from coodie.cql_builder import (
     build_insert_from_columns,
     build_select,
     build_update,
-    build_aggregate,
     build_where_clause,
     parse_filter_kwargs,
     parse_update_kwargs,
     _insert_cql_cache,
     _select_cql_cache,
-    _count_cql_cache,
-    _aggregate_cql_cache,
-    _update_cql_cache,
-    _delete_cql_cache,
 )
 from coodie.schema import ColumnDefinition
 
@@ -889,7 +884,6 @@ def test_build_create_custom_index_with_options():
         "ks",
         col,
         options={"similarity_function": "cosine"},
-    )
     )
     assert "CREATE CUSTOM INDEX IF NOT EXISTS my_ann_idx" in cql
     assert 'ON ks.products ("embedding")' in cql

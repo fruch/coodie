@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 
 from pydantic import Field, field_validator
 
-from coodie.fields import ClusteringKey, Indexed, PrimaryKey
+from coodie.fields import ClusteringKey, Indexed, PrimaryKey, Vector, VectorIndex
 from coodie.sync.document import Document
 
 
@@ -61,3 +61,23 @@ class CoodieEvent(Document):
     class Settings:
         name = "bench_events"
         keyspace = "bench_ks"
+
+
+# Vector dimensions used across vector benchmarks (small to keep inserts fast)
+BENCH_VECTOR_DIMS = 16
+
+
+class CoodieVectorProduct(Document):
+    """Product with a vector embedding — ANN search benchmark target."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str
+    embedding: Annotated[
+        list[float],
+        Vector(dimensions=BENCH_VECTOR_DIMS),
+        VectorIndex(similarity_function="COSINE"),
+    ] = Field(default_factory=list)
+
+    class Settings:
+        name = "bench_vector_products"
+        keyspace = "bench_vector_ks"

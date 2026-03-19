@@ -30,6 +30,7 @@ from coodie.schema import (
     _insert_columns,
     _pk_columns,
     _resolve_polymorphic_base,
+    _vector_columns,
 )
 from coodie.aio.query import QuerySet
 from coodie.sync.query import _snake_case
@@ -175,6 +176,10 @@ class Document(BaseModel):
     ) -> None:
         """Insert (upsert) this document."""
         cls = self.__class__
+        for vec_name, vec_dims in _vector_columns(cls):
+            val = getattr(self, vec_name, None)
+            if val is not None and len(val) != vec_dims:
+                raise InvalidQueryError(f"Vector field '{vec_name}' expects {vec_dims} dimensions, got {len(val)}")
         columns = _insert_columns(cls)
         values = [getattr(self, c) for c in columns]
         disc_col = _find_discriminator_column(cls)
@@ -204,6 +209,10 @@ class Document(BaseModel):
     ) -> None:
         """Insert IF NOT EXISTS (create-only)."""
         cls = self.__class__
+        for vec_name, vec_dims in _vector_columns(cls):
+            val = getattr(self, vec_name, None)
+            if val is not None and len(val) != vec_dims:
+                raise InvalidQueryError(f"Vector field '{vec_name}' expects {vec_dims} dimensions, got {len(val)}")
         columns = _insert_columns(cls)
         values = [getattr(self, c) for c in columns]
         disc_col = _find_discriminator_column(cls)

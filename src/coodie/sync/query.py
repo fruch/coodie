@@ -101,7 +101,7 @@ class QuerySet:
         self._group_by_val: list[str] = group_by_val or []
         self._select_token_val = select_token_val
         self._cast_val = cast_val
-        self._ann_of_val = ann_of_val
+        self._ann_of_val: tuple[str, list[float]] | None = ann_of_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -238,6 +238,13 @@ class QuerySet:
     def is_null(self, column: str) -> QuerySet:
         return self._clone(where=self._where + [(column, "ISNULL", True)])
 
+    def order_by_ann(self, field: str, query_vector: list[float]) -> QuerySet:
+        """Order results by approximate nearest neighbor distance to *query_vector*.
+
+        Emits ``ORDER BY "field" ANN OF ?`` using ScyllaDB's SAI vector index.
+        """
+        return self._clone(ann_of_val=(field, query_vector))
+
     # ------------------------------------------------------------------
     # Terminal methods
     # ------------------------------------------------------------------
@@ -318,7 +325,12 @@ class QuerySet:
         return result
 
     def paged_all(self) -> PagedResult:
-        """Execute query returning a :class:`PagedResult` with documents and paging state."""
+        """Execute query returning a :class:`PagedResult` with documents and paging state.
+
+        When combined with :meth:`order_by_ann`, ScyllaDB ANN queries do not support
+        cursor-based pagination and will always return a single page with
+        ``paging_state=None``.  Use :meth:`limit` to control the number of results.
+        """
         cql, params = build_select(
             self._table(),
             self._keyspace(),

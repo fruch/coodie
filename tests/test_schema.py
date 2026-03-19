@@ -357,7 +357,7 @@ def test_build_schema_unsupported_type_raises():
             name = "bad_docs"
             keyspace = "test_ks"
 
-    with pytest.raises(InvalidQueryError, match="bad_col"):
+    with pytest.raises(InvalidQueryError, match="Cannot map Python type"):
         build_schema(BadDoc)
 
 

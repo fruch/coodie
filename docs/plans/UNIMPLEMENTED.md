@@ -4,14 +4,15 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-07 (post-merge: CQL Phase 1 DML gaps ✅ Done
+> **Last reviewed:** 2026-03-19 (post-merge: CQL Phase 1 DML gaps ✅ Done
 > via PR #184 — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST,
 > TOKEN all implemented with unit + integration tests. LWT integration tests
 > ✅ Done — `test_lwt.py` shipped covering §1.5. CQL Phase 2 data types
-> WIP in PR #193 — duration + vector types. timeseries-iot demo WIP in
-> PR #180, schema-migrations demo WIP in PR #183, realtime-counters demo
-> WIP in PR #176, vector support WIP in PRs #150/#155, collections-tags
-> demo WIP in PR #147)
+> WIP in PR #193 — duration + vector types. CQL Phase 4 LWT/collection
+> DML WIP in PR #194. CQL Phase 5 JSON/metadata WIP in PR #197.
+> timeseries-iot demo WIP in PR #180, schema-migrations demo WIP in
+> PR #183, realtime-counters demo WIP in PR #176, vector support WIP in
+> PRs #150/#155, collections-tags demo WIP in PR #147)
 
 ---
 
@@ -182,9 +183,13 @@
 
 ### 7.3 LWT & Collection Operations (Phase 4)
 
+> **⚠️ IN PROGRESS — [PR #194](https://github.com/fruch/coodie/pull/194): CQL Phase 4 LWT & collection DML gaps.**
+
 > **Prompt:** Implement LWT and collection DML gaps: (1) `DELETE ... IF col = ?` conditional deletes. (2) Extended IF operators: `!=`, `IN`, `>`, `<`. (3) Map put `col[key] = val` and list set-by-index `col[idx] = val`. (4) `DELETE col[key] FROM ...` and `DELETE col[idx] FROM ...`. (5) `USING TIMESTAMP` on batches. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 4.
 
 ### 7.4 JSON & Metadata Features (Phase 5)
+
+> **⚠️ IN PROGRESS — [PR #197](https://github.com/fruch/coodie/pull/197): CQL Phase 5 JSON & metadata features.**
 
 > **Prompt:** Implement JSON and metadata features: (1) `INSERT INTO ... JSON '{...}'` via `Document.save_json()`. (2) `SELECT JSON` via `QuerySet.json()`. (3) `WRITETIME(col)` via `QuerySet.writetime()`. (4) `TTL(col)` via `QuerySet.column_ttl()`. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 5.
 

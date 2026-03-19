@@ -190,6 +190,18 @@ def test_python_rs_driver_rows_to_dicts_empty():
         assert PythonRsDriver._rows_to_dicts(result) == []
 
 
+def test_python_rs_driver_rows_to_dicts_new_api():
+    """New python-rs-driver API uses iter_current_page() instead of iter_rows()."""
+    with patch.dict("sys.modules", _mock_scylla_modules()):
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        class NewRequestResult:
+            def iter_current_page(self):
+                return iter([{"id": "1"}, {"id": "2"}])
+
+        assert PythonRsDriver._rows_to_dicts(NewRequestResult()) == [{"id": "1"}, {"id": "2"}]
+
+
 # ------------------------------------------------------------------
 # _is_ddl helper
 # ------------------------------------------------------------------

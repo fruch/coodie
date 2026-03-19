@@ -4,6 +4,9 @@ from typing import Any, AsyncIterator, TYPE_CHECKING
 
 from coodie.cql_builder import (
     build_select,
+    build_select_json,
+    build_select_writetime,
+    build_select_column_ttl,
     build_count,
     build_delete,
     build_update,
@@ -405,6 +408,52 @@ class QuerySet:
 
     async def max(self, column: str) -> Any:
         return await self._aggregate("MAX", column)
+
+    async def json(self) -> list[str]:
+        """Execute ``SELECT JSON * FROM …`` and return a list of JSON strings."""
+        cql, params = build_select_json(
+            self._table(),
+            self._keyspace(),
+            where=self._where or None,
+            limit=self._limit_val,
+            allow_filtering=self._allow_filtering_val,
+        )
+        rows = await self._get_driver().execute_async(
+            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
+        )
+        return [row.get("[json]", "") for row in rows]
+
+    async def writetime(self, column: str) -> Any:
+        """Execute ``SELECT WRITETIME("col") FROM …`` and return the scalar result."""
+        cql, params = build_select_writetime(
+            self._table(),
+            self._keyspace(),
+            column,
+            where=self._where or None,
+            allow_filtering=self._allow_filtering_val,
+        )
+        rows = await self._get_driver().execute_async(
+            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
+        )
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    async def column_ttl(self, column: str) -> Any:
+        """Execute ``SELECT TTL("col") FROM …`` and return the scalar result."""
+        cql, params = build_select_column_ttl(
+            self._table(),
+            self._keyspace(),
+            column,
+            where=self._where or None,
+            allow_filtering=self._allow_filtering_val,
+        )
+        rows = await self._get_driver().execute_async(
+            cql, params, consistency=self._consistency_val, timeout=self._timeout_val
+        )
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
 
     async def delete(self) -> LWTResult | None:
         cql, params = build_delete(

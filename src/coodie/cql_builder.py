@@ -509,6 +509,102 @@ def build_insert_from_columns(
     return cql, values
 
 
+def build_insert_json(
+    table: str,
+    keyspace: str,
+    json_string: str,
+    ttl: int | None = None,
+    if_not_exists: bool = False,
+    timestamp: int | None = None,
+) -> tuple[str, list[Any]]:
+    """Build an ``INSERT INTO … JSON ?`` CQL statement.
+
+    The *json_string* is bound as a positional parameter so the driver
+    handles escaping.
+    """
+    cql = f"INSERT INTO {keyspace}.{table} JSON ?"
+    if if_not_exists:
+        cql += " IF NOT EXISTS"
+    cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
+    return cql, [json_string]
+
+
+def build_select_json(
+    table: str,
+    keyspace: str,
+    where: list[tuple[str, str, Any]] | None = None,
+    limit: int | None = None,
+    allow_filtering: bool = False,
+) -> tuple[str, list[Any]]:
+    """Build a ``SELECT JSON * FROM …`` CQL statement.
+
+    Returns rows where each row is a dict with a single ``"[json]"`` key
+    containing the JSON string representation of the row.
+    """
+    cql = f"SELECT JSON * FROM {keyspace}.{table}"
+    params: list[Any] = []
+
+    if where:
+        clause, where_params = build_where_clause(where)
+        if clause:
+            cql += " " + clause
+            params.extend(where_params)
+
+    if limit is not None:
+        cql += f" LIMIT {limit}"
+
+    if allow_filtering:
+        cql += " ALLOW FILTERING"
+
+    return cql, params
+
+
+def build_select_writetime(
+    table: str,
+    keyspace: str,
+    column: str,
+    where: list[tuple[str, str, Any]] | None = None,
+    allow_filtering: bool = False,
+) -> tuple[str, list[Any]]:
+    """Build a ``SELECT WRITETIME("col") FROM …`` CQL statement."""
+    cql = f'SELECT WRITETIME("{column}") FROM {keyspace}.{table}'
+    params: list[Any] = []
+
+    if where:
+        clause, where_params = build_where_clause(where)
+        if clause:
+            cql += " " + clause
+            params.extend(where_params)
+
+    if allow_filtering:
+        cql += " ALLOW FILTERING"
+
+    return cql, params
+
+
+def build_select_column_ttl(
+    table: str,
+    keyspace: str,
+    column: str,
+    where: list[tuple[str, str, Any]] | None = None,
+    allow_filtering: bool = False,
+) -> tuple[str, list[Any]]:
+    """Build a ``SELECT TTL("col") FROM …`` CQL statement."""
+    cql = f'SELECT TTL("{column}") FROM {keyspace}.{table}'
+    params: list[Any] = []
+
+    if where:
+        clause, where_params = build_where_clause(where)
+        if clause:
+            cql += " " + clause
+            params.extend(where_params)
+
+    if allow_filtering:
+        cql += " ALLOW FILTERING"
+
+    return cql, params
+
+
 def parse_update_kwargs(
     kwargs: dict[str, Any],
 ) -> tuple[dict[str, Any], list[tuple[str, str, Any]]]:

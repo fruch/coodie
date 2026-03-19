@@ -16,7 +16,11 @@ from coodie.cql_builder import (
     build_drop_table,
     build_insert,
     build_insert_from_columns,
+    build_insert_json,
     build_select,
+    build_select_json,
+    build_select_writetime,
+    build_select_column_ttl,
     build_update,
     build_where_clause,
     parse_filter_kwargs,
@@ -1026,3 +1030,105 @@ def test_build_select_token_projection_multiple():
     _select_cql_cache.clear()
     cql, _ = build_select("products", "ks", select_token=["part_a", "part_b"])
     assert 'TOKEN("part_a", "part_b")' in cql
+
+
+# -- Phase 5: build_insert_json() -----------------------------------------
+
+
+def test_build_insert_json_basic():
+    cql, params = build_insert_json("products", "ks", '{"id": "1", "name": "X"}')
+    assert cql == "INSERT INTO ks.products JSON ?"
+    assert params == ['{"id": "1", "name": "X"}']
+
+
+def test_build_insert_json_if_not_exists():
+    cql, params = build_insert_json("products", "ks", '{"id": "1"}', if_not_exists=True)
+    assert "INSERT INTO ks.products JSON ?" in cql
+    assert "IF NOT EXISTS" in cql
+    assert params == ['{"id": "1"}']
+
+
+def test_build_insert_json_with_ttl():
+    cql, params = build_insert_json("products", "ks", '{"id": "1"}', ttl=60)
+    assert "INSERT INTO ks.products JSON ?" in cql
+    assert "USING TTL 60" in cql
+
+
+def test_build_insert_json_with_timestamp():
+    cql, params = build_insert_json("products", "ks", '{"id": "1"}', timestamp=123456)
+    assert "INSERT INTO ks.products JSON ?" in cql
+    assert "USING TIMESTAMP 123456" in cql
+
+
+def test_build_insert_json_with_ttl_and_timestamp():
+    cql, _ = build_insert_json("products", "ks", '{"id": "1"}', ttl=60, timestamp=123456)
+    assert "USING TTL 60 AND TIMESTAMP 123456" in cql
+
+
+# -- Phase 5: build_select_json() -----------------------------------------
+
+
+def test_build_select_json_basic():
+    cql, params = build_select_json("products", "ks")
+    assert cql == "SELECT JSON * FROM ks.products"
+    assert params == []
+
+
+def test_build_select_json_with_where():
+    cql, params = build_select_json("products", "ks", where=[("id", "=", "1")])
+    assert "SELECT JSON * FROM ks.products" in cql
+    assert 'WHERE "id" = ?' in cql
+    assert params == ["1"]
+
+
+def test_build_select_json_with_limit():
+    cql, params = build_select_json("products", "ks", limit=10)
+    assert "SELECT JSON * FROM ks.products" in cql
+    assert "LIMIT 10" in cql
+
+
+def test_build_select_json_allow_filtering():
+    cql, _ = build_select_json("products", "ks", allow_filtering=True)
+    assert "ALLOW FILTERING" in cql
+
+
+# -- Phase 5: build_select_writetime() ------------------------------------
+
+
+def test_build_select_writetime_basic():
+    cql, params = build_select_writetime("products", "ks", "name")
+    assert cql == 'SELECT WRITETIME("name") FROM ks.products'
+    assert params == []
+
+
+def test_build_select_writetime_with_where():
+    cql, params = build_select_writetime("products", "ks", "name", where=[("id", "=", "1")])
+    assert 'SELECT WRITETIME("name") FROM ks.products' in cql
+    assert 'WHERE "id" = ?' in cql
+    assert params == ["1"]
+
+
+def test_build_select_writetime_allow_filtering():
+    cql, _ = build_select_writetime("products", "ks", "name", allow_filtering=True)
+    assert "ALLOW FILTERING" in cql
+
+
+# -- Phase 5: build_select_column_ttl() -----------------------------------
+
+
+def test_build_select_column_ttl_basic():
+    cql, params = build_select_column_ttl("products", "ks", "name")
+    assert cql == 'SELECT TTL("name") FROM ks.products'
+    assert params == []
+
+
+def test_build_select_column_ttl_with_where():
+    cql, params = build_select_column_ttl("products", "ks", "name", where=[("id", "=", "1")])
+    assert 'SELECT TTL("name") FROM ks.products' in cql
+    assert 'WHERE "id" = ?' in cql
+    assert params == ["1"]
+
+
+def test_build_select_column_ttl_allow_filtering():
+    cql, _ = build_select_column_ttl("products", "ks", "name", allow_filtering=True)
+    assert "ALLOW FILTERING" in cql

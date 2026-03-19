@@ -22,6 +22,7 @@ from coodie.cql_builder import (
     parse_filter_kwargs,
     parse_update_kwargs,
     _insert_cql_cache,
+    _parse_if_conditions,
     _select_cql_cache,
 )
 from coodie.schema import ColumnDefinition

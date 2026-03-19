@@ -1,0 +1,45 @@
+<div class="card" style="margin-bottom: 1rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2>📡 {{ sensor_id }} — Reading History ({{ days }}d)</h2>
+    <button class="btn btn-sm btn-primary"
+            hx-get="/ui/dashboard"
+            hx-target="#sensor-grid"
+            hx-swap="innerHTML">← Back to Grid</button>
+  </div>
+
+  {% if readings %}
+    <table class="readings-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Date Bucket</th>
+          <th>Temp (°C)</th>
+          <th>Humidity (%)</th>
+          <th>Pressure (hPa)</th>
+          <th>Battery</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% from "macros.html" import temp_class, batt_style %}
+        {% for r in readings %}
+          <tr>
+            <td>{{ r.ts.strftime('%Y-%m-%d %H:%M:%S') if r.ts else '—' }}</td>
+            <td style="color: var(--dim);">{{ r.date_bucket }}</td>
+            <td class="{{ temp_class(r.temperature) }}">{{ "%.2f"|format(r.temperature) }}</td>
+            <td>{{ "%.1f"|format(r.humidity) }}</td>
+            <td>{{ "%.1f"|format(r.pressure) }}</td>
+            <td style="{{ batt_style(r.battery_pct) }}">{{ r.battery_pct }}%</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="font-size: 0.65rem; color: var(--dim); margin-top: 0.75rem; text-align: right;">
+      Showing {{ readings | length }} readings · per_partition_limit(20) · ClusteringKey(order="DESC")
+    </div>
+  {% else %}
+    <div class="empty">
+      <span class="empty-icon">📡</span>
+      <p>No readings found for {{ sensor_id }} in the last {{ days }} days</p>
+    </div>
+  {% endif %}
+</div>

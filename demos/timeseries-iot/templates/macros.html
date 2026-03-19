@@ -1,0 +1,18 @@
+{% macro temp_class(temperature) -%}
+  {%- if temperature > 60 -%}temp-hot
+  {%- elif temperature > 30 -%}temp-warm
+  {%- elif temperature > 0 -%}temp-cool
+  {%- else -%}temp-cold{%- endif -%}
+{%- endmacro %}
+
+{% macro batt_class(battery_pct) -%}
+  {%- if battery_pct > 50 -%}battery-ok
+  {%- elif battery_pct > 20 -%}battery-warn
+  {%- else -%}battery-crit{%- endif -%}
+{%- endmacro %}
+
+{% macro batt_style(battery_pct) -%}
+  {%- if battery_pct > 50 -%}color: var(--success);
+  {%- elif battery_pct > 20 -%}color: var(--warning);
+  {%- else -%}color: var(--danger);{%- endif -%}
+{%- endmacro %}

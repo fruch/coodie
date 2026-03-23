@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="lore-panel" style="margin-top: 1.5rem;">
+  <div class="lore-title">📡 STATION LOG — ARGOS-7 // SCYLLA NEBULA</div>
+  Deep in the <em>Scylla Nebula</em>, Station <em>Argos-7</em> monitors environmental conditions
+  across all decks. Sensors transmit telemetry <em>continuously</em> — a background device
+  generates new readings every few seconds, stored in <em>time-bucketed partitions</em>.
+  The <em>DESC clustering order</em> ensures the crew always sees the newest readings first.
+</div>
+
+<div class="lore-panel" style="border-left-color: rgba(56,189,248,0.3); margin-top: 0;">
+  <div class="lore-title">🧑‍💻 COODIE PATTERNS IN THIS DEMO</div>
+  <div class="code-snippet"><span class="cm"># 1. Composite partition key — time-bucketed by day</span>
+sensor_id:   Annotated[<span class="kw">str</span>,  PrimaryKey(partition_key_index=<span class="num">0</span>)]
+date_bucket: Annotated[<span class="kw">date</span>, PrimaryKey(partition_key_index=<span class="num">1</span>)]
+
+<span class="cm"># 2. ClusteringKey DESC — newest readings first</span>
+ts: Annotated[<span class="kw">datetime</span>, ClusteringKey(order=<span class="str">"DESC"</span>)]
+
+<span class="cm"># 3. per_partition_limit() — latest N readings per sensor</span>
+readings = <span class="kw">await</span> SensorReading.find(sensor_id=sid, date_bucket=today) \
+    .per_partition_limit(<span class="num">5</span>).all()
+
+<span class="cm"># 4. paged_all() — cursor-based pagination with infinite scroll</span>
+result = <span class="kw">await</span> SensorReading.find().fetch_size(<span class="num">15</span>).paged_all()
+
+<span class="cm"># 5. Background device — new readings every 3s (real-time)</span>
+<span class="cm"># Dashboard auto-refreshes to show live data</span></div>
+</div>
+
+<!-- Tab navigation -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('dashboard', this)">📊 Live Dashboard</button>
+  <button class="tab" onclick="showTab('charts', this)">📈 Live Charts</button>
+  <button class="tab" onclick="showTab('paged', this)">📄 Infinite Scroll Feed</button>
+</div>
+
+<!-- Dashboard tab — real-time updates every 3s -->
+<div id="tab-dashboard">
+  <div class="refresh-notice" id="live-status">
+    <span class="live-dot"></span>
+    LIVE — auto-refreshes every 3s · background device transmitting
+  </div>
+  <div id="sensor-grid"
+       hx-get="/ui/dashboard"
+       hx-trigger="load, every 3s"
+       hx-swap="innerHTML">
+    <div class="empty">
+      <span class="empty-icon">📡</span>
+      <p>Loading sensor telemetry...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Live Charts tab — Chart.js auto-updating line charts -->
+<div id="tab-charts" style="display: none;">
+  <div class="refresh-notice">
+    <span class="live-dot"></span>
+    LIVE CHARTS — auto-update every 3s · last 5 minutes of data
+  </div>
+  <div id="charts-container"
+       hx-get="/ui/charts"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <div class="empty">
+      <span class="empty-icon">📈</span>
+      <p>Loading chart data...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Paged feed tab — infinite scroll with date filtering -->
+<div id="tab-paged" style="display: none;">
+  <div class="card">
+    <h2>📄 Infinite Scroll Reading Feed</h2>
+    <p style="font-size: 0.75rem; color: var(--muted); margin-bottom: 1rem;">
+      Demonstrates <code style="color: var(--accent);">paged_all()</code> with cursor-based pagination.
+      Scroll down to automatically load more pages. Use the date picker to start from a specific date.
+    </p>
+
+    <!-- Filter controls -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label class="filter-label" for="filter-date">📅 Date Bucket</label>
+        <input type="date" id="filter-date" class="filter-input"
+               onchange="applyFilters()">
+      </div>
+      <div class="filter-group">
+        <label class="filter-label" for="filter-sensor">📡 Sensor</label>
+        <select id="filter-sensor" class="filter-input"
+                hx-get="/sensors"
+                hx-trigger="load"
+                hx-target="#filter-sensor"
+                hx-swap="innerHTML"
+                hx-on::after-request="populateSensorSelect(event)"
+                onchange="applyFilters()">
+          <option value="">All Sensors</option>
+        </select>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="resetFilters()">↻ Reset</button>
+    </div>
+
+    <div id="paged-content">
+      <div id="paged-table-container">
+        <table class="readings-table" id="paged-table">
+          <thead>
+            <tr>
+              <th>Sensor</th>
+              <th>Timestamp</th>
+              <th>Bucket</th>
+              <th>Temp (°C)</th>
+              <th>Humidity (%)</th>
+              <th>Pressure (hPa)</th>
+              <th>Battery</th>
+            </tr>
+          </thead>
+          <tbody id="paged-tbody"
+                 hx-get="/ui/paged?page_size=15"
+                 hx-trigger="load"
+                 hx-swap="beforeend">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-dashboard').style.display = name === 'dashboard' ? '' : 'none';
+  document.getElementById('tab-charts').style.display = name === 'charts' ? '' : 'none';
+  document.getElementById('tab-paged').style.display = name === 'paged' ? '' : 'none';
+  // Start/stop chart refresh when tab is shown/hidden
+  if (name === 'charts') {
+    startChartRefresh();
+  } else {
+    stopChartRefresh();
+  }
+}
+
+function buildPagedUrl() {
+  var params = new URLSearchParams();
+  params.set('page_size', '15');
+  var dateVal = document.getElementById('filter-date').value;
+  if (dateVal) params.set('start_date', dateVal);
+  var sensorVal = document.getElementById('filter-sensor').value;
+  if (sensorVal) params.set('sensor_id', sensorVal);
+  return '/ui/paged?' + params.toString();
+}
+
+function applyFilters() {
+  var tbody = document.getElementById('paged-tbody');
+  tbody.innerHTML = '';
+  var url = buildPagedUrl();
+  tbody.setAttribute('hx-get', url);
+  tbody.setAttribute('hx-trigger', 'load');
+  tbody.setAttribute('hx-swap', 'beforeend');
+  htmx.process(tbody);
+  htmx.trigger(tbody, 'load');
+}
+
+function resetFilters() {
+  document.getElementById('filter-date').value = '';
+  document.getElementById('filter-sensor').value = '';
+  applyFilters();
+}
+
+function populateSensorSelect(event) {
+  // The /sensors endpoint returns a JSON list, but HTMX put it as innerHTML.
+  // We need to rebuild it as <option> elements.
+  var select = document.getElementById('filter-sensor');
+  var savedValue = select.value;
+  try {
+    var sensors = JSON.parse(select.textContent || select.innerText);
+    select.innerHTML = '<option value="">All Sensors</option>';
+    sensors.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = '📡 ' + s;
+      select.appendChild(opt);
+    });
+    if (savedValue) select.value = savedValue;
+  } catch(e) {
+    console.error('Failed to parse sensor list:', e);
+    // If parsing fails, just reset
+    select.innerHTML = '<option value="">All Sensors</option>';
+  }
+}
+
+// --- Chart.js live chart management ---
+var chartInstances = {};
+var chartRefreshInterval = null;
+
+function createChart(canvasId, label, color, borderColor) {
+  var ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  return new Chart(ctx.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: label,
+        data: [],
+        borderColor: borderColor,
+        backgroundColor: color,
+        borderWidth: 2,
+        pointRadius: 1,
+        pointHoverRadius: 4,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(56,189,248,0.06)' },
+          ticks: { color: '#3d5575', font: { size: 9, family: 'Courier New' }, maxTicksLimit: 8 }
+        },
+        y: {
+          grid: { color: 'rgba(56,189,248,0.06)' },
+          ticks: { color: '#3d5575', font: { size: 9, family: 'Courier New' } }
+        }
+      }
+    }
+  });
+}
+
+async function refreshCharts() {
+  var containers = document.querySelectorAll('.sensor-charts');
+  for (var container of containers) {
+    var sensorId = container.dataset.sensor;
+    if (!sensorId) continue;
+    try {
+      var resp = await fetch('/sensors/' + encodeURIComponent(sensorId) + '/chart?minutes=5');
+      var data = await resp.json();
+      updateSensorCharts(sensorId, data);
+    } catch(e) {
+      console.error('Chart refresh error for ' + sensorId + ':', e);
+    }
+  }
+}
+
+function updateSensorCharts(sensorId, data) {
+  var metrics = ['temperature', 'humidity', 'pressure'];
+  for (var metric of metrics) {
+    var key = sensorId + '-' + metric;
+    var chart = chartInstances[key];
+    if (chart) {
+      chart.data.labels = data.labels;
+      chart.data.datasets[0].data = data[metric];
+      chart.update('none');
+    }
+  }
+}
+
+function initChartsForSensor(sensorId) {
+  var prefix = sensorId.replace(/[^a-zA-Z0-9]/g, '_');
+  chartInstances[sensorId + '-temperature'] = createChart(
+    'chart-temp-' + prefix, 'Temperature (°C)',
+    'rgba(239,68,68,0.1)', 'rgba(239,68,68,0.8)'
+  );
+  chartInstances[sensorId + '-humidity'] = createChart(
+    'chart-hum-' + prefix, 'Humidity (%)',
+    'rgba(56,189,248,0.1)', 'rgba(56,189,248,0.8)'
+  );
+  chartInstances[sensorId + '-pressure'] = createChart(
+    'chart-pres-' + prefix, 'Pressure (hPa)',
+    'rgba(245,158,11,0.1)', 'rgba(245,158,11,0.8)'
+  );
+}
+
+function startChartRefresh() {
+  if (chartRefreshInterval) return;
+  // Initialize charts after HTMX loads the charts partial
+  // Wait for HTMX to finish inserting chart canvases into the DOM before initializing Chart.js
+  setTimeout(function() {
+    var containers = document.querySelectorAll('.sensor-charts');
+    containers.forEach(function(c) { initChartsForSensor(c.dataset.sensor); });
+    refreshCharts();
+  }, 300);
+  chartRefreshInterval = setInterval(refreshCharts, 3000);
+}
+
+function stopChartRefresh() {
+  if (chartRefreshInterval) {
+    clearInterval(chartRefreshInterval);
+    chartRefreshInterval = null;
+  }
+}
+
+// Update "seconds ago" on dashboard cards
+function updateAges() {
+  document.querySelectorAll('.live-age').forEach(function(el) {
+    var ts = el.dataset.ts;
+    if (!ts) return;
+    var then = new Date(ts);
+    var now = new Date();
+    var secs = Math.round((now - then) / 1000);
+    if (secs < 60) {
+      el.textContent = secs + 's ago';
+      el.style.color = secs < 10 ? 'var(--success)' : 'var(--dim)';
+    } else {
+      el.textContent = Math.round(secs / 60) + 'm ago';
+      el.style.color = 'var(--dim)';
+    }
+  });
+}
+setInterval(updateAges, 1000);
+// Re-initialize charts when HTMX swaps in the charts partial
+document.addEventListener('htmx:afterSwap', function(evt) {
+  if (evt.detail.target && evt.detail.target.id === 'charts-container') {
+    var containers = document.querySelectorAll('.sensor-charts');
+    containers.forEach(function(c) { initChartsForSensor(c.dataset.sensor); });
+    refreshCharts();
+  }
+});
+</script>
+
+{% endblock %}

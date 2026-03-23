@@ -1,0 +1,45 @@
+<!-- Simulator status partial — polled every 2s by HTMX -->
+<div style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid #2d1b69;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+        <span style="font-size: 0.8rem; font-weight: bold;">
+            {% if sim.active_users > 0 %}
+            <span class="sim-badge active">● LIVE</span>
+            {% else %}
+            <span class="sim-badge idle">○ IDLE</span>
+            {% endif %}
+            {{ sim.active_users }} agent{{ "s" if sim.active_users != 1 else "" }}
+        </span>
+        <span style="font-size: 0.7rem; color: #9b8bb4;">
+            {{ sim.total_hits }} total hits
+        </span>
+    </div>
+
+    {% if sim.users %}
+    <ul class="user-list">
+        {% for u in sim.users %}
+        <li>
+            <span>
+                <span style="color: #69f0ae;">{{ u.id }}</span>
+                <span class="pattern-tag pattern-{{ u.pattern }}">{{ u.pattern }}</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="color: #e040fb; font-size: 0.7rem;">{{ u.hits }} hits</span>
+                <form style="margin: 0;">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <button type="submit" class="btn-stop-one"
+                            hx-post="/ui/sim/stop"
+                            hx-target="#sim-panel"
+                            hx-include="closest form">
+                        ✕
+                    </button>
+                </form>
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p style="font-size: 0.72rem; color: #9b8bb4; text-align: center; padding: 0.5rem 0;">
+        No active agents — start some to see counters move!
+    </p>
+    {% endif %}
+</div>

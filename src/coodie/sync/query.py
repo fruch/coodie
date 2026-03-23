@@ -51,6 +51,7 @@ class QuerySet:
         "_group_by_val",
         "_select_token_val",
         "_cast_val",
+        "_ann_of_val",
         "_validate_val",
     )
 
@@ -78,6 +79,7 @@ class QuerySet:
         group_by_val: list[str] | None = None,
         select_token_val: list[str] | None = None,
         cast_val: list[tuple[str, str]] | None = None,
+        ann_of_val: tuple[str, list[float]] | None = None,
         validate_val: bool | None = None,
     ) -> None:
         self._doc_cls = doc_cls
@@ -101,7 +103,8 @@ class QuerySet:
         self._group_by_val: list[str] = group_by_val or []
         self._select_token_val = select_token_val
         self._cast_val = cast_val
-        new._validate_val = validate_val
+        self._ann_of_val = ann_of_val
+        self._validate_val = validate_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -130,6 +133,7 @@ class QuerySet:
         new._group_by_val = self._group_by_val
         new._select_token_val = self._select_token_val
         new._cast_val = self._cast_val
+        new._ann_of_val = self._ann_of_val
         new._validate_val = self._validate_val
         for key, val in overrides.items():
             setattr(new, f"_{key}", val)

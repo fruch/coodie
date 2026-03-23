@@ -871,3 +871,79 @@ async def test_select_token_generates_correct_cql(Item, queryset_cls, registered
     await _maybe_await(queryset_cls(Item).select_token("id").all)
     stmt, _ = registered_mock_driver.executed[0]
     assert 'TOKEN("id")' in stmt
+
+
+# ------------------------------------------------------------------
+# Phase 9: model_construct() fast path & validate() chain method
+# ------------------------------------------------------------------
+
+
+def test_validate_returns_new_queryset(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).validate()
+    assert qs._validate_val is True
+
+
+def test_validate_false_returns_new_queryset(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item).validate(False)
+    assert qs._validate_val is False
+
+
+def test_default_validate_is_none(Item, queryset_cls, registered_mock_driver):
+    qs = queryset_cls(Item)
+    assert qs._validate_val is None
+
+
+async def test_all_default_uses_model_construct(Item, queryset_cls, registered_mock_driver):
+    """Default path uses model_construct (fast, no validation) — result is an Item instance."""
+    uid = uuid4()
+    registered_mock_driver.set_return_rows([{"id": uid, "name": "Constructed", "rating": 5}])
+    results = await _maybe_await(queryset_cls(Item).all)
+    assert len(results) == 1
+    assert isinstance(results[0], Item)
+    assert results[0].id == uid
+    assert results[0].name == "Constructed"
+    assert results[0].rating == 5
+
+
+async def test_all_validate_true_uses_model_validate(Item, queryset_cls, registered_mock_driver):
+    """validate() forces model_validate path — result is still an Item instance."""
+    uid = uuid4()
+    registered_mock_driver.set_return_rows([{"id": uid, "name": "Validated", "rating": 3}])
+    results = await _maybe_await(queryset_cls(Item).validate().all)
+    assert len(results) == 1
+    assert isinstance(results[0], Item)
+    assert results[0].name == "Validated"
+
+
+async def test_model_construct_preserves_fields_set(Item, queryset_cls, registered_mock_driver):
+    """model_construct (default) sets _fields_set correctly from row keys."""
+    uid = uuid4()
+    registered_mock_driver.set_return_rows([{"id": uid, "name": "Test", "rating": 1}])
+    results = await _maybe_await(queryset_cls(Item).all)
+    assert results[0].model_fields_set == {"id", "name", "rating"}
+
+
+async def test_model_construct_empty_rows_returns_empty(Item, queryset_cls, registered_mock_driver):
+    """Empty row list returns empty list without errors."""
+    results = await _maybe_await(queryset_cls(Item).all)
+    assert results == []
+
+
+async def test_count_uses_one_path(Item, queryset_cls, registered_mock_driver):
+    """count() uses the execute_one path."""
+    registered_mock_driver.set_return_rows([{"count": 99}])
+    count = await _maybe_await(queryset_cls(Item).count)
+    assert count == 99
+
+
+async def test_count_returns_zero_on_none(Item, queryset_cls, registered_mock_driver):
+    """count() returns 0 when execute_one returns None (empty result)."""
+    count = await _maybe_await(queryset_cls(Item).count)
+    assert count == 0
+
+
+async def test_aggregate_uses_one_path(Item, queryset_cls, registered_mock_driver):
+    """_aggregate/sum/avg use the execute_one path."""
+    registered_mock_driver.set_return_rows([{"system.sum(rating)": 42}])
+    result = await _maybe_await(lambda: queryset_cls(Item).sum("rating"))
+    assert result == 42

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773935214680,
+  "lastUpdate": 1774240895504,
   "repoUrl": "https://github.com/fruch/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -12741,6 +12741,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.601814102640509e-7",
             "extra": "mean: 5.467411148426003 usec\nrounds: 6871"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "29139614+renovate[bot]@users.noreply.github.com",
+            "name": "renovate[bot]",
+            "username": "renovate[bot]"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "7902c326d74ecdf0454e520dda1decc329e6ed0c",
+          "message": "chore(deps): update pre-commit hook astral-sh/ruff-pre-commit to v0.15.6",
+          "timestamp": "2026-03-23T06:40:56+02:00",
+          "tree_id": "92c23f4e2afae4160b1b7579ada7cb854e45f45c",
+          "url": "https://github.com/fruch/coodie/commit/7902c326d74ecdf0454e520dda1decc329e6ed0c"
+        },
+        "date": 1774240892338,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 53174.081551664654,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000017183370590345018",
+            "extra": "mean: 18.80615463058608 usec\nrounds: 8433"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1642250.854891053,
+            "unit": "iter/sec",
+            "range": "stddev: 3.2266775586367267e-7",
+            "extra": "mean: 608.9203711002727 nsec\nrounds: 193799"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 149971.2258913593,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002658836423985084",
+            "extra": "mean: 6.667945761304974 usec\nrounds: 19322"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 576647.4263356354,
+            "unit": "iter/sec",
+            "range": "stddev: 4.110405693726568e-7",
+            "extra": "mean: 1.7341619060967666 usec\nrounds: 43587"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 616374.0223521875,
+            "unit": "iter/sec",
+            "range": "stddev: 4.0140152543700426e-7",
+            "extra": "mean: 1.6223915410708434 usec\nrounds: 37286"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 837357.9909437413,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7872685533504344e-7",
+            "extra": "mean: 1.1942323484283628 usec\nrounds: 145497"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 882691.0450756117,
+            "unit": "iter/sec",
+            "range": "stddev: 3.1727983933411134e-7",
+            "extra": "mean: 1.1328992240023683 usec\nrounds: 78223"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 659836.2107527644,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5965585858270873e-7",
+            "extra": "mean: 1.5155276168598943 usec\nrounds: 91828"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 182987.3729048551,
+            "unit": "iter/sec",
+            "range": "stddev: 8.148552437787919e-7",
+            "extra": "mean: 5.464857952356929 usec\nrounds: 7765"
           }
         ]
       }

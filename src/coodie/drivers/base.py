@@ -14,6 +14,12 @@ def _is_ddl(cql: str) -> bool:
 class AbstractDriver(ABC):
     """Abstract base class for coodie execution backends."""
 
+    # Set to ``True`` in driver subclasses whose rows may contain raw
+    # types that require Pydantic coercion (e.g. UUID strings instead of
+    # ``uuid.UUID``).  When ``True`` the QuerySet auto-selects
+    # ``model_validate()`` instead of the fast ``model_construct()`` path.
+    needs_row_validation: bool = False
+
     # ------------------------------------------------------------------
     # Synchronous interface
     # ------------------------------------------------------------------
@@ -77,6 +83,36 @@ class AbstractDriver(ABC):
         drop_removed_indexes: bool = False,
     ) -> list[str]:
         """Async version of :meth:`sync_table`."""
+
+    # ------------------------------------------------------------------
+    # One-row helpers (default implementations; drivers may override)
+    # ------------------------------------------------------------------
+
+    def execute_one(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        """Execute *stmt* and return the first column of the first row, or ``None``."""
+        rows = self.execute(stmt, params, consistency=consistency, timeout=timeout)
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    async def execute_one_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        """Async version of :meth:`execute_one`."""
+        rows = await self.execute_async(stmt, params, consistency=consistency, timeout=timeout)
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
 
     @abstractmethod
     async def close_async(self) -> None:

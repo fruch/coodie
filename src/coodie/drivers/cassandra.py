@@ -268,6 +268,70 @@ class CassandraDriver(AbstractDriver):
         )
         return {r["index_name"] for r in self._rows_to_dicts(rows)}
 
+    # ------------------------------------------------------------------
+    # One-row shortcut — bypasses _rows_to_dicts() and list() allocation
+    # ------------------------------------------------------------------
+
+    def execute_one(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        prepared = self._prepare(stmt)
+        bound = prepared.bind(params)
+        if consistency is not None:
+            from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
+
+            bound.consistency_level = getattr(ConsistencyLevel, consistency)
+        execute_kwargs: dict[str, Any] = {}
+        if timeout is not None:
+            execute_kwargs["timeout"] = timeout
+        result = self._session.execute(bound, **execute_kwargs)
+        row = result.one()
+        if row is None:
+            return None
+        if isinstance(row, dict):
+            return next(iter(row.values()))
+        if hasattr(row, "_asdict"):
+            return next(iter(row._asdict().values()))
+        return row[0]
+
+    async def execute_one_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        prepared = self._prepare(stmt)
+        bound = prepared.bind(params)
+        if consistency is not None:
+            from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
+
+            bound.consistency_level = getattr(ConsistencyLevel, consistency)
+        execute_kwargs: dict[str, Any] = {}
+        if timeout is not None:
+            execute_kwargs["timeout"] = timeout
+        future = self._session.execute_async(bound, **execute_kwargs)
+        result = await self._wrap_future(future)
+        if result is None:
+            return None
+        # The callback bridge delivers a plain list (not a ResultSet),
+        # so we index into it directly instead of using .one().
+        if isinstance(result, list):
+            row = result[0] if result else None
+        else:
+            row = result.one()
+        if row is None:
+            return None
+        if isinstance(row, dict):
+            return next(iter(row.values()))
+        if hasattr(row, "_asdict"):
+            return next(iter(row._asdict().values()))
+        return row[0]
+
     def close(self) -> None:
         self._session.cluster.shutdown()
 

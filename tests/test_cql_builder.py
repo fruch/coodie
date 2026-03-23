@@ -969,3 +969,98 @@ def test_create_table_with_duration_column():
     ]
     cql = build_create_table("events", "ks", cols)
     assert '"ttl_duration" duration' in cql
+
+
+# ---- build_insert_json (Phase 5) ----
+
+
+def test_build_insert_json_basic():
+    cql, params = build_insert_json("users", "ks", '{"id": "1", "name": "Alice"}')
+    assert cql == "INSERT INTO ks.users JSON ?"
+    assert params == ['{"id": "1", "name": "Alice"}']
+
+
+def test_build_insert_json_if_not_exists():
+    cql, _ = build_insert_json("users", "ks", "{}", if_not_exists=True)
+    assert "IF NOT EXISTS" in cql
+
+
+def test_build_insert_json_with_ttl():
+    cql, _ = build_insert_json("users", "ks", "{}", ttl=300)
+    assert "USING TTL 300" in cql
+
+
+def test_build_insert_json_with_timestamp():
+    cql, _ = build_insert_json("users", "ks", "{}", timestamp=1234567890)
+    assert "USING TIMESTAMP 1234567890" in cql
+
+
+# ---- build_select_json (Phase 5) ----
+
+
+def test_build_select_json_basic():
+    cql, params = build_select_json("users", "ks")
+    assert cql == "SELECT JSON * FROM ks.users"
+    assert params == []
+
+
+def test_build_select_json_with_where():
+    where = [("id", "=", "1")]
+    cql, params = build_select_json("users", "ks", where=where)
+    assert "SELECT JSON * FROM ks.users" in cql
+    assert 'WHERE "id" = ?' in cql
+    assert params == ["1"]
+
+
+def test_build_select_json_with_limit():
+    cql, _ = build_select_json("users", "ks", limit=10)
+    assert "LIMIT 10" in cql
+
+
+def test_build_select_json_allow_filtering():
+    cql, _ = build_select_json("users", "ks", allow_filtering=True)
+    assert "ALLOW FILTERING" in cql
+
+
+# ---- build_select_writetime (Phase 5) ----
+
+
+def test_build_select_writetime_basic():
+    cql, params = build_select_writetime("users", "ks", "name")
+    assert cql == 'SELECT WRITETIME("name") FROM ks.users'
+    assert params == []
+
+
+def test_build_select_writetime_with_where():
+    where = [("id", "=", "1")]
+    cql, params = build_select_writetime("users", "ks", "name", where=where)
+    assert 'SELECT WRITETIME("name") FROM ks.users' in cql
+    assert 'WHERE "id" = ?' in cql
+    assert params == ["1"]
+
+
+def test_build_select_writetime_allow_filtering():
+    cql, _ = build_select_writetime("users", "ks", "name", allow_filtering=True)
+    assert "ALLOW FILTERING" in cql
+
+
+# ---- build_select_column_ttl (Phase 5) ----
+
+
+def test_build_select_column_ttl_basic():
+    cql, params = build_select_column_ttl("users", "ks", "name")
+    assert cql == 'SELECT TTL("name") FROM ks.users'
+    assert params == []
+
+
+def test_build_select_column_ttl_with_where():
+    where = [("id", "=", "1")]
+    cql, params = build_select_column_ttl("users", "ks", "name", where=where)
+    assert 'SELECT TTL("name") FROM ks.users' in cql
+    assert 'WHERE "id" = ?' in cql
+    assert params == ["1"]
+
+
+def test_build_select_column_ttl_allow_filtering():
+    cql, _ = build_select_column_ttl("users", "ks", "name", allow_filtering=True)
+    assert "ALLOW FILTERING" in cql

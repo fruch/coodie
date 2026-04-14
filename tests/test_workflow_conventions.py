@@ -149,7 +149,7 @@ def test_schedule_cron_valid(workflow_path: Path):
 # ---------------------------------------------------------------------------
 
 _SLASH_COMMAND_WORKFLOWS = [
-    p for p in WORKFLOW_FILES if p.name in ("pr-rebase-squash.yml", "pr-solve-command.yml", "pr-conflict-detect.yml")
+    p for p in WORKFLOW_FILES if p.name in ("pr-conflict-detect.yml",)
 ]
 
 

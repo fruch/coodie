@@ -43,7 +43,7 @@ implementation phases:
 | `udt-support.md` | 7 phases | Mixed (some ✅, some ⏳) |
 | `documentation-plan.md` | 6 phases | Mixed (checkboxes in milestones) |
 | `performance-improvement.md` | 5 phases | Multiple completed |
-| `pr-comment-rebase-squash-action.md` | 5 phases | All ✅ |
+| `pr-comment-rebase-squash-action.md` (removed) | 5 phases | All ✅ |
 | `github-actions-testing-plan.md` | 4 phases | Partial |
 | `python-rs-driver-support.md` | Multiple phases | Partial |
 
@@ -61,7 +61,6 @@ The repository already has patterns for post-merge automation:
 | Workflow | Pattern |
 |---|---|
 | `self-healing-ci.yml` | `workflow_run` trigger → react to completed workflows |
-| `pr-rebase-squash.yml` | `issue_comment` trigger → Copilot CLI integration |
 | `ci.yml` | `push` to master → semantic-release |
 
 ---
@@ -111,7 +110,7 @@ Legend:
 | Parse plan markdown for phases | ❌ | Need to extract phase headers and status markers |
 | Identify next incomplete phase | ❌ | Need logic to scan phases for first non-✅ phase |
 | Extract phase tasks for prompt | ❌ | Need to extract phase goal and task table for the Copilot CLI prompt |
-| Invoke Copilot CLI to delegate task | 🔧 | Copilot CLI already used in `pr-rebase-squash.yml`; need `gh copilot` with task prompt |
+| Invoke Copilot CLI to delegate task | 🔧 | Copilot CLI integration pattern can be reused |
 | Handle "all phases complete" | ❌ | Post a congratulatory comment on the merged PR |
 | Conventional plan-reference format | ❌ | Need a convention: `Plan: docs/plans/<name>.md` in PR body |
 
@@ -143,7 +142,7 @@ phase structure, status, and task tables.
 | 1.3 | Detect phase completion via ✅ in phase header **or** all tasks in the phase table having ✅ status | ✅ |
 | 1.4 | Extract the task table (markdown) for each phase so it can be included in the delegation prompt | ✅ |
 | 1.5 | Add unit tests for the parser in `.github/scripts/test_parse_plan.py` using `pytest` | ✅ |
-| 1.6 | Test against real plan files: `udt-support.md`, `documentation-plan.md`, `pr-comment-rebase-squash-action.md` | ✅ |
+| 1.6 | Test against real plan files: `udt-support.md`, `documentation-plan.md` | ✅ |
 
 ### Phase 2: PR-to-Plan Linking Convention ✅
 
@@ -187,7 +186,7 @@ delegate execution of that phase — no intermediate GitHub issue needed.
 | 4.1 | Install Copilot CLI in the workflow (`npm install -g @github/copilot` or use `gh copilot`) | ✅ |
 | 4.2 | Construct the delegation prompt: "Continue to phase N of plan `<path>`. Goal: `<goal>`. Tasks: `<task list>`" | ✅ |
 | 4.3 | Invoke `gh copilot` (or `copilot -p`) with the constructed prompt to delegate the task | ✅ |
-| 4.4 | Authenticate with Copilot using the `COPILOT_PAT` secret (same pattern as `pr-rebase-squash.yml`) | ✅ |
+| 4.4 | Authenticate with Copilot using the `COPILOT_PAT` secret | ✅ |
 | 4.5 | If all phases are complete, post a comment on the merged PR: "🎉 All phases of \<plan\> are now complete!" | ✅ |
 | 4.6 | If Copilot CLI is unavailable (no `COPILOT_PAT`), degrade gracefully: post a PR comment with the next phase details and a manual prompt suggestion instead | ✅ |
 | 4.7 | Log the delegation prompt and Copilot CLI response to `$GITHUB_STEP_SUMMARY` | ✅ |
@@ -541,7 +540,7 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           PHASE_CONTENT=$(cat /tmp/next-phase-content.md)
 
-          # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
+          # Install Copilot CLI
           npm install -g @github/copilot 2>/dev/null || true
 
           # Construct the delegation prompt
@@ -662,7 +661,7 @@ gh run view <run-id> --log
 | Arbitrary file read via plan reference | Plan path is validated against `docs/plans/*.md` pattern; no path traversal possible |
 | Copilot CLI prompt injection via plan content | Plan files are committed to the repo and reviewed via PRs; prompt content is repo-controlled, not user-supplied |
 | Unauthorized plan continuation | Only merged PRs trigger the workflow; merge permissions are governed by branch protection rules |
-| `COPILOT_PAT` secret exposure | The PAT is only exposed via `COPILOT_GITHUB_TOKEN` env var in the delegation step; it is never logged or passed to other steps. If the secret is missing, the workflow degrades gracefully (posts manual prompt instead). This token only needs the **Copilot Requests (Read)** account permission — no repo write access. For full PAT setup instructions, see `pr-comment-rebase-squash-action.md` [§5.3](pr-comment-rebase-squash-action.md#53-creating-copilot_pat-copilot-cli-access) |
+| `COPILOT_PAT` secret exposure | The PAT is only exposed via `COPILOT_GITHUB_TOKEN` env var in the delegation step; it is never logged or passed to other steps. If the secret is missing, the workflow degrades gracefully (posts manual prompt instead). This token only needs the **Copilot Requests (Read)** account permission — no repo write access. |
 | `GITHUB_TOKEN` scope | Token is limited to `contents: read`, `pull-requests: write` — minimum required permissions |
 | Concurrent delegation for same plan | Concurrency group per PR prevents parallel runs |
 
@@ -688,7 +687,6 @@ gh run view <run-id> --log
 | All phases complete | All phases have ✅ | `all_complete = true` |
 | No phases found | Plan with no `### Phase` headers | Empty phase list |
 | Real plan: `udt-support.md` | Actual file | Correctly identifies incomplete phases |
-| Real plan: `pr-comment-rebase-squash-action.md` | Actual file | All phases complete |
 
 ### 8.2 Workflow Integration Tests (Phase 3)
 
@@ -699,7 +697,7 @@ Because this is a workflow, integration testing is primarily manual:
 | **Bootstrap:** PR introduces a new plan file | PR adds `docs/plans/new-feature.md` with 3 phases | Copilot CLI delegates Phase 1 | 3, 4 |
 | **Bootstrap:** PR introduces plan, all phases already ✅ | PR adds fully-completed plan file | "All phases complete" comment | 3, 4 |
 | PR with plan reference, next phase exists | PR body contains `Plan: docs/plans/udt-support.md` | Copilot CLI invoked with next phase prompt | 3, 4 |
-| PR with plan reference, all phases done | PR body contains `Plan: docs/plans/pr-comment-rebase-squash-action.md` | "All phases complete" comment | 3, 4 |
+| PR with plan reference, all phases done | PR body contains `Plan:` pointing to a fully-completed plan | "All phases complete" comment | 3, 4 |
 | PR with no plan reference and no plan files changed | Normal PR body, no `docs/plans/` files touched | Workflow exits silently | 3 |
 | PR with invalid plan path | `Plan: docs/plans/nonexistent.md` | Warning comment posted | 5 |
 | PR closed without merge | PR closed via "Close" button | Workflow does not run | 3 |
@@ -725,7 +723,6 @@ Because this is a workflow, integration testing is primarily manual:
 - [GitHub Actions: `pull_request` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request)
 - [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
 - [GitHub Copilot coding agent](https://docs.github.com/en/copilot/using-github-copilot/using-copilot-coding-agent)
-- [Existing `pr-rebase-squash.yml`](../../.github/workflows/pr-rebase-squash.yml) — Copilot CLI integration pattern
 - [Existing `self-healing-ci.yml`](../../.github/workflows/self-healing-ci.yml) — pattern for PR commenting
 - [Plan writing conventions](../../.github/skills/writing-plans/SKILL.md)
 - [Conventional Commits specification](https://www.conventionalcommits.org/)

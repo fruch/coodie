@@ -48,14 +48,12 @@ The repository has 11 GitHub Actions workflow files:
 | 5 | Docs | `docs.yml` | `push` (master) | 66 |
 | 6 | Publish | `publish.yml` | `push` (tags) | 41 |
 | 7 | Labels | `labels.yml` | `push` (master, `.github/labels.toml`) | 22 |
-| 8 | PR Rebase & Squash | `pr-rebase-squash.yml` | `issue_comment`, `workflow_dispatch` | 272 |
-| 9 | Self-Healing CI | `self-healing-ci.yml` | `workflow_run` | 108 |
-| 10 | Issue Manager | `issue-manager.yml` | `issue_comment`, `schedule` | 32 |
-| 11 | Hacktoberfest | `hacktoberfest.yml` | `schedule` | 17 |
+| 8 | Self-Healing CI | `self-healing-ci.yml` | `workflow_run` | 108 |
+| 9 | Issue Manager | `issue-manager.yml` | `issue_comment`, `schedule` | 32 |
 
 **There is no automated testing of any workflow file today.** The only
 validation is GitHub's built-in YAML parsing on push and manual smoke
-testing described in `docs/plans/pr-comment-rebase-squash-action.md`.
+testing.
 
 ### 1.2 Complexity Assessment
 
@@ -76,10 +74,7 @@ Legend:
 | Publish | 🟢 | No | PyPI OIDC, artifact upload |
 | Labels | 🟢 | No | Single marketplace action |
 | Issue Manager | 🟢 | No | Single marketplace action |
-| Hacktoberfest | 🟢 | No | Single marketplace action |
-
-**The two 🔴-complexity workflows (`pr-rebase-squash.yml` and
-`self-healing-ci.yml`) contain the most shell logic and are the highest
+**The `self-healing-ci.yml` workflow contains the most shell logic and is the highest
 priority for testing.**
 
 ---
@@ -143,12 +138,9 @@ environment.
 - **Slow** — each run starts a Docker container (~10-30 s overhead)
 - **Event simulation is fragile** — complex events like `issue_comment`
   require hand-crafted JSON payloads that drift from GitHub's actual schema
-- **`pr-rebase-squash.yml` specifically** — uses `gh api` calls that
-  require a real GitHub API token and a real PR; act cannot easily mock these
-
 **Applicability to coodie:** 🔧 Medium — useful for testing simple
-workflows (`test-unit.yml`, `ci.yml`) but impractical for the complex
-workflows (`pr-rebase-squash.yml`) that rely on real GitHub API state.
+workflows (`test-unit.yml`, `ci.yml`) but impractical for complex
+workflows that rely on real GitHub API state.
 
 ### 2.3 Bats — Shell Script Unit Testing
 
@@ -173,10 +165,9 @@ System) is a TAP-compliant testing framework for Bash scripts.
 - Cannot test GitHub-specific context variables (`${{ github.event.* }}`)
   without mocking
 
-**Applicability to coodie:** ✅ High — the `pr-rebase-squash.yml` workflow
-has 9 shell steps with complex conditional logic (command parsing, rebase,
-squash with Copilot fallback). Extracting these into testable scripts and
-testing with Bats gives the highest confidence in the most complex logic.
+**Applicability to coodie:** ✅ High — workflows with complex shell logic
+benefit from extracting steps into testable scripts and testing with Bats
+for the highest confidence in the most complex logic.
 
 ### 2.4 Python / pytest — YAML Validation & Script Testing
 
@@ -233,9 +224,8 @@ define any custom JavaScript or TypeScript Actions.
 
 ### 2.6 workflow_dispatch — Live Smoke Tests
 
-The `pr-rebase-squash.yml` workflow already supports `workflow_dispatch`
-with `pr_number` and `command` inputs (lines 21-34). This enables
-triggering the workflow manually from the Actions tab for testing.
+Some workflows support `workflow_dispatch` triggers, enabling
+manual testing from the Actions tab.
 
 **What it tests:**
 - Full end-to-end behavior in the real GitHub environment
@@ -243,7 +233,6 @@ triggering the workflow manually from the Actions tab for testing.
 
 **Pros:**
 - Tests the actual production environment — 100% fidelity
-- Already implemented in `pr-rebase-squash.yml`
 - Can be automated via `gh workflow run` in a dedicated test workflow
 
 **Cons:**
@@ -252,9 +241,9 @@ triggering the workflow manually from the Actions tab for testing.
 - Slower than local testing (~30-60 s per run)
 - Side effects (pushes force-with-lease, posts comments) require cleanup
 
-**Applicability to coodie:** ✅ High — already available for
-`pr-rebase-squash.yml`. Can be extended to other workflows. Best used as
-a final validation step, not for rapid iteration.
+**Applicability to coodie:** ✅ High — can be extended to workflows
+that support `workflow_dispatch`. Best used as a final validation step,
+not for rapid iteration.
 
 ### 2.7 Comparison Matrix
 
@@ -303,13 +292,11 @@ testing pyramid** for workflows:
 While `act` is the most well-known workflow testing tool, it is
 **not the best fit** for coodie's most complex workflows:
 
-1. `pr-rebase-squash.yml` depends heavily on `gh api` calls with real
-   PRs — `act` cannot realistically mock this state.
-2. `self-healing-ci.yml` uses `workflow_run` triggers, which `act` does
+1. `self-healing-ci.yml` uses `workflow_run` triggers, which `act` does
    not fully support.
-3. The Docker overhead (~10-30 s startup + ~2 GB image) is disproportionate
+2. The Docker overhead (~10-30 s startup + ~2 GB image) is disproportionate
    for what are essentially Bash scripts with `gh` CLI calls.
-4. The shell logic is better tested by extracting it into scripts and
+3. The shell logic is better tested by extracting it into scripts and
    using Bats — this is faster, more targeted, and gives clearer
    failure messages.
 
@@ -335,14 +322,13 @@ primary testing mechanism. Developers can install it optionally.
 
 ### Phase 2: Shell Script Extraction & Bats Tests (Priority: High) ✅
 
-**Goal:** Extract the complex shell logic from `pr-rebase-squash.yml` and `self-healing-ci.yml` into standalone scripts, test them with Bats, and integrate Bats into the existing pytest suite via a custom pytest plugin.
+**Goal:** Extract the complex shell logic from workflows into standalone scripts, test them with Bats, and integrate Bats into the existing pytest suite via a custom pytest plugin.
 
 | Task | Description |
 |---|---|
 | 2.1 | Create `.github/scripts/` directory for extracted shell scripts |
-| 2.2 | Extract the "Parse slash command" step (lines 130-149 of `pr-rebase-squash.yml`) into `.github/scripts/parse-command.sh` |
-| 2.3 | Extract the "Squash commits" step's commit-message logic into `.github/scripts/build-squash-message.sh` |
-| 2.4 | Extract the "Collect failed job logs" step from `self-healing-ci.yml` into `.github/scripts/collect-failed-logs.sh` |
+| 2.2 | Extract complex shell steps from workflows into standalone scripts |
+| 2.3 | Extract the "Collect failed job logs" step from `self-healing-ci.yml` into `.github/scripts/collect-failed-logs.sh` |
 | 2.5 | Update workflow YAML files to source the extracted scripts instead of inline shell |
 | 2.6 | Create `tests/workflows/` directory for Bats test files |
 | 2.7 | Write Bats tests for `parse-command.sh`: `/rebase`, `/squash`, `/rebase squash`, mixed-case, leading whitespace, invalid input |
@@ -459,15 +445,14 @@ class BatsTestFailure(Exception):
 
 ### Phase 4: workflow_dispatch Smoke Tests (Priority: Low)
 
-**Goal:** Document and optionally automate live smoke tests for `pr-rebase-squash.yml` using its existing `workflow_dispatch` trigger.
+**Goal:** Document and optionally automate live smoke tests for workflows using `workflow_dispatch` triggers.
 
 | Task | Description |
 |---|---|
 | 4.1 | Document the manual smoke-test procedure in `CONTRIBUTING.md`: how to trigger via Actions tab, expected results, cleanup steps |
-| 4.2 | Create a test PR template (branch `test/workflow-smoke`) with known state (2 commits, no conflicts) for reproducible testing |
-| 4.3 | Add `workflow_dispatch` triggers to `self-healing-ci.yml` for manual testing (similar to how `pr-rebase-squash.yml` already has one) |
-| 4.4 | Optionally: create `.github/workflows/test-workflows.yml` that runs nightly, creates a test PR, triggers `/rebase squash`, and validates the result |
-| 4.5 | Verify: manual smoke test passes for all three commands (`rebase`, `squash`, `rebase squash`) |
+| 4.2 | Create a test PR template (branch `test/workflow-smoke`) with known state for reproducible testing |
+| 4.3 | Add `workflow_dispatch` triggers to `self-healing-ci.yml` for manual testing |
+| 4.4 | Verify: manual smoke tests pass |
 
 ---
 
@@ -548,6 +533,4 @@ class BatsTestFailure(Exception):
 - [Bats — Bash Automated Testing System](https://github.com/bats-core/bats-core)
 - [`@github/local-action` — Local Action Debugger](https://github.com/github/local-action)
 - [GitHub Actions workflow syntax reference](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions)
-- [Existing smoke-test plan for `pr-rebase-squash.yml`](pr-comment-rebase-squash-action.md#8-test-plan)
-- [PR Rebase & Squash workflow](../../.github/workflows/pr-rebase-squash.yml)
 - [Self-Healing CI workflow](../../.github/workflows/self-healing-ci.yml)

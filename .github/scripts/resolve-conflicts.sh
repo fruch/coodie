@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # resolve-conflicts.sh — Attempt to resolve git merge/rebase conflicts using
 # the GitHub Models API (via resolve-conflict-file.py).  Called by the
-# "Resolve conflicts" step in .github/workflows/pr-rebase-squash.yml (rebase
-# mode) and .github/workflows/pr-solve-command.yml (merge mode).
+# "Resolve conflicts" step used in rebase (rebase mode) and merge (merge mode)
+# workflows.
 #
 # This script replaces the previous Copilot CLI approach, which was blocked by
 # the CLI's permission sandbox in CI environments.  The Models API is called

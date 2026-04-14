@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776163103480,
+  "lastUpdate": 1776164556976,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -13176,6 +13176,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 5.788978125061892e-7",
             "extra": "mean: 4.425466287800472 usec\nrounds: 7742"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "262e2571f0961657758a3faa4497f9578c79ae37",
+          "message": "docs: add PyPI downloads badge and fix branch references in README\n\n- Add monthly downloads badge from shields.io/pypi\n- Fix badge branch parameters from `main` to `master`\n- Fix LICENSE, CONTRIBUTING.md, CHANGELOG.md links to use `blob/master`\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-14T14:01:51+03:00",
+          "tree_id": "4e0e37788eba91f23689e753022cfa29118dee8e",
+          "url": "https://github.com/scylladb/coodie/commit/262e2571f0961657758a3faa4497f9578c79ae37"
+        },
+        "date": 1776164555155,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 63905.2680713563,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018099614484771073",
+            "extra": "mean: 15.648162196634633 usec\nrounds: 8613"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1968950.7386573046,
+            "unit": "iter/sec",
+            "range": "stddev: 7.8942176114706e-8",
+            "extra": "mean: 507.8847227442239 nsec\nrounds: 197278"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 147193.80767105654,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000838215742686631",
+            "extra": "mean: 6.79376405721336 usec\nrounds: 18407"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 575675.5123501236,
+            "unit": "iter/sec",
+            "range": "stddev: 5.302429803371564e-7",
+            "extra": "mean: 1.7370896947094805 usec\nrounds: 48810"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 630992.1389203371,
+            "unit": "iter/sec",
+            "range": "stddev: 4.287511012805092e-7",
+            "extra": "mean: 1.584805797598455 usec\nrounds: 58645"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 855695.7444380457,
+            "unit": "iter/sec",
+            "range": "stddev: 3.646039817287494e-7",
+            "extra": "mean: 1.1686396788810984 usec\nrounds: 168039"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 866186.7653543993,
+            "unit": "iter/sec",
+            "range": "stddev: 3.6998814122457345e-7",
+            "extra": "mean: 1.1544854296992764 usec\nrounds: 83732"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 636206.5429816344,
+            "unit": "iter/sec",
+            "range": "stddev: 6.046119005195612e-7",
+            "extra": "mean: 1.5718165916895754 usec\nrounds: 90901"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 182887.09097620545,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015052945545864369",
+            "extra": "mean: 5.467854481485 usec\nrounds: 7676"
           }
         ]
       }

@@ -255,6 +255,35 @@ def build_where_clause(
     return "WHERE " + " AND ".join(parts), params
 
 
+# ---------------------------------------------------------------------------
+# Shared helpers for CQL template caching
+# ---------------------------------------------------------------------------
+
+
+def _where_to_shape(where: list[tuple[str, str, Any]]) -> tuple:
+    """Convert WHERE triples into a hashable shape tuple (excludes values)."""
+    parts = []
+    for col, op, value in where:
+        if op == "IN":
+            parts.append((col, op, len(value)))
+        elif op == "ISNULL":
+            parts.append((col, op, value))
+        else:
+            parts.append((col, op))
+    return tuple(parts)
+
+
+def _extract_where_params(where: list[tuple[str, str, Any]], params: list[Any]) -> None:
+    """Append bind-parameter values from WHERE triples into *params*."""
+    for _col, op, value in where:
+        if op == "ISNULL":
+            pass  # IS [NOT] NULL has no params
+        elif op == "IN":
+            params.extend(value)
+        else:
+            params.append(value)
+
+
 _select_cql_cache: dict[tuple, str] = {}
 
 
@@ -273,17 +302,8 @@ def build_select(
     cast: list[tuple[str, str]] | None = None,
     ann_of: tuple[str, list[float]] | None = None,
 ) -> tuple[str, list[Any]]:
-    where_shape: tuple = ()
-    if where:
-        shape_parts = []
-        for col, op, value in where:
-            if op == "IN":
-                shape_parts.append((col, op, len(value)))
-            elif op == "ISNULL":
-                shape_parts.append((col, op, value))
-            else:
-                shape_parts.append((col, op))
-        where_shape = tuple(shape_parts)
+    # Build the cache key from the query *shape* (excludes actual values).
+    where_shape = _where_to_shape(where) if where else ()
     cache_key = (
         table,
         keyspace,
@@ -302,13 +322,8 @@ def build_select(
 
     params: list[Any] = []
     if where:
-        for _col, op, value in where:
-            if op == "ISNULL":
-                pass
-            elif op == "IN":
-                params.extend(value)
-            else:
-                params.append(value)
+        _extract_where_params(where, params)
+
     # ANN vector param is appended after WHERE params.
     if ann_of is not None:
         params.append(ann_of[1])
@@ -363,25 +378,43 @@ def build_select(
     return cql, params
 
 
+# Cache for COUNT CQL templates keyed by query shape.
+_count_cql_cache: dict[tuple, str] = {}
+
+
 def build_count(
     table: str,
     keyspace: str,
     where: list[tuple[str, str, Any]] | None = None,
     allow_filtering: bool = False,
 ) -> tuple[str, list[Any]]:
-    cql = f"SELECT COUNT(*) FROM {keyspace}.{table}"
+    where_shape = _where_to_shape(where) if where else ()
+    cache_key = (table, keyspace, where_shape, allow_filtering)
+
     params: list[Any] = []
+    if where:
+        _extract_where_params(where, params)
+
+    cached_cql = _count_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
+    cql = f"SELECT COUNT(*) FROM {keyspace}.{table}"
 
     if where:
-        clause, where_params = build_where_clause(where)
+        clause, _wp = build_where_clause(where)
         if clause:
             cql += " " + clause
-            params.extend(where_params)
 
     if allow_filtering:
         cql += " ALLOW FILTERING"
 
+    _count_cql_cache[cache_key] = cql
     return cql, params
+
+
+# Cache for aggregate CQL templates keyed by query shape.
+_aggregate_cql_cache: dict[tuple, str] = {}
 
 
 def build_aggregate(
@@ -392,18 +425,28 @@ def build_aggregate(
     where: list[tuple[str, str, Any]] | None = None,
     allow_filtering: bool = False,
 ) -> tuple[str, list[Any]]:
-    cql = f'SELECT {func.upper()}("{column}") FROM {keyspace}.{table}'
+    where_shape = _where_to_shape(where) if where else ()
+    cache_key = (table, keyspace, func.upper(), column, where_shape, allow_filtering)
+
     params: list[Any] = []
+    if where:
+        _extract_where_params(where, params)
+
+    cached_cql = _aggregate_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
+    cql = f'SELECT {func.upper()}("{column}") FROM {keyspace}.{table}'
 
     if where:
-        clause, where_params = build_where_clause(where)
+        clause, _wp = build_where_clause(where)
         if clause:
             cql += " " + clause
-            params.extend(where_params)
 
     if allow_filtering:
         cql += " ALLOW FILTERING"
 
+    _aggregate_cql_cache[cache_key] = cql
     return cql, params
 
 
@@ -481,6 +524,10 @@ def parse_update_kwargs(
     return set_data, collection_ops
 
 
+# Cache for UPDATE CQL templates keyed by query shape.
+_update_cql_cache: dict[tuple, str] = {}
+
+
 def build_update(
     table: str,
     keyspace: str,
@@ -492,37 +539,66 @@ def build_update(
     if_exists: bool = False,
     timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
-    set_parts = [f'"{k}" = ?' for k in set_data]
+    # Build cache key from query shape (column names + ops, not values).
+    set_cols = tuple(set_data.keys())
+    col_ops_shape = tuple((col, op) for col, op, _v in collection_ops) if collection_ops else ()
+    where_shape = _where_to_shape(where) if where else ()
+    if_cond_cols = tuple(if_conditions.keys()) if if_conditions else ()
+    cache_key = (
+        table,
+        keyspace,
+        set_cols,
+        col_ops_shape,
+        where_shape,
+        ttl,
+        if_cond_cols,
+        if_exists,
+        timestamp,
+    )
+
+    # Extract params (always needed regardless of cache hit).
     params: list[Any] = list(set_data.values())
+    if collection_ops:
+        for _col, _op, value in collection_ops:
+            params.append(value)
+    _extract_where_params(where, params)
+    if if_conditions and not if_exists:
+        params.extend(if_conditions.values())
+
+    cached_cql = _update_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
+    set_parts = [f'"{k}" = ?' for k in set_data]
 
     if collection_ops:
-        for col, op, value in collection_ops:
+        for col, op, _value in collection_ops:
             if op in ("add", "append", "update"):
                 set_parts.append(f'"{col}" = "{col}" + ?')
-                params.append(value)
             elif op == "prepend":
                 set_parts.append(f'"{col}" = ? + "{col}"')
-                params.append(value)
             elif op == "remove":
                 set_parts.append(f'"{col}" = "{col}" - ?')
-                params.append(value)
 
     cql = f"UPDATE {keyspace}.{table}"
     cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
     cql += " SET " + ", ".join(set_parts)
 
-    clause, where_params = build_where_clause(where)
+    clause, _wp = build_where_clause(where)
     cql += " " + clause
-    params.extend(where_params)
 
     if if_exists:
         cql += " IF EXISTS"
     elif if_conditions:
         cond_parts = [f'"{k}" = ?' for k in if_conditions]
         cql += " IF " + " AND ".join(cond_parts)
-        params.extend(if_conditions.values())
 
+    _update_cql_cache[cache_key] = cql
     return cql, params
+
+
+# Cache for DELETE CQL templates keyed by query shape.
+_delete_cql_cache: dict[tuple, str] = {}
 
 
 def build_delete(
@@ -533,16 +609,34 @@ def build_delete(
     if_exists: bool = False,
     timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
+    where_shape = _where_to_shape(where) if where else ()
+    cache_key = (
+        table,
+        keyspace,
+        tuple(columns) if columns else None,
+        where_shape,
+        if_exists,
+        timestamp,
+    )
+
+    params: list[Any] = []
+    _extract_where_params(where, params)
+
+    cached_cql = _delete_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else ""
     cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace("DELETE  FROM", "DELETE FROM")
     cql += _build_using_clause(timestamp=timestamp)
 
-    clause, params = build_where_clause(where)
+    clause, _wp = build_where_clause(where)
     cql += " " + clause
 
     if if_exists:
         cql += " IF EXISTS"
 
+    _delete_cql_cache[cache_key] = cql
     return cql, params
 
 

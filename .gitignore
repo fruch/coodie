@@ -145,3 +145,6 @@ cython_debug/
 
 # Generated version file (from hatch-vcs)
 src/coodie/_version.py
+
+# Git worktrees
+.worktrees/

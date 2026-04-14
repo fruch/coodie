@@ -38,6 +38,7 @@ class ColumnDefinition:
     vector_index: bool = False
     vector_index_name: str | None = None
     vector_similarity_function: str | None = None
+    vector_index_options: dict | None = None
 
 
 def build_schema(doc_cls: type) -> list[ColumnDefinition]:
@@ -80,6 +81,8 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         # Determine CQL type — pass full annotation so markers are visible
         try:
             cql_type = python_type_to_cql_type_str(annotation)
+        except InvalidQueryError:
+            raise
         except Exception as exc:
             raise InvalidQueryError(
                 f"Cannot determine CQL type for field {field_name!r} on {doc_cls.__name__!r}: {exc}. "
@@ -98,6 +101,7 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         is_vector_index = False
         vector_index_name: str | None = None
         vector_similarity_function: str | None = None
+        vector_index_options: dict | None = None
 
         for meta in metadata:
             if isinstance(meta, PrimaryKey):
@@ -116,8 +120,9 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
                 is_static = True
             elif isinstance(meta, VectorIndex):
                 is_vector_index = True
-                vector_index_name = meta.index_name
                 vector_similarity_function = meta.similarity_function
+                if meta.similarity_function:
+                    vector_index_options = {"similarity_function": meta.similarity_function}
 
         # Determine required: check pydantic model_fields
         required = True
@@ -142,8 +147,26 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
                 vector_index=is_vector_index,
                 vector_index_name=vector_index_name,
                 vector_similarity_function=vector_similarity_function,
+                vector_index_options=vector_index_options,
             )
         )
+
+        # Validate VectorIndex constraints.
+        if is_vector_index:
+            if not isinstance(cql_type, str) or not cql_type.startswith("vector<"):
+                raise InvalidQueryError(
+                    f"VectorIndex can only be applied to vector columns; field '{field_name}' has type '{cql_type}'."
+                )
+            if is_indexed:
+                raise InvalidQueryError(
+                    f"Cannot apply both Indexed() and VectorIndex() on the same column '{field_name}'."
+                )
+            if is_primary_key:
+                raise InvalidQueryError(f"VectorIndex cannot be applied to a primary key column '{field_name}'.")
+            if is_clustering_key:
+                raise InvalidQueryError(f"VectorIndex cannot be applied to a clustering key column '{field_name}'.")
+            if is_static:
+                raise InvalidQueryError(f"VectorIndex cannot be applied to a static column '{field_name}'.")
 
     # Validate counter tables: non-PK/CK columns must all be counter, or none.
     counter_cols = [c for c in cols if c.cql_type == "counter"]
@@ -164,6 +187,27 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
 def _insert_columns(doc_cls: type) -> tuple[str, ...]:
     """Return ordered column names for INSERT, cached per model class."""
     return tuple(doc_cls.model_fields.keys())
+
+
+@functools.lru_cache(maxsize=128)
+def _vector_columns(doc_cls: type) -> tuple[tuple[str, int], ...]:
+    """Return ``((field_name, dimensions), …)`` for every ``Vector``-annotated field.
+
+    Used by ``save()`` to validate that list lengths match declared dimensions.
+    """
+    from coodie.fields import Vector
+
+    hints = _cached_type_hints(doc_cls)
+    result: list[tuple[str, int]] = []
+    for field_name, annotation in hints.items():
+        if field_name.startswith("_") or field_name == "Settings":
+            continue
+        origin = typing.get_origin(annotation)
+        if origin is typing.Annotated:
+            for meta in typing.get_args(annotation)[1:]:
+                if isinstance(meta, Vector):
+                    result.append((field_name, meta.dimensions))
+    return tuple(result)
 
 
 @functools.lru_cache(maxsize=128)

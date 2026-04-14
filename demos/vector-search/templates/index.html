@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔍 Neural Catalog — Vector Search Demo</title>
+    <title>📡 Signal Graveyard — Dimension-10</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <style>
         :root {
             --bg: #07080f; --bg-deep: #040508; --surface: #0d1020;
-            --surface-hover: #121528; --border: #1a2040; --border-glow: #243060;
+            --surface-hover: #121528; --border: #1a2040; --border-glow: #1e3060;
             --text: #c8d0e8; --muted: #5c6888; --dim: #2a3050;
-            --accent: #818cf8; --accent-glow: #6366f1; --accent-dim: #1e2155;
-            --accent-hover: #a5b4fc; --danger: #ef4444; --danger-dim: #7f1d1d;
-            --success: #34d399; --warning: #fbbf24;
-            --violet: #818cf8; --violet-dim: #151835; --ghost: rgba(129,140,248,0.07);
+            --accent: #38bdf8; --accent-glow: #0ea5e9; --accent-dim: #0c2a40;
+            --accent-hover: #7dd3fc; --danger: #ef4444; --danger-dim: #7f1d1d;
+            --success: #34d399; --warning: #fbbf24; --critical: #f87171;
+            --noise: #6b7280;
             --radius: 6px; --radius-lg: 12px;
         }
 
@@ -26,18 +26,17 @@
             line-height: 1.6;
             min-height: 100vh;
             background-image:
-                radial-gradient(ellipse at 20% 30%, rgba(99,102,241,0.05) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 70%, rgba(129,140,248,0.04) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 90%, rgba(99,102,241,0.03) 0%, transparent 50%);
+                radial-gradient(ellipse at 20% 30%, rgba(14,165,233,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(56,189,248,0.03) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 10%, rgba(14,165,233,0.03) 0%, transparent 40%);
         }
 
         a { color: var(--accent); text-decoration: none; }
-        a:hover { color: var(--accent-hover); text-shadow: 0 0 8px rgba(129,140,248,0.4); }
+        a:hover { color: var(--accent-hover); text-shadow: 0 0 8px rgba(56,189,248,0.4); }
 
         .container { max-width: 960px; margin: 0 auto; padding: 1rem; }
         @media (min-width: 768px) { .container { padding: 1.5rem; } }
 
-        /* Header */
         header {
             background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
             border-bottom: 1px solid var(--border-glow);
@@ -48,20 +47,18 @@
         header::after {
             content: '';
             position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--accent-glow), var(--violet), var(--accent-glow), transparent);
+            background: linear-gradient(90deg, transparent, var(--accent-glow), var(--accent), var(--accent-glow), transparent);
             animation: scan 4s linear infinite;
         }
         @keyframes scan { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
 
-        header .container {
-            display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-        }
+        header .container { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
         header h1 {
             font-size: 1.1rem; font-weight: 700; letter-spacing: 0.05em;
             text-transform: uppercase; white-space: nowrap;
         }
         @media (min-width: 768px) { header h1 { font-size: 1.3rem; } }
-        header h1 .glyph { color: var(--accent); text-shadow: 0 0 12px rgba(129,140,248,0.5); }
+        header h1 .glyph { color: var(--accent); text-shadow: 0 0 12px rgba(56,189,248,0.5); }
         header .badge {
             font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
             background: linear-gradient(135deg, var(--accent-dim), var(--border-glow));
@@ -69,13 +66,10 @@
             border: 1px solid var(--accent-dim); text-transform: uppercase;
             animation: pulse 3s ease-in-out infinite;
         }
-        @keyframes pulse { 0%, 100% { box-shadow: 0 0 4px rgba(129,140,248,0.2); } 50% { box-shadow: 0 0 12px rgba(129,140,248,0.5); } }
-        header .stat {
-            margin-left: auto; font-size: 0.7rem; color: var(--muted);
-        }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 4px rgba(56,189,248,0.2); } 50% { box-shadow: 0 0 12px rgba(56,189,248,0.5); } }
+        header .stat { margin-left: auto; font-size: 0.7rem; color: var(--muted); }
         header .stat strong { color: var(--accent); }
 
-        /* Lore panels */
         .lore-panel {
             background: linear-gradient(135deg, rgba(13,16,32,0.95), rgba(4,5,8,0.98));
             border: 1px solid var(--border);
@@ -92,7 +86,7 @@
         .lore-panel::before {
             content: '';
             position: absolute; top: 0; left: 0; right: 0; height: 100%;
-            background: linear-gradient(90deg, rgba(129,140,248,0.03), transparent 30%);
+            background: linear-gradient(90deg, rgba(56,189,248,0.03), transparent 30%);
             pointer-events: none;
         }
         .lore-panel .lore-title {
@@ -107,7 +101,6 @@
         .lore-panel em { color: var(--accent); font-style: normal; font-weight: 600; }
         .lore-panel strong { color: var(--accent-hover); font-weight: 700; }
 
-        /* Code snippet */
         .code-snippet {
             background: var(--bg-deep);
             border: 1px solid var(--border);
@@ -125,7 +118,6 @@
         .code-snippet .cm { color: var(--muted); font-style: italic; }
         .code-snippet .num { color: #f9a8d4; }
 
-        /* Search panel */
         .search-panel {
             background: var(--surface);
             border: 1px solid var(--border-glow);
@@ -145,9 +137,7 @@
             text-transform: uppercase; color: var(--accent);
             margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
         }
-        .search-row {
-            display: flex; gap: 0.5rem; margin-bottom: 0.75rem;
-        }
+        .search-row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
         .search-row input[type="text"] {
             flex: 1;
             background: var(--bg-deep);
@@ -162,7 +152,7 @@
         .search-row input[type="text"]:focus {
             outline: none;
             border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(129,140,248,0.15), inset 0 0 8px rgba(129,140,248,0.05);
+            box-shadow: 0 0 0 2px rgba(56,189,248,0.15), inset 0 0 8px rgba(56,189,248,0.05);
         }
         .search-row input::placeholder { color: var(--muted); font-style: italic; }
         .search-row button {
@@ -182,13 +172,10 @@
         }
         .search-row button:hover {
             background: linear-gradient(135deg, var(--accent-glow), var(--accent));
-            box-shadow: 0 0 16px rgba(129,140,248,0.3);
+            box-shadow: 0 0 16px rgba(56,189,248,0.3);
         }
 
-        /* Examples */
-        .examples {
-            display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem;
-        }
+        .examples { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
         .example-chip {
             font-size: 0.7rem; color: var(--muted);
             background: var(--bg-deep);
@@ -201,7 +188,7 @@
         .example-chip:hover {
             border-color: var(--accent-dim);
             color: var(--accent);
-            box-shadow: 0 0 6px rgba(129,140,248,0.2);
+            box-shadow: 0 0 6px rgba(56,189,248,0.2);
         }
         .examples-label {
             font-size: 0.65rem; color: var(--dim);
@@ -209,13 +196,9 @@
             margin-bottom: 0.3rem; margin-top: 0.75rem;
         }
 
-        /* Indicator */
-        .htmx-indicator { display: none; }
-        .htmx-request .htmx-indicator { display: inline; }
         #search-spinner { color: var(--accent); font-size: 0.75rem; margin-top: 0.5rem; display: none; }
         .htmx-request #search-spinner { display: block; }
 
-        /* Tabs */
         .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; }
         .tab-btn {
             font-family: inherit; font-size: 0.7rem; font-weight: 700;
@@ -227,10 +210,8 @@
         .tab-btn:hover { color: var(--accent); }
         .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-        /* Results area */
         #results { min-height: 120px; }
 
-        /* Footer */
         .footer {
             margin-top: 3rem; padding-top: 1rem;
             border-top: 1px solid var(--border);
@@ -242,10 +223,10 @@
 <body>
     <header>
         <div class="container">
-            <h1><span class="glyph">⬡</span> NEURAL&nbsp;CATALOG&nbsp;<span class="glyph">—</span> VECTOR&nbsp;SEARCH</h1>
-            <span class="badge">ANN · COSINE</span>
+            <h1><span class="glyph">📡</span> SIGNAL&nbsp;GRAVEYARD&nbsp;<span class="glyph">—</span>&nbsp;DIMENSION-10</h1>
+            <span class="badge">ANN · COSINE · 384D</span>
             <span class="stat">
-                <strong>{{ total }}</strong> products indexed
+                <strong>{{ total }}</strong> signals archived
             </span>
         </div>
     </header>
@@ -253,75 +234,78 @@
     <div class="container" style="margin-top: 1.5rem;">
 
         <div class="lore-panel">
-            <div class="lore-title">📡 MISSION BRIEF — OPERATION: SEMANTIC COMPASS</div>
-            Deep in the ScyllaDB cluster, NEBULA-7 has vectorized every product in the catalog.
-            Each item carries a <em>16-dimensional embedding</em> — a mathematical fingerprint of its
-            meaning. When you search, your query is projected into the same space and
-            <strong>ScyllaDB's vector-store sidecar</strong> returns the nearest neighbors using
-            <em>cosine similarity</em>. No keywords. No filters. Pure <em>semantic distance</em>.
-            The <em>Coodie Corps</em> built the index with a single annotation:
-            <em>VectorIndex(similarity_function="COSINE")</em>.
+            <div class="lore-title">📡 MISSION BRIEF — OPERATION: SIGNAL GRAVEYARD</div>
+            The rogue AI <strong>ECHO-NULL</strong> has flooded every emergency channel with synthetic noise —
+            burying real distress calls from ships with hull breaches, failing life support, and dead engines.
+            The <em>Coodie Corps</em> built a semantic archive: each signal carries a
+            <em>384-dimensional embedding</em> computed by <em>sentence-transformers/all-MiniLM-L6-v2</em>.
+            Enter a fragment — or describe the emergency you're looking for — and
+            <strong>ScyllaDB's vector-store</strong> runs <em>ORDER BY embedding ANN OF ?</em> to surface
+            semantically similar signals. A score of <strong>0.95</strong> means the same emergency.
+            A score of <strong>0.2</strong> is ECHO-NULL's noise.
         </div>
 
-        <div class="lore-panel" style="border-left-color: rgba(129,140,248,0.25);">
+        <div class="lore-panel" style="border-left-color: rgba(56,189,248,0.25);">
             <div class="lore-title">🧑‍💻 COODIE VECTOR PATTERNS</div>
-            <div class="code-snippet"><span class="cm"># 1. Declare a vector column with an ANN index</span>
-<span class="kw">class</span> ProductEmbedding(Document):
+            <div class="code-snippet"><span class="cm"># 1. Declare a 384-dim vector column with an ANN index</span>
+<span class="kw">class</span> DistressSignal(Document):
     embedding: Annotated[list[float],
-        <span class="fn">Vector</span>(dimensions=<span class="num">16</span>),
+        <span class="fn">Vector</span>(dimensions=<span class="num">384</span>),
         <span class="fn">VectorIndex</span>(similarity_function=<span class="str">"COSINE"</span>),
     ] = Field(default_factory=list)
     <span class="cm"># → CREATE CUSTOM INDEX USING 'vector_index'</span>
     <span class="cm">#   WITH OPTIONS = {'similarity_function': 'COSINE'}</span>
 
-<span class="cm"># 2. Run an ANN query — CQL: ORDER BY embedding ANN OF ?</span>
-results = <span class="kw">await</span> (ProductEmbedding.find()
-    .<span class="fn">order_by_ann</span>(<span class="str">"embedding"</span>, query_vector)
-    .<span class="fn">limit</span>(<span class="num">10</span>).<span class="fn">all</span>())</div>
+<span class="cm"># 2. Embed with sentence-transformers, then ANN search</span>
+vec = model.<span class="fn">encode</span>(<span class="str">"ship is sinking"</span>, normalize_embeddings=<span class="kw">True</span>)
+results = <span class="kw">await</span> (DistressSignal.find()
+    .<span class="fn">order_by_ann</span>(<span class="str">"embedding"</span>, vec)
+    .<span class="fn">limit</span>(<span class="num">10</span>).<span class="fn">all</span>())
+<span class="cm"># finds: "hull breach", "vessel structural failure", "pressure loss"</span></div>
         </div>
 
         <div class="search-panel">
-            <div class="panel-title">🔭 Semantic Query Interface</div>
+            <div class="panel-title">📡 Signal Fragment Scanner</div>
             <form hx-post="/ui/search" hx-target="#results" hx-indicator="#search-spinner">
                 <div class="search-row">
                     <input type="text" name="query" id="query"
-                           placeholder='describe what you want, e.g. "something for my morning workout"'
+                           placeholder='e.g. "ship is breaking apart" or "crew can't breathe"'
                            autocomplete="off" autofocus>
                     <input type="hidden" name="limit" value="10">
-                    <button type="submit">⬡ Search</button>
+                    <button type="submit">📡 Scan</button>
                 </div>
             </form>
-            <div id="search-spinner" class="htmx-indicator">⏳ Computing embedding &amp; running ANN query...</div>
-            <div class="examples-label">Try these example queries — click to fill:</div>
+            <div id="search-spinner">⏳ Computing embedding &amp; scanning archive...</div>
+            <div class="examples-label">Try these signal fragments — click to scan:</div>
             <div class="examples">
-                <span class="example-chip" onclick="fillQuery(this)">wireless audio for long flights</span>
-                <span class="example-chip" onclick="fillQuery(this)">something to improve my posture at a desk</span>
-                <span class="example-chip" onclick="fillQuery(this)">gift for a coffee lover</span>
-                <span class="example-chip" onclick="fillQuery(this)">books for learning to code</span>
-                <span class="example-chip" onclick="fillQuery(this)">outdoor exercise gear under $100</span>
-                <span class="example-chip" onclick="fillQuery(this)">cozy home lighting or ambiance</span>
-                <span class="example-chip" onclick="fillQuery(this)">healthy snack with lots of protein</span>
-                <span class="example-chip" onclick="fillQuery(this)">smart home automation</span>
+                <span class="example-chip" onclick="fillQuery(this)">ship is tearing apart</span>
+                <span class="example-chip" onclick="fillQuery(this)">crew cannot breathe</span>
+                <span class="example-chip" onclick="fillQuery(this)">engines are dead</span>
+                <span class="example-chip" onclick="fillQuery(this)">we are lost in space</span>
+                <span class="example-chip" onclick="fillQuery(this)">reactor meltdown imminent</span>
+                <span class="example-chip" onclick="fillQuery(this)">vessel is going down</span>
+                <span class="example-chip" onclick="fillQuery(this)">no food no water</span>
+                <span class="example-chip" onclick="fillQuery(this)">signal signal signal all is noise</span>
             </div>
         </div>
 
         <div class="tabs">
             <button class="tab-btn active" id="tab-search"
-                    onclick="switchTab('search')">⬡ Search Results</button>
+                    onclick="switchTab('search')">📡 Search Results</button>
             <button class="tab-btn" id="tab-browse"
                     hx-get="/ui/browse" hx-target="#results" hx-swap="innerHTML"
-                    onclick="switchTab('browse')">📦 Browse All</button>
+                    onclick="switchTab('browse')">📂 Browse Archive</button>
         </div>
 
         <div id="results">
             <p style="color: var(--muted); text-align: center; padding: 3rem 0; font-size: 0.85rem;">
-                ⬡ &nbsp; Enter a query above or click an example chip to begin semantic search.
+                📡 &nbsp; Enter a signal fragment above or click an example to scan the graveyard.
             </p>
         </div>
 
         <div class="footer">
-            coodie vector-search demo &nbsp;·&nbsp;
-            ScyllaDB <code>ORDER BY embedding ANN OF [...]</code> &nbsp;·&nbsp;
+            coodie vector-search demo — Dimension-10: The Signal Graveyard &nbsp;·&nbsp;
+            <code>ORDER BY embedding ANN OF [...]</code> &nbsp;·&nbsp;
             <a href="https://github.com/scylladb/coodie">github.com/scylladb/coodie</a>
         </div>
     </div>

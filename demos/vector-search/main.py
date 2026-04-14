@@ -1,10 +1,7 @@
-"""FastAPI vector search demo showcasing coodie's ANN query support."""
-
 from __future__ import annotations
 
 __version__ = "0.1.0"
 
-import hashlib
 import math
 import os
 from contextlib import asynccontextmanager
@@ -17,26 +14,28 @@ from fastapi.templating import Jinja2Templates
 
 from coodie.aio import init_coodie
 
-from models import ProductEmbedding
+from models import DistressSignal
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+_model = None
 
-def _text_to_embedding(text: str, dimensions: int = 16) -> list[float]:
-    """Derive a deterministic embedding from text (same as seed.py)."""
-    raw: list[float] = []
-    for i in range(dimensions):
-        h = hashlib.sha256(f"{text}:{i}".encode()).hexdigest()
-        raw.append(int(h[:8], 16) / 0xFFFFFFFF * 2 - 1)
-    norm = math.sqrt(sum(x * x for x in raw))
-    if norm > 0:
-        raw = [x / norm for x in raw]
-    return raw
+
+def _get_model():
+    global _model
+    if _model is None:
+        from fastembed import TextEmbedding
+
+        _model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    return _model
+
+
+def _embed(text: str) -> list[float]:
+    return next(iter(_get_model().embed([text]))).tolist()
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    """Compute cosine similarity between two vectors."""
     dot = sum(x * y for x, y in zip(a, b))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(x * x for x in b))
@@ -47,21 +46,20 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Startup: connect to ScyllaDB and sync tables."""
     hosts = os.getenv("SCYLLA_HOSTS", "127.0.0.1").split(",")
     keyspace = os.getenv("SCYLLA_KEYSPACE", "vector_demo")
     await init_coodie(hosts=hosts, keyspace=keyspace)
-    await ProductEmbedding.sync_table()
+    await DistressSignal.sync_table()
+    _get_model()
     yield
 
 
-app = FastAPI(title="Vector Search Demo", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Signal Graveyard", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/", response_class=HTMLResponse)
 async def ui_index(request: Request) -> HTMLResponse:
-    """Render the main search page."""
-    total = await ProductEmbedding.find().count()
+    total = await DistressSignal.find().count()
     return templates.TemplateResponse(request, "index.html", {"total": total})
 
 
@@ -71,7 +69,6 @@ async def ui_search(
     query: str = Form(default=""),
     limit: int = Form(default=10),
 ) -> HTMLResponse:
-    """Compute embedding for the query text and run ANN search."""
     if not query.strip():
         return templates.TemplateResponse(
             request,
@@ -79,14 +76,13 @@ async def ui_search(
             {"results": [], "query": ""},
         )
 
-    query_embedding = _text_to_embedding(query)
-    products = await ProductEmbedding.find().order_by_ann("embedding", query_embedding).limit(limit).all()
+    query_embedding = _embed(query)
+    signals = await DistressSignal.find().order_by_ann("embedding", query_embedding).limit(limit).all()
 
-    # Compute similarity scores for display
     results = []
-    for p in products:
-        score = _cosine_similarity(query_embedding, p.embedding)
-        results.append({"product": p, "score": score})
+    for s in signals:
+        score = _cosine_similarity(query_embedding, s.embedding)
+        results.append({"signal": s, "score": score})
 
     return templates.TemplateResponse(
         request,
@@ -97,10 +93,9 @@ async def ui_search(
 
 @app.get("/ui/browse", response_class=HTMLResponse)
 async def ui_browse(request: Request) -> HTMLResponse:
-    """Browse all products (no vector search)."""
-    products = await ProductEmbedding.find().limit(50).all()
+    signals = await DistressSignal.find().limit(50).all()
     return templates.TemplateResponse(
         request,
         "partials/browse.html",
-        {"products": products},
+        {"signals": signals},
     )

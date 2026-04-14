@@ -1,5 +1,3 @@
-"""Product embedding model for the coodie vector search demo."""
-
 from __future__ import annotations
 
 from typing import Annotated
@@ -11,26 +9,19 @@ from coodie.aio import Document
 from coodie.fields import PrimaryKey, Vector, VectorIndex
 
 
-class ProductEmbedding(Document):
-    """A product with a pre-computed embedding vector for ANN search.
-
-    Partition key = ``product_id`` (UUID).
-    The ``embedding`` column stores a 16-dimensional float vector and is indexed
-    with a cosine-similarity vector index for fast approximate nearest-neighbor
-    queries.
-    """
-
-    product_id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
-    name: str
-    category: str
-    description: str = ""
-    price: float = 0.0
+class DistressSignal(Document):
+    signal_id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    callsign: str
+    origin: str
+    signal_text: str
+    category: str  # hull_breach / life_support / navigation / engine_failure / unknown
+    threat_level: str  # CRITICAL / HIGH / MEDIUM / LOW / NOISE
     embedding: Annotated[
         list[float],
-        Vector(dimensions=16),
+        Vector(dimensions=384),
         VectorIndex(similarity_function="COSINE"),
     ] = Field(default_factory=list)
 
     class Settings:
-        name = "product_embeddings"
+        name = "distress_signals"
         keyspace = "vector_demo"

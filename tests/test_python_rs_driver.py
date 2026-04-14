@@ -181,6 +181,18 @@ def test_python_rs_driver_rows_to_dicts_normal():
         assert PythonRsDriver._rows_to_dicts(result) == [{"id": "1"}, {"id": "2"}]
 
 
+def test_python_rs_driver_rows_to_dicts_iter_current_page():
+    """_rows_to_dicts prefers iter_current_page() (new python-rs-driver API)."""
+    with patch.dict("sys.modules", _mock_scylla_modules()):
+        from coodie.drivers.python_rs import PythonRsDriver
+
+        class FakeResult:
+            def iter_current_page(self):
+                return iter([{"id": "1"}, {"id": "2"}])
+
+        assert PythonRsDriver._rows_to_dicts(FakeResult()) == [{"id": "1"}, {"id": "2"}]
+
+
 def test_python_rs_driver_rows_to_dicts_empty():
     with patch.dict("sys.modules", _mock_scylla_modules()):
         from coodie.drivers.python_rs import PythonRsDriver

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776199654271,
+  "lastUpdate": 1776203308416,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -14133,6 +14133,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000100064351714922",
             "extra": "mean: 5.449340846292482 usec\nrounds: 7587"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "614e547b4b5c84e7619066742107fc4520b1b1a7",
+          "message": "fix(drivers): support python-rs-driver iter_current_page() API rename\n\nHandle the method rename from current_rows() to iter_current_page() in\npython-driver-rs for forward compatibility.\n\nUltraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)\n\nCo-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>",
+          "timestamp": "2026-04-15T00:47:35+03:00",
+          "tree_id": "21f1401b26553b184cf54c224726c3b266555aad",
+          "url": "https://github.com/scylladb/coodie/commit/614e547b4b5c84e7619066742107fc4520b1b1a7"
+        },
+        "date": 1776203306771,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 63360.45094113357,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001581603295285857",
+            "extra": "mean: 15.782715955242681 usec\nrounds: 8129"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1636125.1122788151,
+            "unit": "iter/sec",
+            "range": "stddev: 2.5560866028245484e-7",
+            "extra": "mean: 611.2002025365821 nsec\nrounds: 191571"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 146478.76373857455,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002961391079217554",
+            "extra": "mean: 6.826928180420287 usec\nrounds: 19911"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 575090.1996343968,
+            "unit": "iter/sec",
+            "range": "stddev: 4.914913363158465e-7",
+            "extra": "mean: 1.7388576620428096 usec\nrounds: 42097"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 635938.1023539887,
+            "unit": "iter/sec",
+            "range": "stddev: 4.809194294412464e-7",
+            "extra": "mean: 1.5724800830433021 usec\nrounds: 45765"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 855038.6874829505,
+            "unit": "iter/sec",
+            "range": "stddev: 3.751509212433956e-7",
+            "extra": "mean: 1.169537723426041 usec\nrounds: 139025"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 880405.4578962207,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1277967246222985e-7",
+            "extra": "mean: 1.1358403006605131 usec\nrounds: 73175"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 668502.1200016335,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2885206400764326e-7",
+            "extra": "mean: 1.4958815687788043 usec\nrounds: 86641"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 165472.75935110543,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000021569744372622983",
+            "extra": "mean: 6.043290774393674 usec\nrounds: 7425"
           }
         ]
       }

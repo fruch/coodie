@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776172921139,
+  "lastUpdate": 1776174332480,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -13524,6 +13524,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 6.071848142942469e-7",
             "extra": "mean: 5.179156048005285 usec\nrounds: 7581"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "29139614+renovate[bot]@users.noreply.github.com",
+            "name": "renovate[bot]",
+            "username": "renovate[bot]"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "cdae2c262c6b311641acff7dde04f8ce5c9b733e",
+          "message": "chore(deps): update pre-commit hooks (non-major)",
+          "timestamp": "2026-04-14T16:44:47+03:00",
+          "tree_id": "445ad0edea1ad7118bee94afeeb561e7f21c29d5",
+          "url": "https://github.com/scylladb/coodie/commit/cdae2c262c6b311641acff7dde04f8ce5c9b733e"
+        },
+        "date": 1776174331431,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 61959.20672997299,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000019961732835490046",
+            "extra": "mean: 16.139651438052486 usec\nrounds: 7858"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1577739.6098099304,
+            "unit": "iter/sec",
+            "range": "stddev: 4.999094410820092e-7",
+            "extra": "mean: 633.8181495744215 nsec\nrounds: 166362"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 148423.84615287912,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009690530541928334",
+            "extra": "mean: 6.737461842687884 usec\nrounds: 11125"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 568015.4901292456,
+            "unit": "iter/sec",
+            "range": "stddev: 5.230095980928108e-7",
+            "extra": "mean: 1.7605153686433115 usec\nrounds: 46751"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 600578.2329001277,
+            "unit": "iter/sec",
+            "range": "stddev: 5.145920039863319e-7",
+            "extra": "mean: 1.6650620106078562 usec\nrounds: 42783"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 832352.835897533,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1613970904204017e-7",
+            "extra": "mean: 1.2014135795208671 usec\nrounds: 136912"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 836320.8071956071,
+            "unit": "iter/sec",
+            "range": "stddev: 4.752092881956639e-7",
+            "extra": "mean: 1.19571340494714 usec\nrounds: 74935"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 647250.0566602286,
+            "unit": "iter/sec",
+            "range": "stddev: 4.999219131847502e-7",
+            "extra": "mean: 1.5449979335033819 usec\nrounds: 89040"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 181325.78653212677,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000010868775821371843",
+            "extra": "mean: 5.514935405079978 usec\nrounds: 7369"
           }
         ]
       }

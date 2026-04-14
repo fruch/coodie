@@ -270,6 +270,18 @@ def test_raw_dc_partial_update(benchmark, bench_env, cql_session):
     benchmark(_update)
 
 
+@pytest.mark.benchmark(group="partial-update-fair")
+def test_raw_dc_partial_update_fair(benchmark, bench_env, cql_session):
+    """Raw+DC baseline for fair partial-update (same as partial-update)."""
+    _ensure_update_row(cql_session)
+    stmt = _PREPARED["update_product_price"]
+
+    def _update():
+        cql_session.execute(stmt, (42.0, _UPDATE_ID))
+
+    benchmark(_update)
+
+
 # ---------------------------------------------------------------------------
 # UPDATE with IF condition (LWT)
 # ---------------------------------------------------------------------------
@@ -277,6 +289,18 @@ def test_raw_dc_partial_update(benchmark, bench_env, cql_session):
 
 @pytest.mark.benchmark(group="update-if-condition")
 def test_raw_dc_update_if_condition(benchmark, bench_env, cql_session):
+    _ensure_update_row(cql_session)
+    stmt = _PREPARED["update_product_price_if"]
+
+    def _update():
+        cql_session.execute(stmt, (99.0, _UPDATE_ID, "UpdateBrand"))
+
+    benchmark(_update)
+
+
+@pytest.mark.benchmark(group="update-if-condition-fair")
+def test_raw_dc_update_if_condition_fair(benchmark, bench_env, cql_session):
+    """Raw+DC baseline for fair LWT update (same as update-if-condition)."""
     _ensure_update_row(cql_session)
     stmt = _PREPARED["update_product_price_if"]
 

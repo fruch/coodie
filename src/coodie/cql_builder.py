@@ -601,10 +601,15 @@ def build_update(
     params: list[Any] = list(set_data.values())
     if collection_ops:
         for _col, _op, value in collection_ops:
-            params.append(value)
+            if _op in ("put", "setindex"):
+                k, v = value
+                params.extend([k, v])
+            else:
+                params.append(value)
     _extract_where_params(where, params)
     if if_conditions and not if_exists:
-        params.extend(if_conditions.values())
+        _, cond_params_pre = _parse_if_conditions(if_conditions)
+        params.extend(cond_params_pre)
 
     cached_cql = _update_cql_cache.get(cache_key)
     if cached_cql is not None:
@@ -620,11 +625,8 @@ def build_update(
                 set_parts.append(f'"{col}" = ? + "{col}"')
             elif op == "remove":
                 set_parts.append(f'"{col}" = "{col}" - ?')
-                params.append(value)
             elif op in ("put", "setindex"):
-                k, v = value
                 set_parts.append(f'"{col}"[?] = ?')
-                params.extend([k, v])
 
     cql = f"UPDATE {keyspace}.{table}"
     cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
@@ -636,9 +638,8 @@ def build_update(
     if if_exists:
         cql += " IF EXISTS"
     elif if_conditions:
-        cond_clause, cond_params = _parse_if_conditions(if_conditions)
+        cond_clause, _ = _parse_if_conditions(if_conditions)
         cql += cond_clause
-        params.extend(cond_params)
 
     _update_cql_cache[cache_key] = cql
     return cql, params

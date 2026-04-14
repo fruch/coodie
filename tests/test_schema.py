@@ -357,7 +357,7 @@ def test_build_schema_unsupported_type_raises():
             name = "bad_docs"
             keyspace = "test_ks"
 
-    with pytest.raises(InvalidQueryError, match="bad_col"):
+    with pytest.raises(InvalidQueryError, match="Cannot map Python type"):
         build_schema(BadDoc)
 
 
@@ -419,7 +419,7 @@ class _VectorDoc(BaseModel):
 
 class _VectorIdxDoc(BaseModel):
     id: Annotated[UUID, PrimaryKey()]
-    embedding: Annotated[list[float], Vector(dimensions=3), VectorIndex(similarity_function="euclidean")]
+    embedding: Annotated[list[float], Vector(dimensions=3), VectorIndex(similarity_function="EUCLIDEAN")]
 
 
 def test_build_schema_duration_field():
@@ -441,4 +441,4 @@ def test_build_schema_vector_index():
     cols = build_schema(_VectorIdxDoc)
     emb_col = next(c for c in cols if c.name == "embedding")
     assert emb_col.vector_index is True
-    assert emb_col.vector_similarity_function == "euclidean"
+    assert emb_col.vector_similarity_function == "EUCLIDEAN"

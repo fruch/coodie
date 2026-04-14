@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import logging
 from collections import namedtuple
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -413,6 +414,7 @@ def test_cassandra_driver_prepared_cache(cassandra_driver, mock_cassandra_sessio
     mock_cassandra_session.prepare.assert_called_once_with("SELECT * FROM test_ks.t")
 
 
+@pytest.mark.skipif(not importlib.util.find_spec("cassandra"), reason="cassandra-driver not installed")
 def test_cassandra_driver_execute_with_consistency(cassandra_driver, mock_cassandra_session):
     from cassandra import ConsistencyLevel  # type: ignore[import-untyped]
 
@@ -470,6 +472,7 @@ def test_cassandra_driver_rows_to_dicts_empty_iterable():
     assert CassandraDriver._rows_to_dicts([]) == []
 
 
+@pytest.mark.skipif(not importlib.util.find_spec("cassandra"), reason="cassandra-driver not installed")
 def test_cassandra_driver_sets_dict_factory(mock_cassandra_session):
     """CassandraDriver sets dict_factory on the session so rows arrive as dicts."""
     from cassandra.query import dict_factory  # type: ignore[import-untyped]

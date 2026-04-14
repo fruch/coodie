@@ -99,30 +99,41 @@ class Duration:
 
 
 @dataclass(frozen=True)
-class Vector:
-    """Annotated marker: maps ``list[float]`` to CQL ``vector<float, N>``.
+class Discriminator:
+    """Annotated marker: discriminator column for polymorphic (single-table inheritance) models."""
 
-    Args:
-        dimensions: The number of dimensions in the vector.
+
+@dataclass(frozen=True)
+class Vector:
+    """Annotated marker: vector column for ANN similarity search.
+
+    Maps ``list[float]`` to the CQL ``vector<float, N>`` type::
+
+        embedding: Annotated[list[float], Vector(dimensions=384)]
     """
 
     dimensions: int
 
 
+_VALID_SIMILARITY_FUNCTIONS = frozenset({"COSINE", "DOT_PRODUCT", "EUCLIDEAN"})
+
+
 @dataclass(frozen=True)
 class VectorIndex:
-    """Annotated marker: create a vector (ANN) index on this column.
+    """Annotated marker: create a SAI vector index on this column.
 
-    Args:
-        similarity_function: The similarity function to use for ANN searches.
-            Common values: ``"cosine"``, ``"euclidean"``, ``"dot_product"``.
-        index_name: Optional custom index name.
+    Emits ``CREATE CUSTOM INDEX … USING 'vector_index'`` with the
+    chosen similarity function (``COSINE``, ``DOT_PRODUCT``, or
+    ``EUCLIDEAN``)::
+
+        embedding: Annotated[list[float], Vector(dimensions=384), VectorIndex(similarity_function="COSINE")]
     """
 
-    similarity_function: str = "cosine"
-    index_name: str | None = None
+    similarity_function: str = "COSINE"
 
-
-@dataclass(frozen=True)
-class Discriminator:
-    """Annotated marker: discriminator column for polymorphic (single-table inheritance) models."""
+    def __post_init__(self) -> None:
+        if self.similarity_function not in _VALID_SIMILARITY_FUNCTIONS:
+            raise ValueError(
+                f"Invalid similarity_function {self.similarity_function!r}, "
+                f"must be one of {sorted(_VALID_SIMILARITY_FUNCTIONS)}"
+            )

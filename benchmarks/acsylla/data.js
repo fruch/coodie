@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776162887072,
+  "lastUpdate": 1776163049745,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -13002,6 +13002,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.64074199215768e-7",
             "extra": "mean: 5.638772812144026 usec\nrounds: 7496"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "eee85f7e29040ad57da38623f47c7e97879ccc2b",
+          "message": "fix(ci): set up automatic releases with PyPI Trusted Publishing\n\nThe release pipeline was non-functional: ci.yml targeted branch `main`\nbut the default branch is `master`, so the release job never fired.\n\n- Fix branch references from `main` to `master` in ci.yml and pyproject.toml\n- Update semantic-release config to v10 branches format\n- Split monolithic release job into release/build/publish-to-pypi jobs\n- Use Trusted Publishing (OIDC) for PyPI — no API token needed\n- Delete redundant publish.yml (GITHUB_TOKEN tags don't trigger workflows)\n- Update CONTRIBUTING.md release documentation\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-14T13:36:49+03:00",
+          "tree_id": "c712f6d56df7f93ca2e9bd9c739c6efde0ae51c3",
+          "url": "https://github.com/scylladb/coodie/commit/eee85f7e29040ad57da38623f47c7e97879ccc2b"
+        },
+        "date": 1776163047898,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 78237.80362789263,
+            "unit": "iter/sec",
+            "range": "stddev: 8.28714021369749e-7",
+            "extra": "mean: 12.781544900673683 usec\nrounds: 8207"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1760419.28126437,
+            "unit": "iter/sec",
+            "range": "stddev: 1.6867346784750116e-7",
+            "extra": "mean: 568.0464936067838 nsec\nrounds: 150967"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 161356.47501334673,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009829026874059864",
+            "extra": "mean: 6.197458143017093 usec\nrounds: 19053"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 563525.2443793446,
+            "unit": "iter/sec",
+            "range": "stddev: 3.202460938923607e-7",
+            "extra": "mean: 1.7745433944159499 usec\nrounds: 46158"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 630633.2506238408,
+            "unit": "iter/sec",
+            "range": "stddev: 2.774409892478413e-7",
+            "extra": "mean: 1.5857076977954632 usec\nrounds: 47793"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 873590.6388377642,
+            "unit": "iter/sec",
+            "range": "stddev: 2.356971512903625e-7",
+            "extra": "mean: 1.1447009108641693 usec\nrounds: 99355"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 840623.3035051861,
+            "unit": "iter/sec",
+            "range": "stddev: 2.6292206266801967e-7",
+            "extra": "mean: 1.1895934788272624 usec\nrounds: 72380"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 689540.043854628,
+            "unit": "iter/sec",
+            "range": "stddev: 2.9208534442691394e-7",
+            "extra": "mean: 1.4502420982106512 usec\nrounds: 91467"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 189107.08183888535,
+            "unit": "iter/sec",
+            "range": "stddev: 5.422455275341539e-7",
+            "extra": "mean: 5.28800926055205 usec\nrounds: 7343"
           }
         ]
       }

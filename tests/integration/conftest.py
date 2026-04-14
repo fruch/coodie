@@ -48,7 +48,7 @@ from coodie.sync.document import Document as SyncDocument
 from coodie.sync.document import MaterializedView as SyncMaterializedView
 from tests.conftest import _maybe_await
 from tests.conftest_scylla import create_acsylla_session, create_cql_session, create_python_rs_session  # noqa: F401
-from tests.conftest_scylla import scylla_container  # noqa: F401
+from tests.conftest_scylla import _test_network, scylla_container, vector_store_container  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +67,30 @@ def scylla_session(scylla_container: object, driver_type: str) -> object:  # noq
         yield None
         return
 
-    session, cluster = create_cql_session(scylla_container, "test_ks")
+    session, cluster = create_cql_session(scylla_container, "test_ks", tablets=False)
+    yield session
+    cluster.shutdown()
+
+
+@pytest.fixture(scope="session")
+def scylla_vector_session(scylla_container: object, vector_store_container: object, driver_type: str) -> object:  # noqa: F811
+    """Return a cassandra-driver Session with a tablet-enabled ``vector_ks`` keyspace.
+
+    Depends on ``vector_store_container`` so the vector-store service is started
+    before vector tests run.  Uses NetworkTopologyStrategy + tablets for vector
+    index support on ScyllaDB 6.x+.
+    Skipped when ``--driver-type=acsylla`` or ``--driver-type=python-rs``.
+    """
+    if driver_type in ("acsylla", "python-rs"):
+        yield None
+        return
+
+    try:
+        session, cluster = create_cql_session(scylla_container, "vector_ks")
+    except (ImportError, ModuleNotFoundError):
+        yield None
+        return
+
     yield session
     cluster.shutdown()
 

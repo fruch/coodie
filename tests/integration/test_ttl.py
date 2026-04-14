@@ -53,9 +53,7 @@ class TestTTLAndTimestamp:
     # (2) __default_ttl__ in Settings applies TTL to all saves
     # ------------------------------------------------------------------
 
-    async def test_default_ttl_applies_to_all_saves(
-        self, coodie_driver, TTLItem, execute_raw_fn
-    ) -> None:
+    async def test_default_ttl_applies_to_all_saves(self, coodie_driver, TTLItem, execute_raw_fn) -> None:
         """A model with __default_ttl__=2 causes rows to expire automatically."""
         await _maybe_await(TTLItem.sync_table)
 
@@ -63,8 +61,7 @@ class TestTTLAndTimestamp:
         table = TTLItem.Settings.name
         rows = await _maybe_await(
             execute_raw_fn,
-            "SELECT default_time_to_live FROM system_schema.tables "
-            "WHERE keyspace_name = ? AND table_name = ?",
+            "SELECT default_time_to_live FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
             ["test_ks", table],
         )
         assert len(rows) == 1
@@ -87,9 +84,7 @@ class TestTTLAndTimestamp:
     # (3) save(timestamp=...) uses explicit write timestamp
     # ------------------------------------------------------------------
 
-    async def test_save_with_explicit_timestamp(
-        self, coodie_driver, Product, execute_raw_fn
-    ) -> None:
+    async def test_save_with_explicit_timestamp(self, coodie_driver, Product, execute_raw_fn) -> None:
         """save(timestamp=<micros>) writes with the specified CQL timestamp."""
         await _maybe_await(Product.sync_table)
         pid = uuid4()
@@ -115,9 +110,7 @@ class TestTTLAndTimestamp:
     # (4) QuerySet.ttl(N) on bulk update
     # ------------------------------------------------------------------
 
-    async def test_queryset_ttl_on_bulk_update(
-        self, coodie_driver, Product, QS
-    ) -> None:
+    async def test_queryset_ttl_on_bulk_update(self, coodie_driver, Product, QS) -> None:
         """QuerySet.ttl(N).update() applies TTL — updated cells expire."""
         await _maybe_await(Product.sync_table)
         pid = uuid4()

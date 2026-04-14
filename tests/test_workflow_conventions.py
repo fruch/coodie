@@ -148,9 +148,7 @@ def test_schedule_cron_valid(workflow_path: Path):
 # 3.7 — Slash-command workflows have per-PR concurrency groups
 # ---------------------------------------------------------------------------
 
-_SLASH_COMMAND_WORKFLOWS = [
-    p for p in WORKFLOW_FILES if p.name in ("pr-conflict-detect.yml",)
-]
+_SLASH_COMMAND_WORKFLOWS = [p for p in WORKFLOW_FILES if p.name in ("pr-conflict-detect.yml",)]
 
 
 @pytest.mark.parametrize("workflow_path", _SLASH_COMMAND_WORKFLOWS, ids=[p.name for p in _SLASH_COMMAND_WORKFLOWS])

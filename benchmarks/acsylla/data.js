@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776174332480,
+  "lastUpdate": 1776178764306,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -13611,6 +13611,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000010868775821371843",
             "extra": "mean: 5.514935405079978 usec\nrounds: 7369"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "3d7b49ad1f6505faf97058a10525314fe3c802ce",
+          "message": "feat(benchmarks): add vector benchmarks with SAI availability detection\n\nAdd pytest-benchmark suite for vector insert and ANN query operations\nwith automatic SAI availability detection. Update benchmark models and\nconftest to support vector-store container and shared Docker network.",
+          "timestamp": "2026-04-14T17:58:30+03:00",
+          "tree_id": "4d462baa22831480bd25a9a0e03c7945d01e9a3e",
+          "url": "https://github.com/scylladb/coodie/commit/3d7b49ad1f6505faf97058a10525314fe3c802ce"
+        },
+        "date": 1776178762901,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 61705.96253004988,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018819729275247614",
+            "extra": "mean: 16.20588933383893 usec\nrounds: 7491"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1626438.4853845977,
+            "unit": "iter/sec",
+            "range": "stddev: 2.8246853464701325e-7",
+            "extra": "mean: 614.840345322703 nsec\nrounds: 196117"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 145774.0431112163,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003093909457743577",
+            "extra": "mean: 6.859931841480611 usec\nrounds: 18501"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 558135.3172816132,
+            "unit": "iter/sec",
+            "range": "stddev: 4.879841614145144e-7",
+            "extra": "mean: 1.7916802055646284 usec\nrounds: 39688"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 609239.5720339218,
+            "unit": "iter/sec",
+            "range": "stddev: 4.907185974764832e-7",
+            "extra": "mean: 1.6413904248890796 usec\nrounds: 45681"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 865506.2969409513,
+            "unit": "iter/sec",
+            "range": "stddev: 3.49831623927356e-7",
+            "extra": "mean: 1.1553930959652217 usec\nrounds: 154751"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 819032.1017090052,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2169624495704003e-7",
+            "extra": "mean: 1.2209533642373533 usec\nrounds: 71190"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 667586.6098309068,
+            "unit": "iter/sec",
+            "range": "stddev: 4.1314497119493715e-7",
+            "extra": "mean: 1.4979329801915742 usec\nrounds: 88168"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 186997.2638846213,
+            "unit": "iter/sec",
+            "range": "stddev: 9.102620184700532e-7",
+            "extra": "mean: 5.347671828059513 usec\nrounds: 6329"
           }
         ]
       }

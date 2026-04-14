@@ -4,15 +4,13 @@
 > **not yet implemented**. Each item is a self-contained prompt you can give
 > to an AI coding agent (or a developer) to implement the feature.
 >
-> **Last reviewed:** 2026-03-19 (post-merge: CQL Phase 1 DML gaps ✅ Done
-> via PR #184 — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST,
-> TOKEN all implemented with unit + integration tests. LWT integration tests
-> ✅ Done — `test_lwt.py` shipped covering §1.5. CQL Phase 2 data types
-> WIP in PR #193 — duration + vector types. CQL Phase 4 LWT/collection
-> DML WIP in PR #194. CQL Phase 5 JSON/metadata WIP in PR #197.
-> timeseries-iot demo WIP in PR #180, schema-migrations demo WIP in
-> PR #183, realtime-counters demo WIP in PR #176, vector support WIP in
-> PRs #150/#155, collections-tags demo WIP in PR #147)
+> **Last reviewed:** 2026-04-14 (post-merge: `collections-tags`,
+> `realtime-counters`, and `timeseries-iot` demos shipped; CQL Phase 2 data
+> types ✅ Done in `master` (`duration` + `vector` support present in
+> `src/coodie/types.py` / `src/coodie/fields.py`; vector tests and docs
+> shipped). Remaining in-progress PR-linked work: CQL Phase 4 in PR #194,
+> CQL Phase 5 in PR #197, schema-migrations demo in PR #183, vector-search
+> demo in PR #150, and performance Phase 9 in PR #196.)
 
 ---
 
@@ -26,6 +24,7 @@
 6. [Sync API Support](#6-sync-api-support)
 7. [CQL Gap Analysis](#7-cql-gap-analysis)
 8. [Silent Exception Pass](#8-silent-exception-pass)
+9. [Performance Improvement Plan](#9-performance-improvement-plan)
 
 ---
 
@@ -71,47 +70,29 @@
 
 *Source: `demos-extension-plan.md`*
 
-> *7 demos exist: `demos/fastapi-catalog/`, `demos/flask-blog/`, `demos/django-taskboard/` (✅), `demos/lwt-user-registry/` (✅), `demos/ttl-sessions/` (✅), `demos/batch-importer/` (✅), and `demos/materialized-views/` (✅). Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for 10+ additional demos.*
+> *10 demos now exist: `demos/fastapi-catalog/`, `demos/flask-blog/`, `demos/django-taskboard/`, `demos/lwt-user-registry/`, `demos/ttl-sessions/`, `demos/batch-importer/`, `demos/materialized-views/`, `demos/collections-tags/`, `demos/realtime-counters/`, and `demos/timeseries-iot/`. Demo CI workflow `test-demos.yml` is ✅ Done. The plan calls for additional demos beyond these shipped examples.*
 
-### 3.1 Real-Time Counters Demo
+### 3.1 Vector Similarity Search Demo
 
-> **⚠️ IN PROGRESS — [PR #176](https://github.com/fruch/coodie/pull/176): Realtime counters demo (Phase 4.2).**
+> **⚠️ IN PROGRESS — [PR #150](https://github.com/scylladb/coodie/pull/150): vector-search demo work.**
 
-> **Prompt:** Create `demos/realtime-counters/` — a page-view analytics demo showcasing coodie's `CounterDocument`, `increment()`, and `decrement()`. Build a live analytics dashboard showing counter updates in real-time. Add `seed.py` to generate synthetic traffic, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 4 (task 4.2).
+> **Prompt:** Create `demos/vector-search/` — a semantic product search demo using the already-shipped vector library support (`Vector`, `VectorIndex`, ANN query support via `order_by_ann()`). Include embeddings ingestion, ANN-backed search UI, `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 6.
 
-### 3.2 Collections & Tags Demo
-
-> **⚠️ IN PROGRESS — [PR #147](https://github.com/fruch/coodie/pull/147): Collections-tags demo (Phase 5.2).**
-
-> **Prompt:** Create `demos/collections-tags/` — an article tagging system demo showcasing coodie's collection types (`list`, `set`, `map` fields) and collection mutation operations (`add__`, `remove__`, `append__`, `prepend__`). Include frozen collection examples. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 5 (task 5.2).
-
-### 3.3 Vector Similarity Search (Library + Demo)
-
-> **⚠️ IN PROGRESS — [PR #150](https://github.com/fruch/coodie/pull/150) (WIP/draft): Vector column support + demo. [PR #155](https://github.com/fruch/coodie/pull/155): Extracted library-only vector support (Vector, VectorIndex, CQL builder, ANN queries, unit tests, integration tests, benchmarks).**
-
-> **Prompt:** Add vector column support to coodie and create a vector search demo. **Library work:** (1) Add `Vector(dimensions=N)` field annotation to `coodie/fields.py` mapping to CQL `vector<float, N>`. (2) Update `coodie/schema.py` to emit `vector<float, N>` in DDL. (3) Add `VectorIndex(similarity_function="COSINE")` annotation for `CREATE INDEX ... USING 'vector_index'`. (4) Support ANN queries via a QuerySet method that emits `ORDER BY field ANN OF [...]` CQL. (5) Validate vector dimensions on save. (6) Add unit and integration tests. **Demo work:** Create `demos/vector-search/` — semantic product search using sentence-transformer embeddings with ANN queries. See `docs/plans/demos-extension-plan.md` Phase 6.
-
-### 3.4 Time-Series IoT Demo
-
-> **⚠️ IN PROGRESS — [PR #180](https://github.com/fruch/coodie/pull/180): Timeseries-IoT demo (Phase 7, task 7.1).**
-
-> **Prompt:** Create `demos/timeseries-iot/` — an IoT sensor data demo showcasing time-bucketed partitions, clustering keys with DESC order, `per_partition_limit()`, and `paged_all()` for pagination. Add `seed.py` generating synthetic sensor readings, colorful dashboard UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.1).
-
-### 3.5 Polymorphic CMS Demo
+### 3.2 Polymorphic CMS Demo
 
 > **Prompt:** Create `demos/polymorphic-cms/` — a content management system demo showcasing coodie's single-table inheritance with `Discriminator` column. Define `Article`, `Video`, and `Podcast` subtypes sharing a single table. Add `seed.py`, colorful UI, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 7 (task 7.2).
 
-### 3.6 Argus-Style Test Tracker Demo
+### 3.3 Argus-Style Test Tracker Demo
 
 > **Prompt:** Create `demos/argus-tracker/` — a scaled-down test tracker inspired by scylladb/argus. Define complex models: User, TestRun (composite PK + clustering), Event (compound partition), Notification (TimeUUID). Include batch event ingestion, prepared-statement caching patterns, and partition-scoped queries. Add `seed.py`, `Makefile`, and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.1).
 
-### 3.7 cqlengine → coodie Migration Guide Demo
+### 3.4 cqlengine → coodie Migration Guide Demo
 
 > **Prompt:** Create `demos/migration-guide/` — a side-by-side migration walkthrough from cqlengine to coodie. Include `cqlengine_models.py` and `coodie_models.py` with equivalent models, a `migrate.py` script that syncs tables, and a `verify.py` that checks data round-trip. Reference argus model patterns. Add `README.md` with step-by-step walkthrough. See `docs/plans/demos-extension-plan.md` Phase 8 (task 8.3).
 
-### 3.8 Schema Migrations Demo
+### 3.5 Schema Migrations Demo
 
-> **⚠️ IN PROGRESS — [PR #183](https://github.com/fruch/coodie/pull/183) (draft): Schema migrations demo (Phase 10).**
+> **⚠️ IN PROGRESS — [PR #183](https://github.com/scylladb/coodie/pull/183): Schema migrations demo (Phase 10).**
 
 > **Prompt:** Create `demos/schema-migrations/` — a demo showcasing coodie's Phase B migration framework CLI (`coodie migrate`). Demonstrate `apply`, `rollback`, `dry-run`, and state tracking with the `_coodie_migrations` table. Include sample migration files following the `YYYYMMDD_NNN_description.py` pattern. Add `Makefile` and `README.md`. See `docs/plans/demos-extension-plan.md` Phase 10 reference.
 
@@ -169,31 +150,25 @@
 
 *Source: `cql-gap-analysis.md`*
 
-> *New plan comparing coodie against the ScyllaDB CQL Reference. Identifies 41 missing CQL features across data types, DDL, DML, LWT, and ScyllaDB extensions. Phase 1 (core DML gaps) is ✅ Done — TRUNCATE, DISTINCT, GROUP BY, aggregates, IS NOT NULL, CAST, TOKEN all implemented with unit + integration tests (PR #184 merged). 5 phases remain.*
+> *New plan comparing coodie against the ScyllaDB CQL Reference. Identifies 41 missing CQL features across data types, DDL, DML, LWT, and ScyllaDB extensions. Phase 1 (core DML gaps) is ✅ Done (PR #184 merged). Phase 2 (data types: `duration` + `vector`) is ✅ Done in `master`. 3 phases remain.*
 
-### 7.1 Data Type Gaps (Phase 2)
-
-> **⚠️ IN PROGRESS — [PR #193](https://github.com/fruch/coodie/pull/193) (draft): CQL Phase 2 data types — duration + vector types.**
-
-> **Prompt:** Add missing CQL data types to coodie: (1) `duration` type with a `CqlDuration(months, days, nanoseconds)` dataclass and `Duration()` field marker. (2) `vector<float, N>` type with `Vector(dimensions=N)` field marker, `VectorIndex(similarity_function)`, and `order_by_ann()` QuerySet method. Add type mapping in `types.py`, CQL builder support, DDL generation, and unit tests. See `docs/plans/cql-gap-analysis.md` Phase 2.
-
-### 7.2 DDL & Keyspace Gaps (Phase 3)
+### 7.1 DDL & Keyspace Gaps (Phase 3)
 
 > **Prompt:** Implement DDL gaps: (1) `ALTER TABLE DROP column`, `ALTER TABLE RENAME`. (2) Custom SAI index class support. (3) Index options (`WITH OPTIONS`). (4) Collection element indexes (`KEYS`, `VALUES`, `ENTRIES`, `FULL`). (5) `ALTER MATERIALIZED VIEW`. (6) `ALTER TYPE RENAME field`. (7) `ALTER KEYSPACE` with `durable_writes` and `tablets` options. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 3.
 
-### 7.3 LWT & Collection Operations (Phase 4)
+### 7.2 LWT & Collection Operations (Phase 4)
 
-> **⚠️ IN PROGRESS — [PR #194](https://github.com/fruch/coodie/pull/194): CQL Phase 4 LWT & collection DML gaps.**
+> **⚠️ IN PROGRESS — [PR #194](https://github.com/scylladb/coodie/pull/194): CQL Phase 4 LWT & collection DML gaps.**
 
 > **Prompt:** Implement LWT and collection DML gaps: (1) `DELETE ... IF col = ?` conditional deletes. (2) Extended IF operators: `!=`, `IN`, `>`, `<`. (3) Map put `col[key] = val` and list set-by-index `col[idx] = val`. (4) `DELETE col[key] FROM ...` and `DELETE col[idx] FROM ...`. (5) `USING TIMESTAMP` on batches. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 4.
 
-### 7.4 JSON & Metadata Features (Phase 5)
+### 7.3 JSON & Metadata Features (Phase 5)
 
-> **⚠️ IN PROGRESS — [PR #197](https://github.com/fruch/coodie/pull/197): CQL Phase 5 JSON & metadata features.**
+> **⚠️ IN PROGRESS — [PR #197](https://github.com/scylladb/coodie/pull/197): CQL Phase 5 JSON & metadata features.**
 
 > **Prompt:** Implement JSON and metadata features: (1) `INSERT INTO ... JSON '{...}'` via `Document.save_json()`. (2) `SELECT JSON` via `QuerySet.json()`. (3) `WRITETIME(col)` via `QuerySet.writetime()`. (4) `TTL(col)` via `QuerySet.column_ttl()`. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 5.
 
-### 7.5 ScyllaDB Extensions & Low-Priority Gaps (Phase 6)
+### 7.4 ScyllaDB Extensions & Low-Priority Gaps (Phase 6)
 
 > **Prompt:** Implement ScyllaDB-specific extensions and low-priority gaps: (1) `BYPASS CACHE` hint. (2) `USING TIMEOUT` in CQL statements. (3) Tablets-enabled keyspace creation. (4) Role/user management DDL (`CREATE ROLE`, `GRANT`, `REVOKE`, etc.) — evaluate if appropriate for an ORM. Add unit + integration tests. See `docs/plans/cql-gap-analysis.md` Phase 6.
 
@@ -206,3 +181,21 @@
 > *Audit of `except … pass` and overly broad exception handlers. Phase 1 is ✅ Done — narrowed `_cached_type_hints` to `(NameError, AttributeError, TypeError)` and added `logging.warning()` for CassandraDriver `dict_factory` import failure. All identified problematic cases are fixed.*
 
 *No remaining items — the single implementation phase is complete.*
+
+---
+
+## 9. Performance Improvement Plan
+
+*Source: `performance-improvement.md`*
+
+> *Phases 1–8b are ✅ Done. Phase 9 optimization work is active and Phase 10 contains remaining quick wins.*
+
+### 9.1 Raw+DC Benchmark Gap Optimizations (Phase 9)
+
+> **⚠️ IN PROGRESS — [PR #196](https://github.com/scylladb/coodie/pull/196): Phase 9 performance optimizations.**
+
+> **Prompt:** Finish Phase 9 optimizations from `docs/plans/performance-improvement.md` §13G by implementing and validating the benchmark-targeted improvements (model construction fast-path, one-row driver shortcut, and validation-chain reductions), then re-run benchmark comparisons and document deltas.
+
+### 9.2 Remaining Quick Wins (Phase 10)
+
+> **Prompt:** Implement Phase 10 tasks from `docs/plans/performance-improvement.md` §15, prioritizing the P0 quick wins first (`_snake_case` caching, CQL cache expansion for count/update/delete, UDT field-type caching, and timestamp-building micro-optimizations), then measure impact with the benchmark suite and update the plan status/results.

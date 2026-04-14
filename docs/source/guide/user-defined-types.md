@@ -150,7 +150,7 @@ home: Annotated[Address, Frozen()]   # Frozen() is redundant but accepted
 ```{note}
 Non-frozen UDT support (for partial field updates on top-level columns) may
 be added in a future coodie release.  See the
-[UDT support plan](https://github.com/fruch/coodie/blob/main/docs/plans/udt-support.md)
+[UDT support plan](https://github.com/scylladb/coodie/blob/main/docs/plans/udt-support.md)
 for the roadmap.
 ```
 

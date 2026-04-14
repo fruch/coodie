@@ -1,6 +1,6 @@
 # Performance Improvement Plan for coodie
 
-> **Based on**: Benchmark CI run [#22353872673](https://github.com/fruch/coodie/actions/runs/22353872673) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22353872673/job/64694559794?pr=31#step:5:122)) and acsylla driver ([job](https://github.com/fruch/coodie/actions/runs/22353872673/job/64694559911?pr=31#step:5:122))
+> **Based on**: Benchmark CI run [#22353872673](https://github.com/scylladb/coodie/actions/runs/22353872673) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22353872673/job/64694559794?pr=31#step:5:122)) and acsylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22353872673/job/64694559911?pr=31#step:5:122))
 > **Date**: 2026-02-24
 > **Status**: Updated with latest benchmark results and cross-driver comparison
 
@@ -549,7 +549,7 @@ self._doc_cls.model_validate(coerce_row_none_collections(self._doc_cls, row))
 
 ## 9. Driver Comparison: scylla-driver vs acsylla
 
-> **Run**: [#22353872673](https://github.com/fruch/coodie/actions/runs/22353872673) — same ScyllaDB container, same benchmark code, different coodie driver.
+> **Run**: [#22353872673](https://github.com/scylladb/coodie/actions/runs/22353872673) — same ScyllaDB container, same benchmark code, different coodie driver.
 > cqlengine always uses scylla-driver regardless of the `--driver-type` option.
 
 ### 9.1 coodie performance by driver (Mean times)
@@ -643,8 +643,8 @@ self._doc_cls.model_validate(coerce_row_none_collections(self._doc_cls, row))
 
 ## 10. Phase 1 Results
 
-> **Post-optimization run**: [#22371151749](https://github.com/fruch/coodie/actions/runs/22371151749) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22371151749/job/64752712030?pr=46#step:5:124))
-> **PR**: [#46](https://github.com/fruch/coodie/pull/46) — `perf: implement Phase 1 performance improvements`
+> **Post-optimization run**: [#22371151749](https://github.com/scylladb/coodie/actions/runs/22371151749) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22371151749/job/64752712030?pr=46#step:5:124))
+> **PR**: [#46](https://github.com/scylladb/coodie/pull/46) — `perf: implement Phase 1 performance improvements`
 
 ### 10.1 Phase 1 Changes Implemented
 
@@ -766,8 +766,8 @@ Phase 2's table metadata cache, which is a separate feature (not a code optimiza
 
 ## 11. Phase 2 Results
 
-> **Post-optimization run**: [#22374004611](https://github.com/fruch/coodie/actions/runs/22374004611) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22374004611/job/64760385946?pr=57#step:5:124))
-> **PR**: [#57](https://github.com/fruch/coodie/pull/57) — `perf(drivers): implement Phase 2 sync_table optimizations`
+> **Post-optimization run**: [#22374004611](https://github.com/scylladb/coodie/actions/runs/22374004611) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22374004611/job/64760385946?pr=57#step:5:124))
+> **PR**: [#57](https://github.com/scylladb/coodie/pull/57) — `perf(drivers): implement Phase 2 sync_table optimizations`
 
 ### 11.1 Phase 2 Changes Implemented
 
@@ -883,8 +883,8 @@ Phase 2's table metadata cache, which is a separate feature (not a code optimiza
 
 ## 12. Phase 3 Results
 
-> **Post-optimization run**: [#22404800091](https://github.com/fruch/coodie/actions/runs/22404800091) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22404800091/job/64861387772?pr=61#step:5:124))
-> **PR**: [#61](https://github.com/fruch/coodie/pull/61) — `perf: implement Phase 3 query path optimizations (tasks 3.6, 3.7, 3.8)`
+> **Post-optimization run**: [#22404800091](https://github.com/scylladb/coodie/actions/runs/22404800091) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22404800091/job/64861387772?pr=61#step:5:124))
+> **PR**: [#61](https://github.com/scylladb/coodie/pull/61) — `perf: implement Phase 3 query path optimizations (tasks 3.6, 3.7, 3.8)`
 
 ### 12.1 Phase 3 Changes Implemented
 
@@ -1215,8 +1215,8 @@ limitations.
 
 ### 13B.3 Phase 5 Results
 
-> **Post-optimization run**: [#22417171511](https://github.com/fruch/coodie/actions/runs/22417171511) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22417171511/job/64905668613))
-> **PR**: [#78](https://github.com/fruch/coodie/pull/78) — `perf: Phase 5 — PK column cache and native async for CassandraDriver`
+> **Post-optimization run**: [#22417171511](https://github.com/scylladb/coodie/actions/runs/22417171511) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22417171511/job/64905668613))
+> **PR**: [#78](https://github.com/scylladb/coodie/pull/78) — `perf: Phase 5 — PK column cache and native async for CassandraDriver`
 
 #### 13B.3.1 Core Operations — Phase 3 vs Phase 5
 
@@ -1318,8 +1318,8 @@ limitations.
 
 ## 13C. Phase 6 — Custom `dict_factory` for CassandraDriver
 
-> **PR**: [#113](https://github.com/fruch/coodie/pull/113) — `perf(drivers): set dict_factory on CassandraDriver session for zero-copy rows`
-> **Pre-change baseline run**: [#22488403820](https://github.com/fruch/coodie/actions/runs/22488403820) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22488403820/job/65143784056)) — commit `8db913f` on master, 2026-02-27
+> **PR**: [#113](https://github.com/scylladb/coodie/pull/113) — `perf(drivers): set dict_factory on CassandraDriver session for zero-copy rows`
+> **Pre-change baseline run**: [#22488403820](https://github.com/scylladb/coodie/actions/runs/22488403820) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22488403820/job/65143784056)) — commit `8db913f` on master, 2026-02-27
 
 ### 13C.1 Change Implemented
 
@@ -1351,7 +1351,7 @@ CassandraDriver.execute()
 **Savings per query**: Eliminates `_asdict()` (returns OrderedDict) + `dict()` wrapping for each row.
 For a 1-row query (GET by PK): ~30–50 µs. For a 10-row query: ~300–500 µs.
 
-### 13C.2 Pre-Change Baseline (run [#22488403820](https://github.com/fruch/coodie/actions/runs/22488403820))
+### 13C.2 Pre-Change Baseline (run [#22488403820](https://github.com/scylladb/coodie/actions/runs/22488403820))
 
 The most recent master run before this change confirms Phase 5 numbers are stable:
 
@@ -1417,14 +1417,14 @@ The change makes path 2 the default for all CassandraDriver queries.
 > 🔲 **Pending**: Will be filled in once PR #113 is merged and the benchmark workflow runs on master.
 >
 > The benchmark workflow auto-pushes to `gh-pages` on every `master` push, so results will
-> be visible at `https://fruch.github.io/coodie/benchmarks/scylla/` after merge.
+> be visible at `https://scylladb.github.io/coodie/benchmarks/scylla/` after merge.
 
 ---
 
 ## 13D. Phase 7 — `__slots__` on LWTResult, PagedResult, and BatchQuery
 
-> **PR**: [#120](https://github.com/fruch/coodie/pull/120) — `perf: add __slots__ to LWTResult, PagedResult, and BatchQuery`
-> **Benchmark run**: [#22530373428](https://github.com/fruch/coodie/actions/runs/22530373428) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22530373428/job/65268812271)) — commit `065c756` on `copilot/add-slots-to-hot-path-classes`, 2026-02-28
+> **PR**: [#120](https://github.com/scylladb/coodie/pull/120) — `perf: add __slots__ to LWTResult, PagedResult, and BatchQuery`
+> **Benchmark run**: [#22530373428](https://github.com/scylladb/coodie/actions/runs/22530373428) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22530373428/job/65268812271)) — commit `065c756` on `copilot/add-slots-to-hot-path-classes`, 2026-02-28
 
 ### 13D.1 Changes Implemented
 
@@ -1529,7 +1529,7 @@ noise floor of CI benchmarks), consistent with the original §14.5.4 estimate.
 ## 13E. Phase 8 — Benchmark Review & Next-Level Optimizations
 
 > **Date**: 2026-02-28
-> **Based on**: Phase 7 benchmark results (run [#22530373428](https://github.com/fruch/coodie/actions/runs/22530373428))
+> **Based on**: Phase 7 benchmark results (run [#22530373428](https://github.com/scylladb/coodie/actions/runs/22530373428))
 > **Status**: Proposed
 
 ### 13E.1 Current Benchmark Summary
@@ -1809,8 +1809,8 @@ The remaining 3–4 losses would all be in the "accepted Pydantic trade-off" cat
 
 ## 13F. Phase 8b — Connection-Level Optimizations (§14.5.6)
 
-> **PR**: [#137](https://github.com/fruch/coodie/pull/137) — `feat(drivers): connection-level performance optimizations — compression, speculative execution, prepared statement warming`
-> **Baseline**: Phase 7 (13D) benchmark run [#22530373428](https://github.com/fruch/coodie/actions/runs/22530373428) — scylla driver ([job](https://github.com/fruch/coodie/actions/runs/22530373428/job/65268812271)) — commit `065c756`, 2026-02-28
+> **PR**: [#137](https://github.com/scylladb/coodie/pull/137) — `feat(drivers): connection-level performance optimizations — compression, speculative execution, prepared statement warming`
+> **Baseline**: Phase 7 (13D) benchmark run [#22530373428](https://github.com/scylladb/coodie/actions/runs/22530373428) — scylla driver ([job](https://github.com/scylladb/coodie/actions/runs/22530373428/job/65268812271)) — commit `065c756`, 2026-02-28
 
 ### 13F.1 Changes Implemented
 
@@ -1922,7 +1922,7 @@ The §14.5.6 optimizations are **deployment-time configuration improvements** ra
 ## 13G. Phase 9 — Raw+DC Benchmark Analysis & Optimization Targets
 
 > **Date**: 2026-03-05
-> **Based on**: Raw+DC benchmarks added in PR [#187](https://github.com/fruch/coodie/pull/187) — CI run [#22739849451](https://github.com/fruch/coodie/actions/runs/22739849451) — commit `313a210`
+> **Based on**: Raw+DC benchmarks added in PR [#187](https://github.com/scylladb/coodie/pull/187) — CI run [#22739849451](https://github.com/scylladb/coodie/actions/runs/22739849451) — commit `313a210`
 > **Status**: Analysis complete, proposed optimizations pending implementation
 
 ### 13G.1 Background

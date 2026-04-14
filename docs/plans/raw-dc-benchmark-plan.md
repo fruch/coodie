@@ -90,7 +90,7 @@ ScyllaDB testcontainer — the same infrastructure the existing benchmarks use.
 
 ## 5. Benchmark Results
 
-> **CI Run:** [#22739849451](https://github.com/fruch/coodie/actions/runs/22739849451) — commit `313a210` (all 86 benchmarks passed)
+> **CI Run:** [#22739849451](https://github.com/scylladb/coodie/actions/runs/22739849451) — commit `313a210` (all 86 benchmarks passed)
 > **Backend:** ScyllaDB testcontainer · **Driver:** cassandra-driver with `dict_factory`
 
 ### 5.1 Three-Way Comparison — Raw+DC vs coodie vs cqlengine

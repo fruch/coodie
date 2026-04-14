@@ -8,18 +8,18 @@
 
 *Cassandra + Beanie (hoodie) = **coodie** 🧥*
 
-[![CI Status](https://img.shields.io/github/actions/workflow/status/fruch/coodie/ci.yml?branch=main&label=CI&logo=github&style=for-the-badge)](https://github.com/fruch/coodie/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/github/actions/workflow/status/fruch/coodie/docs.yml?branch=main&label=Docs&logo=github&style=for-the-badge)](https://fruch.github.io/coodie/)
-[![Coverage](https://img.shields.io/codecov/c/github/fruch/coodie.svg?logo=codecov&logoColor=fff&style=for-the-badge)](https://codecov.io/gh/fruch/coodie)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/scylladb/coodie/ci.yml?branch=main&label=CI&logo=github&style=for-the-badge)](https://github.com/scylladb/coodie/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/scylladb/coodie/docs.yml?branch=main&label=Docs&logo=github&style=for-the-badge)](https://scylladb.github.io/coodie/)
+[![Coverage](https://img.shields.io/codecov/c/github/scylladb/coodie.svg?logo=codecov&logoColor=fff&style=for-the-badge)](https://codecov.io/gh/scylladb/coodie)
 [![PyPI](https://img.shields.io/pypi/v/coodie.svg?logo=python&logoColor=fff&style=for-the-badge)](https://pypi.org/project/coodie/)
 [![Python](https://img.shields.io/pypi/pyversions/coodie.svg?style=for-the-badge&logo=python&logoColor=fff)](https://pypi.org/project/coodie/)
-[![License](https://img.shields.io/pypi/l/coodie.svg?style=for-the-badge)](https://github.com/fruch/coodie/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/coodie.svg?style=for-the-badge)](https://github.com/scylladb/coodie/blob/main/LICENSE)
 
 <p>
-<a href="https://fruch.github.io/coodie/">📖 Documentation</a> •
+<a href="https://scylladb.github.io/coodie/">📖 Documentation</a> •
 <a href="#-quick-start">🚀 Quick Start</a> •
-<a href="https://github.com/fruch/coodie/blob/main/CONTRIBUTING.md">🤝 Contributing</a> •
-<a href="https://github.com/fruch/coodie/blob/main/CHANGELOG.md">📋 Changelog</a>
+<a href="https://github.com/scylladb/coodie/blob/main/CONTRIBUTING.md">🤝 Contributing</a> •
+<a href="https://github.com/scylladb/coodie/blob/main/CHANGELOG.md">📋 Changelog</a>
 </p>
 
 </div>
@@ -262,13 +262,13 @@ await Product.find(brand="Discontinued").allow_filtering().delete()
 
 | Resource | Link |
 |---|---|
-| 📖 **Full Documentation** | [fruch.github.io/coodie](https://fruch.github.io/coodie/) |
-| 🚀 **Quick Start Guide** | [Installation & Quickstart](https://fruch.github.io/coodie/quickstart.html) |
-| 📊 **Benchmark History** | [Performance Trends](https://fruch.github.io/coodie/benchmarks/) |
-| 🔄 **Migrating from cqlengine** | [Migration Guide](https://fruch.github.io/coodie/migration/from-cqlengine.html) |
+| 📖 **Full Documentation** | [scylladb.github.io/coodie](https://scylladb.github.io/coodie/) |
+| 🚀 **Quick Start Guide** | [Installation & Quickstart](https://scylladb.github.io/coodie/quickstart.html) |
+| 📊 **Benchmark History** | [Performance Trends](https://scylladb.github.io/coodie/benchmarks/) |
+| 🔄 **Migrating from cqlengine** | [Migration Guide](https://scylladb.github.io/coodie/migration/from-cqlengine.html) |
 | 🤝 **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 📋 **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
-| 🐛 **Bug Reports** | [GitHub Issues](https://github.com/fruch/coodie/issues) |
+| 🐛 **Bug Reports** | [GitHub Issues](https://github.com/scylladb/coodie/issues) |
 
 ## Contributors ✨
 
@@ -280,7 +280,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- markdownlint-disable -->
 <table>
   <tr>
-    <td align="center"><a href="http://fruch.github.io/"><img src="https://avatars.githubusercontent.com/u/340979?v=4?s=80" width="80px;" alt=""/><br /><sub><b>Israel Fruchter</b></sub></a><br /><a href="https://github.com/fruch/coodie/commits?author=fruch" title="Code">💻</a> <a href="#ideas-fruch" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/fruch/coodie/commits?author=fruch" title="Documentation">📖</a></td>
+    <td align="center"><a href="http://fruch.github.io/"><img src="https://avatars.githubusercontent.com/u/340979?v=4?s=80" width="80px;" alt=""/><br /><sub><b>Israel Fruchter</b></sub></a><br /><a href="https://github.com/scylladb/coodie/commits?author=fruch" title="Code">💻</a> <a href="#ideas-fruch" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/scylladb/coodie/commits?author=fruch" title="Documentation">📖</a></td>
   </tr>
 </table>
 

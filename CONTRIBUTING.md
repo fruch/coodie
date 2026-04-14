@@ -204,33 +204,60 @@ for manual testing:
 
 ## Making a new release
 
-Publishing to PyPI is triggered automatically whenever a tag matching `v<major>.<minor>.<patch>` (e.g. `v1.0.0`) is pushed to the repository. The [Publish to PyPI](.github/workflows/publish.yml) GitHub Actions workflow will build the package and publish it using [Trusted Publishing](#setting-up-trusted-publishing-on-pypi) — no API tokens or credentials are stored in GitHub secrets.
+Releases happen automatically when commits are merged to `master`. The
+[CI workflow](.github/workflows/ci.yml) uses
+[python-semantic-release](https://python-semantic-release.readthedocs.io/)
+to analyse [Conventional Commits](https://www.conventionalcommits.org)
+and determine whether a version bump is needed:
+
+| Commit prefix | Version bump |
+|---|---|
+| `fix:` | Patch (`0.0.x`) |
+| `feat:` | Minor (`0.x.0`) |
+| `feat!:` / `BREAKING CHANGE:` | Major (`x.0.0`) |
+
+When a new version is detected the CI will:
+
+1. Update `CHANGELOG.md` and push a version tag (e.g. `v1.0.0`).
+2. Create a GitHub Release with auto-generated release notes.
+3. Build the package with `uv build` (version derived from the tag via `hatch-vcs`).
+4. Publish to PyPI using [Trusted Publishing](#setting-up-trusted-publishing-on-pypi) (OIDC).
+
+No manual tagging or PyPI token management is required.
 
 ### Setting up Trusted Publishing on PyPI
 
-[Trusted Publishing](https://docs.pypi.org/trusted-publishers/) lets PyPI verify GitHub Actions runs via OpenID Connect (OIDC), so you never have to create or rotate a PyPI API token.
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/) lets PyPI verify
+GitHub Actions runs via OpenID Connect (OIDC), so you never have to create or
+rotate a PyPI API token.
 
 **One-time setup steps (done once per PyPI project):**
 
 1. Go to <https://pypi.org> and log in.
 2. Open the project page for `coodie`, then go to **Manage → Publishing**.
-   - If the project does not exist yet, go to <https://pypi.org/manage/account/publishing/> to add a *pending* publisher before the first upload.
+   - If the project does not exist yet, go to
+     <https://pypi.org/manage/account/publishing/> to add a *pending* publisher
+     before the first upload.
 3. Click **Add a new publisher** and fill in the form:
 
    | Field | Value |
    |---|---|
    | Owner | `scylladb` |
    | Repository name | `coodie` |
-   | Workflow name | `publish.yml` |
+   | Workflow name | `ci.yml` |
    | Environment name | `release` |
 
 4. Click **Add**.
 
 **GitHub repository setup:**
 
-1. In the repository, go to **Settings → Environments** and create an environment named **`release`**.
-2. Optionally add protection rules (e.g. require a reviewer before the publish job runs).
+1. In the repository, go to **Settings → Environments** and create an
+   environment named **`release`**.
+2. Optionally add protection rules (e.g. require a reviewer before the
+   publish job runs).
 
-Once this is done, pushing a version tag such as `v1.0.0` will trigger the workflow and PyPI will accept the upload without any stored credentials.
+Once this is done, every merge to `master` that includes a `feat:` or `fix:`
+commit will trigger an automatic release and PyPI publish — no stored
+credentials needed.
 
 [gh-issues]: https://github.com/scylladb/coodie/issues

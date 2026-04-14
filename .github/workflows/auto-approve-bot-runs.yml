@@ -49,7 +49,7 @@
 # permissions.  If it does not, set a fine-grained PAT as the GH_PAT secret
 # with these repository permissions:
 #   • Actions:        Read and write
-#   • Pull requests:  Read and write  (already needed by self-healing CI)
+#   • Pull requests:  Read and write
 
 name: Auto-Approve Bot Runs
 

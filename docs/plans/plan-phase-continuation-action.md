@@ -60,7 +60,6 @@ The repository already has patterns for post-merge automation:
 
 | Workflow | Pattern |
 |---|---|
-| `self-healing-ci.yml` | `workflow_run` trigger → react to completed workflows |
 | `ci.yml` | `push` to master → semantic-release |
 
 ---
@@ -723,6 +722,5 @@ Because this is a workflow, integration testing is primarily manual:
 - [GitHub Actions: `pull_request` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request)
 - [GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
 - [GitHub Copilot coding agent](https://docs.github.com/en/copilot/using-github-copilot/using-copilot-coding-agent)
-- [Existing `self-healing-ci.yml`](../../.github/workflows/self-healing-ci.yml) — pattern for PR commenting
 - [Plan writing conventions](../../.github/skills/writing-plans/SKILL.md)
 - [Conventional Commits specification](https://www.conventionalcommits.org/)

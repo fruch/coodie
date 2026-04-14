@@ -48,8 +48,7 @@ The repository has 11 GitHub Actions workflow files:
 | 5 | Docs | `docs.yml` | `push` (master) | 66 |
 | 6 | Publish | `publish.yml` | `push` (tags) | 41 |
 | 7 | Labels | `labels.yml` | `push` (master, `.github/labels.toml`) | 22 |
-| 8 | Self-Healing CI | `self-healing-ci.yml` | `workflow_run` | 108 |
-| 9 | Issue Manager | `issue-manager.yml` | `issue_comment`, `schedule` | 32 |
+| 8 | Issue Manager | `issue-manager.yml` | `issue_comment`, `schedule` | 32 |
 
 **There is no automated testing of any workflow file today.** The only
 validation is GitHub's built-in YAML parsing on push and manual smoke
@@ -64,8 +63,8 @@ Legend:
 
 | Workflow | Complexity | Testable Shell Logic | Key Risks |
 |---------|:----------:|:--------------------:|-----------|
-| PR Rebase & Squash | 🔴 | Yes (9 shell steps) | Permission checks, command parsing, git rebase/squash, Copilot CLI fallback |
-| Self-Healing CI | 🔴 | Yes (3 shell steps) | Log collection loops, PR comment construction, `workflow_run` trigger |
+| PR Rebase & Squash (removed) | 🔴 | Yes (9 shell steps) | Permission checks, command parsing, git rebase/squash, Copilot CLI fallback |
+| Self-Healing CI (removed) | 🔴 | Yes (3 shell steps) | Log collection loops, PR comment construction, `workflow_run` trigger |
 | Benchmarks | 🟡 | Minimal | Matrix strategy, artifact management, gh-pages deploy |
 | Integration Tests | 🟡 | Minimal | Matrix with driver exclusions, service containers |
 | Unit Tests | 🟡 | Minimal | Matrix (3 Python versions × 3 OSes) |
@@ -74,8 +73,6 @@ Legend:
 | Publish | 🟢 | No | PyPI OIDC, artifact upload |
 | Labels | 🟢 | No | Single marketplace action |
 | Issue Manager | 🟢 | No | Single marketplace action |
-**The `self-healing-ci.yml` workflow contains the most shell logic and is the highest
-priority for testing.**
 
 ---
 
@@ -292,9 +289,7 @@ testing pyramid** for workflows:
 While `act` is the most well-known workflow testing tool, it is
 **not the best fit** for coodie's most complex workflows:
 
-1. `self-healing-ci.yml` uses `workflow_run` triggers, which `act` does
-   not fully support.
-2. The Docker overhead (~10-30 s startup + ~2 GB image) is disproportionate
+1. The Docker overhead (~10-30 s startup + ~2 GB image) is disproportionate
    for what are essentially Bash scripts with `gh` CLI calls.
 3. The shell logic is better tested by extracting it into scripts and
    using Bats — this is faster, more targeted, and gives clearer
@@ -328,12 +323,8 @@ primary testing mechanism. Developers can install it optionally.
 |---|---|
 | 2.1 | Create `.github/scripts/` directory for extracted shell scripts |
 | 2.2 | Extract complex shell steps from workflows into standalone scripts |
-| 2.3 | Extract the "Collect failed job logs" step from `self-healing-ci.yml` into `.github/scripts/collect-failed-logs.sh` |
 | 2.5 | Update workflow YAML files to source the extracted scripts instead of inline shell |
 | 2.6 | Create `tests/workflows/` directory for Bats test files |
-| 2.7 | Write Bats tests for `parse-command.sh`: `/rebase`, `/squash`, `/rebase squash`, mixed-case, leading whitespace, invalid input |
-| 2.8 | Write Bats tests for `build-squash-message.sh`: Copilot success, Copilot failure (fallback to PR title), error-message rejection, empty body |
-| 2.9 | Write Bats tests for `collect-failed-logs.sh`: no failed jobs, one failed job, multiple failed jobs, API error |
 | 2.10 | Create `tests/workflows/conftest.py` — a pytest-bats plugin that collects `.bats` files as pytest items, parses individual `@test` blocks, and runs them via `bats`, reporting pass/fail per test case (see [§2.10 Plugin Design](#210-plugin-design) below) |
 | 2.11 | Add a CI job that installs `bats-core` and runs all Bats tests via `pytest tests/workflows/` on PRs touching `.github/` |
 | 2.12 | Verify: all Bats tests pass locally and in CI via both `bats` directly and `pytest tests/workflows/` |
@@ -451,7 +442,6 @@ class BatsTestFailure(Exception):
 |---|---|
 | 4.1 | Document the manual smoke-test procedure in `CONTRIBUTING.md`: how to trigger via Actions tab, expected results, cleanup steps |
 | 4.2 | Create a test PR template (branch `test/workflow-smoke`) with known state for reproducible testing |
-| 4.3 | Add `workflow_dispatch` triggers to `self-healing-ci.yml` for manual testing |
 | 4.4 | Verify: manual smoke tests pass |
 
 ---
@@ -521,7 +511,6 @@ class BatsTestFailure(Exception):
 | `/squash` on a multi-commit PR → single commit with PR title as subject | 4 |
 | `/rebase squash` → rebase then squash in one run | 4 |
 | Trigger on closed PR → workflow exits with "not open" error | 4 |
-| `self-healing-ci.yml` manual trigger → failure comment posted on test PR | 4 |
 
 ---
 
@@ -533,4 +522,3 @@ class BatsTestFailure(Exception):
 - [Bats — Bash Automated Testing System](https://github.com/bats-core/bats-core)
 - [`@github/local-action` — Local Action Debugger](https://github.com/github/local-action)
 - [GitHub Actions workflow syntax reference](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions)
-- [Self-Healing CI workflow](../../.github/workflows/self-healing-ci.yml)

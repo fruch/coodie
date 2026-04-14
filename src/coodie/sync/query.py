@@ -443,16 +443,17 @@ class QuerySet:
     def max(self, column: str) -> Any:
         return self._aggregate("MAX", column)
 
-    def delete(self) -> LWTResult | None:
+    def delete(self, if_conditions: dict[str, Any] | None = None) -> LWTResult | None:
         cql, params = build_delete(
             self._table(),
             self._keyspace(),
             self._where,
             timestamp=self._timestamp_val,
             if_exists=self._if_exists_val,
+            if_conditions=if_conditions,
         )
         rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
-        if self._if_exists_val:
+        if self._if_exists_val or if_conditions:
             return _parse_lwt_result(rows)
         return None
 

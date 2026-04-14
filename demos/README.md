@@ -30,6 +30,7 @@ seeds sample data, and launches the app.
 | 🐝 Task Board | Django | Sync API, dual-database pattern, counter columns, Kanban UI | [`django-taskboard/`](django-taskboard/) |
 | 🔮 Materialized Views | FastAPI + HTMX | `MaterializedView`, `sync_view()`, read-only queries, auto-updating views | [`materialized-views/`](materialized-views/) |
 | 📊 Realtime Counters | FastAPI + HTMX | `CounterDocument`, `increment()`, `decrement()`, live analytics dashboard | [`realtime-counters/`](realtime-counters/) |
+| 🔧 Schema Migrations | FastAPI | `coodie migrate` CLI, apply/rollback/dry-run, `_coodie_migrations` state tracking, migration file authoring | [`schema-migrations/`](schema-migrations/) |
 
 ## Shared Infrastructure
 

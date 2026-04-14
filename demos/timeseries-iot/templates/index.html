@@ -262,7 +262,19 @@ function updateSensorCharts(sensorId, data) {
   }
 }
 
+function destroyChartsForSensor(sensorId) {
+  var metrics = ['temperature', 'humidity', 'pressure'];
+  for (var metric of metrics) {
+    var key = sensorId + '-' + metric;
+    if (chartInstances[key]) {
+      chartInstances[key].destroy();
+      delete chartInstances[key];
+    }
+  }
+}
+
 function initChartsForSensor(sensorId) {
+  destroyChartsForSensor(sensorId);
   var prefix = sensorId.replace(/[^a-zA-Z0-9]/g, '_');
   chartInstances[sensorId + '-temperature'] = createChart(
     'chart-temp-' + prefix, 'Temperature (°C)',
@@ -295,6 +307,10 @@ function stopChartRefresh() {
     clearInterval(chartRefreshInterval);
     chartRefreshInterval = null;
   }
+  for (var key in chartInstances) {
+    if (chartInstances[key]) chartInstances[key].destroy();
+  }
+  chartInstances = {};
 }
 
 // Update "seconds ago" on dashboard cards

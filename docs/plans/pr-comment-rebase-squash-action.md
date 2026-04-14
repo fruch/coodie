@@ -272,7 +272,7 @@ Follow these steps to generate the workflow push token:
    | **Expiration** | Pick a reasonable lifetime (e.g., 90 days); set a calendar reminder to rotate |
    | **Description** | "Push access for branches with .github/workflows/ changes" |
    | **Resource owner** | Your personal account (any collaborator with write access) |
-   | **Repository access** | Select **"Only select repositories"** and choose `fruch/coodie` |
+   | **Repository access** | Select **"Only select repositories"** and choose `scylladb/coodie` |
 
 3. **Set permissions:**
 
@@ -293,7 +293,7 @@ Follow these steps to generate the workflow push token:
 > `https://github.com/OWNER/REPO/settings/secrets/actions/new`
 >
 > For this repository:
-> [`https://github.com/fruch/coodie/settings/secrets/actions/new`](https://github.com/fruch/coodie/settings/secrets/actions/new)
+> [`https://github.com/scylladb/coodie/settings/secrets/actions/new`](https://github.com/scylladb/coodie/settings/secrets/actions/new)
 
 1. Open the link above, or navigate: Repository → **Settings** → **Secrets and
    variables** → **Actions** → **New repository secret**

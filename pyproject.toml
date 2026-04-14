@@ -37,11 +37,11 @@ python-rs = [
 coodie = "coodie.migrations.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/fruch/coodie"
-Documentation = "https://fruch.github.io/coodie/"
-Repository = "https://github.com/fruch/coodie"
-"Bug Tracker" = "https://github.com/fruch/coodie/issues"
-Changelog = "https://github.com/fruch/coodie/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/scylladb/coodie"
+Documentation = "https://scylladb.github.io/coodie/"
+Repository = "https://github.com/scylladb/coodie"
+"Bug Tracker" = "https://github.com/scylladb/coodie/issues"
+Changelog = "https://github.com/scylladb/coodie/blob/main/CHANGELOG.md"
 
 # NOTE: We'd prefer to use uv_build here, but it doesn't yet support dynamic
 # versioning from VCS. Switch back once uv_build gains this support:

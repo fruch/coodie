@@ -378,9 +378,9 @@ except DocumentNotFound:
 
 ## Project Links
 
-- [GitHub Repository](https://github.com/fruch/coodie)
+- [GitHub Repository](https://github.com/scylladb/coodie)
 - [PyPI Package](https://pypi.org/project/coodie/)
-- [Full Documentation](https://fruch.github.io/coodie/)
-- [Changelog](https://fruch.github.io/coodie/changelog.html)
-- [Contributing Guide](https://fruch.github.io/coodie/contributing.html)
-- [Migration from cqlengine](https://fruch.github.io/coodie/migration/from-cqlengine.html)
+- [Full Documentation](https://scylladb.github.io/coodie/)
+- [Changelog](https://scylladb.github.io/coodie/changelog.html)
+- [Contributing Guide](https://scylladb.github.io/coodie/contributing.html)
+- [Migration from cqlengine](https://scylladb.github.io/coodie/migration/from-cqlengine.html)

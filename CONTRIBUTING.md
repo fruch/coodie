@@ -259,15 +259,15 @@ cat > /tmp/rebase-event.json << 'EOF'
   "action": "created",
   "issue": {
     "number": PR_NUMBER,
-    "pull_request": {"url": "https://api.github.com/repos/fruch/coodie/pulls/PR_NUMBER"}
+    "pull_request": {"url": "https://api.github.com/repos/scylladb/coodie/pulls/PR_NUMBER"}
   },
   "comment": {
     "id": COMMENT_ID,
     "body": "/rebase",
     "user": {"login": "fruch", "id": 340979}
   },
-  "repository": {"full_name": "fruch/coodie", "name": "coodie",
-                  "owner": {"login": "fruch"}}
+  "repository": {"full_name": "scylladb/coodie", "name": "coodie",
+                  "owner": {"login": "scylladb"}}
 }
 EOF
 
@@ -339,15 +339,15 @@ using `GITHUB_TOKEN`, but Copilot will not respond to the mention.
 **Creating the PAT:**
 
 1. Go to <https://github.com/settings/personal-access-tokens/new>
-2. Set **Resource owner** to `fruch` (or the org that owns this repo)
-3. Set **Repository access** to **Only select repositories** → `fruch/coodie`
+2. Set **Resource owner** to `scylladb` (or the org that owns this repo)
+3. Set **Repository access** to **Only select repositories** → `scylladb/coodie`
 4. Under **Repository permissions**, grant:
    - **Pull requests: Read and write** — needed to post PR comments
 5. Click **Generate token** and copy the value
 
 **Storing the secret:**
 
-1. Go to <https://github.com/fruch/coodie/settings/secrets/actions/new>
+1. Go to <https://github.com/scylladb/coodie/settings/secrets/actions/new>
 2. Name: `GH_PAT`
 3. Value: paste the token from the previous step
 4. Click **Add secret**
@@ -379,7 +379,7 @@ Publishing to PyPI is triggered automatically whenever a tag matching `v<major>.
 
    | Field | Value |
    |---|---|
-   | Owner | `fruch` |
+   | Owner | `scylladb` |
    | Repository name | `coodie` |
    | Workflow name | `publish.yml` |
    | Environment name | `release` |
@@ -393,4 +393,4 @@ Publishing to PyPI is triggered automatically whenever a tag matching `v<major>.
 
 Once this is done, pushing a version tag such as `v1.0.0` will trigger the workflow and PyPI will accept the upload without any stored credentials.
 
-[gh-issues]: https://github.com/fruch/coodie/issues
+[gh-issues]: https://github.com/scylladb/coodie/issues

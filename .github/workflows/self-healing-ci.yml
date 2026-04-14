@@ -13,8 +13,8 @@ name: Self-Healing CI
 #
 # Create a fine-grained Personal Access Token with the following settings:
 #   URL:          https://github.com/settings/personal-access-tokens/new
-#   Resource owner: fruch (or the org that owns this repo)
-#   Repository access: Only select repositories → fruch/coodie
+#   Resource owner: scylladb (or the org that owns this repo)
+#   Repository access: Only select repositories → scylladb/coodie
 #   Repository permissions:
 #     • Pull requests: Read and write   ← needed to post PR comments
 #
@@ -24,7 +24,7 @@ name: Self-Healing CI
 # PATs and avoids this limitation.
 #
 # Store the generated token as a repository secret named GH_PAT:
-#   https://github.com/fruch/coodie/settings/secrets/actions/new
+#   https://github.com/scylladb/coodie/settings/secrets/actions/new
 
 on:
   workflow_call:

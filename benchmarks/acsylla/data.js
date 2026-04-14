@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776199638791,
+  "lastUpdate": 1776199654271,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -14046,6 +14046,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 8.217850688044204e-7",
             "extra": "mean: 5.4107635863411305 usec\nrounds: 7673"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "1e2743847fa09a04b4135b34c750de31ddf1b74b",
+          "message": "test: add integration tests for TTL, batch writes, and advanced query features\n\n- add TTL/TIMESTAMP integration tests covering expiry, bulk update via QuerySet,\n  and Pydantic ValidationError handling when a TTL-expired column returns null\n- add batch write tests for empty batches and mixed-model batches\n- add advanced query tests covering token-based pagination, count/aggregate,\n  order_by, filtering on secondary index, and QuerySet chaining\n- fix sync_table calls in token tests and handle ValidationError from\n  model_validate() path (Acsylla driver) as valid proof of TTL expiry\n\nCo-authored-by: fruch <340979+fruch@users.noreply.github.com>",
+          "timestamp": "2026-04-14T23:46:46+03:00",
+          "tree_id": "9b9b5d0e7fa90da6de2613ddd332b0cfce4cedde",
+          "url": "https://github.com/scylladb/coodie/commit/1e2743847fa09a04b4135b34c750de31ddf1b74b"
+        },
+        "date": 1776199653219,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 61831.62955129755,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000018299611640053954",
+            "extra": "mean: 16.17295237497125 usec\nrounds: 8084"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1620852.8386768259,
+            "unit": "iter/sec",
+            "range": "stddev: 2.8019708460188784e-7",
+            "extra": "mean: 616.9591564008639 nsec\nrounds: 189430"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 143604.16013930494,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026587882138368457",
+            "extra": "mean: 6.963586563438957 usec\nrounds: 19633"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 550746.0717709508,
+            "unit": "iter/sec",
+            "range": "stddev: 4.5755980090878254e-7",
+            "extra": "mean: 1.8157188062811802 usec\nrounds: 45001"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 606331.8706932914,
+            "unit": "iter/sec",
+            "range": "stddev: 4.28176720470186e-7",
+            "extra": "mean: 1.6492618124404064 usec\nrounds: 49757"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 843784.3972640313,
+            "unit": "iter/sec",
+            "range": "stddev: 3.420789162445873e-7",
+            "extra": "mean: 1.1851368705589926 usec\nrounds: 165536"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 841853.4304358743,
+            "unit": "iter/sec",
+            "range": "stddev: 3.673474504084959e-7",
+            "extra": "mean: 1.1878552297188414 usec\nrounds: 78407"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 676649.2597997821,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7898862676793487e-7",
+            "extra": "mean: 1.477870529697906 usec\nrounds: 91828"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 183508.43307596748,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000100064351714922",
+            "extra": "mean: 5.449340846292482 usec\nrounds: 7587"
           }
         ]
       }

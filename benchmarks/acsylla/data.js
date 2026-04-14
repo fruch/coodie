@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776163049745,
+  "lastUpdate": 1776163103480,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -13089,6 +13089,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 5.422455275341539e-7",
             "extra": "mean: 5.28800926055205 usec\nrounds: 7343"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "ca54eca21e2bac1ad4e5625b8503a86add559ed6",
+          "message": "fix(ci): grant pull-requests write permission to claude-code-review workflow\n\nThe Claude Code Action needs write access to post review comments on PRs.\nWith only read permission, the OIDC token exchange fails with 401 Unauthorized.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-14T13:37:20+03:00",
+          "tree_id": "c6986dfa517d4f4e8ab1cf9decef5edaf3455118",
+          "url": "https://github.com/scylladb/coodie/commit/ca54eca21e2bac1ad4e5625b8503a86add559ed6"
+        },
+        "date": 1776163101559,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 63510.94758389892,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001832860274462848",
+            "extra": "mean: 15.745316957820304 usec\nrounds: 8244"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 2560342.083205457,
+            "unit": "iter/sec",
+            "range": "stddev: 5.567404116165053e-8",
+            "extra": "mean: 390.5728092193195 nsec\nrounds: 116374"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 191084.1997152525,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004485218071659442",
+            "extra": "mean: 5.233295068300611 usec\nrounds: 20419"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 662269.4181515708,
+            "unit": "iter/sec",
+            "range": "stddev: 3.7139971892127077e-7",
+            "extra": "mean: 1.50995950075885 usec\nrounds: 47754"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 783639.1636904074,
+            "unit": "iter/sec",
+            "range": "stddev: 3.001420299522129e-7",
+            "extra": "mean: 1.2760975284730287 usec\nrounds: 45761"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 1078393.0794420769,
+            "unit": "iter/sec",
+            "range": "stddev: 2.84008292795129e-7",
+            "extra": "mean: 927.3056541844327 nsec\nrounds: 166973"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 1018018.8448498714,
+            "unit": "iter/sec",
+            "range": "stddev: 2.792873166512359e-7",
+            "extra": "mean: 982.3000871339187 nsec\nrounds: 75758"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 804473.1343303258,
+            "unit": "iter/sec",
+            "range": "stddev: 3.285877124385723e-7",
+            "extra": "mean: 1.2430495902544194 usec\nrounds: 92619"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 225964.88933983413,
+            "unit": "iter/sec",
+            "range": "stddev: 5.788978125061892e-7",
+            "extra": "mean: 4.425466287800472 usec\nrounds: 7742"
           }
         ]
       }

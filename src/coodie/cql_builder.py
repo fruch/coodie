@@ -64,8 +64,6 @@ def build_create_table(
 
     clustering_order_parts = []
     if any(c.clustering_order != "ASC" for c in ck_cols):
-        # CQL requires ALL clustering columns to be listed in WITH CLUSTERING
-        # ORDER BY whenever the clause is present — even those that are ASC.
         clustering_order_parts = [f'"{c.name}" {c.clustering_order}' for c in ck_cols]
 
     with_parts: list[str] = []
@@ -94,8 +92,31 @@ def build_create_index(
     return f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
 
 
+def build_create_custom_index(
+    table: str,
+    keyspace: str,
+    col: ColumnDefinition,
+    index_class: str = "org.apache.cassandra.index.sai.StorageAttachedIndex",
+    options: dict[str, str] | None = None,
+) -> str:
+    index_name = col.vector_index_name or f"{table}_{col.name}_idx"
+    cql = f"CREATE CUSTOM INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} (\"{col.name}\") USING '{index_class}'"
+    if options:
+        opts_str = ", ".join(f"'{k}': '{v}'" for k, v in options.items())
+        cql += f" WITH OPTIONS = {{{opts_str}}}"
+    return cql
+
+
+def build_create_vector_index(
+    table: str,
+    keyspace: str,
+    col: ColumnDefinition,
+) -> str:
+    """Build a ``CREATE CUSTOM INDEX`` for a vector column using ``'vector_index'``."""
+    return build_create_custom_index(table, keyspace, col, index_class="vector_index", options=col.vector_index_options)
+
+
 def build_drop_index(index_name: str, keyspace: str) -> str:
-    """Build a ``DROP INDEX IF EXISTS`` CQL statement."""
     return f"DROP INDEX IF EXISTS {keyspace}.{index_name}"
 
 
@@ -104,7 +125,6 @@ def build_alter_table_options(
     keyspace: str,
     options: dict[str, Any],
 ) -> str:
-    """Build an ``ALTER TABLE … WITH`` statement for table option changes."""
     parts = []
     for k, v in options.items():
         if isinstance(v, str):
@@ -115,7 +135,6 @@ def build_alter_table_options(
 
 
 def build_truncate(table: str, keyspace: str) -> str:
-    """Build a ``TRUNCATE TABLE`` CQL statement."""
     return f"TRUNCATE TABLE {keyspace}.{table}"
 
 
@@ -133,19 +152,6 @@ def build_create_materialized_view(
     where_clause: str | None = None,
     clustering_order: dict[str, str] | None = None,
 ) -> str:
-    """Build a ``CREATE MATERIALIZED VIEW`` CQL statement.
-
-    Args:
-        view_name: Name of the materialized view.
-        keyspace: Keyspace for the view.
-        base_table: The base table the view selects from.
-        columns: Columns to include (use ``["*"]`` for all).
-        primary_key_columns: Partition key column(s).
-        clustering_columns: Optional clustering column(s).
-        where_clause: The ``WHERE`` clause required by CQL (e.g.
-            ``'"col" IS NOT NULL AND "pk" IS NOT NULL'``).
-        clustering_order: Optional dict mapping column name to ``"ASC"``/``"DESC"``.
-    """
     cols_str = ", ".join(c if c == "*" else f'"{c}"' for c in columns)
 
     if len(primary_key_columns) == 1:
@@ -180,14 +186,12 @@ def build_create_materialized_view(
 
 
 def build_drop_materialized_view(view_name: str, keyspace: str) -> str:
-    """Build a ``DROP MATERIALIZED VIEW`` CQL statement."""
     return f"DROP MATERIALIZED VIEW IF EXISTS {keyspace}.{view_name}"
 
 
 def parse_filter_kwargs(
     kwargs: dict[str, Any],
 ) -> list[tuple[str, str, Any]]:
-    """Parse Django-style filter kwargs into (column, operator, value) triples."""
     operators = {
         "gt": ">",
         "gte": ">=",
@@ -208,7 +212,6 @@ def parse_filter_kwargs(
     }
     result = []
     for key, value in kwargs.items():
-        # Check for __token__<op> pattern first (two-level suffix)
         parts2 = key.rsplit("__", 2)
         if len(parts2) == 3:
             col, mid, op = parts2
@@ -228,7 +231,6 @@ def parse_filter_kwargs(
 def build_where_clause(
     filter_triples: list[tuple[str, str, Any]],
 ) -> tuple[str, list[Any]]:
-    """Build WHERE clause from (col, op, value) triples. Returns (clause_str, params)."""
     if not filter_triples:
         return "", []
     parts = []
@@ -253,7 +255,6 @@ def build_where_clause(
     return "WHERE " + " AND ".join(parts), params
 
 
-# Cache for SELECT CQL templates keyed by query shape.
 _select_cql_cache: dict[tuple, str] = {}
 
 
@@ -270,8 +271,8 @@ def build_select(
     group_by: list[str] | None = None,
     select_token: list[str] | None = None,
     cast: list[tuple[str, str]] | None = None,
+    ann_of: tuple[str, list[float]] | None = None,
 ) -> tuple[str, list[Any]]:
-    # Build the cache key from the query *shape* (excludes actual values).
     where_shape: tuple = ()
     if where:
         shape_parts = []
@@ -289,25 +290,28 @@ def build_select(
         tuple(columns) if columns else None,
         where_shape,
         limit,
-        tuple(order_by) if order_by else None,
+        None if ann_of else (tuple(order_by) if order_by else None),
         allow_filtering,
         per_partition_limit,
         distinct,
         tuple(group_by) if group_by else None,
         tuple(select_token) if select_token else None,
         tuple(cast) if cast else None,
+        ann_of[0] if ann_of else None,
     )
 
-    # Extract params (always needed regardless of cache hit).
     params: list[Any] = []
     if where:
         for _col, op, value in where:
             if op == "ISNULL":
-                pass  # IS [NOT] NULL has no params
+                pass
             elif op == "IN":
                 params.extend(value)
             else:
                 params.append(value)
+    # ANN vector param is appended after WHERE params.
+    if ann_of is not None:
+        params.append(ann_of[1])
 
     cached_cql = _select_cql_cache.get(cache_key)
     if cached_cql is not None:
@@ -315,12 +319,10 @@ def build_select(
 
     cols_str = ", ".join(f'"{c}"' for c in columns) if columns else "*"
 
-    # Append CAST expressions
     if cast:
         cast_parts = [f'CAST("{c}" AS {t})' for c, t in cast]
         cols_str += ", " + ", ".join(cast_parts)
 
-    # Append TOKEN() in SELECT projection
     if select_token:
         token_cols = ", ".join(f'"{c}"' for c in select_token)
         cols_str += f", TOKEN({token_cols})"
@@ -337,7 +339,9 @@ def build_select(
         gb_parts = ", ".join(f'"{c}"' for c in group_by)
         cql += f" GROUP BY {gb_parts}"
 
-    if order_by:
+    if ann_of is not None:
+        cql += f' ORDER BY "{ann_of[0]}" ANN OF ?'
+    elif order_by:
         order_parts = []
         for col in order_by:
             if col.startswith("-"):
@@ -388,10 +392,6 @@ def build_aggregate(
     where: list[tuple[str, str, Any]] | None = None,
     allow_filtering: bool = False,
 ) -> tuple[str, list[Any]]:
-    """Build a ``SELECT <func>(<column>)`` CQL statement for aggregation.
-
-    *func* should be one of ``SUM``, ``AVG``, ``MIN``, ``MAX``, ``COUNT``.
-    """
     cql = f'SELECT {func.upper()}("{column}") FROM {keyspace}.{table}'
     params: list[Any] = []
 
@@ -440,7 +440,6 @@ def build_insert(
     return cql, vals
 
 
-# Cache for INSERT CQL templates keyed by (table, keyspace, columns, if_not_exists).
 _insert_cql_cache: dict[tuple, str] = {}
 
 
@@ -453,12 +452,6 @@ def build_insert_from_columns(
     if_not_exists: bool = False,
     timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
-    """Build an INSERT statement from pre-computed column names and values.
-
-    Like :func:`build_insert` but avoids creating an intermediate ``dict``.
-    The base CQL (without ``USING`` clause) is cached per
-    ``(table, keyspace, columns, if_not_exists)`` tuple.
-    """
     cache_key = (table, keyspace, columns, if_not_exists)
     base_cql = _insert_cql_cache.get(cache_key)
     if base_cql is None:
@@ -475,12 +468,6 @@ def build_insert_from_columns(
 def parse_update_kwargs(
     kwargs: dict[str, Any],
 ) -> tuple[dict[str, Any], list[tuple[str, str, Any]]]:
-    """Parse update kwargs into regular set data and collection operations.
-
-    Returns ``(set_data, collection_ops)`` where *collection_ops* is a list of
-    ``(column, operator, value)`` tuples.  Supported operators: ``add``,
-    ``remove``, ``append``, ``prepend``, ``update`` (alias for ``add``).
-    """
     collection_operators = {"add", "remove", "append", "prepend", "update"}
     set_data: dict[str, Any] = {}
     collection_ops: list[tuple[str, str, Any]] = []
@@ -565,11 +552,7 @@ def build_counter_update(
     deltas: dict[str, int],
     where: list[tuple[str, str, Any]],
 ) -> tuple[str, list[Any]]:
-    """Build an UPDATE statement for counter columns.
-
-    Generates ``UPDATE … SET col = col + ?`` for each counter column.
-    Negative delta values produce decrement operations.
-    """
+    """Build an UPDATE statement for counter columns."""
     set_parts = [f'"{k}" = "{k}" + ?' for k in deltas]
     params: list[Any] = list(deltas.values())
 
@@ -587,19 +570,12 @@ def build_create_type(
     keyspace: str,
     fields: list[tuple[str, str]],
 ) -> str:
-    """Build a ``CREATE TYPE IF NOT EXISTS`` CQL statement.
-
-    Args:
-        type_name: Name of the UDT.
-        keyspace: Keyspace for the type.
-        fields: List of ``(field_name, cql_type_str)`` tuples.
-    """
+    """Build a ``CREATE TYPE IF NOT EXISTS`` CQL statement."""
     field_defs = ", ".join(f'"{name}" {cql_type}' for name, cql_type in fields)
     return f"CREATE TYPE IF NOT EXISTS {keyspace}.{type_name} ({field_defs})"
 
 
 def build_drop_type(type_name: str, keyspace: str) -> str:
-    """Build a ``DROP TYPE IF EXISTS`` CQL statement."""
     return f"DROP TYPE IF EXISTS {keyspace}.{type_name}"
 
 
@@ -609,7 +585,6 @@ def build_alter_type_add(
     field_name: str,
     cql_type: str,
 ) -> str:
-    """Build an ``ALTER TYPE … ADD`` CQL statement."""
     return f'ALTER TYPE {keyspace}.{type_name} ADD "{field_name}" {cql_type}'
 
 

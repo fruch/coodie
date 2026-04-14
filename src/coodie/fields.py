@@ -94,5 +94,46 @@ class Frozen:
 
 
 @dataclass(frozen=True)
+class Duration:
+    """Annotated marker: maps a ``CqlDuration`` field to CQL ``duration``."""
+
+
+@dataclass(frozen=True)
 class Discriminator:
     """Annotated marker: discriminator column for polymorphic (single-table inheritance) models."""
+
+
+@dataclass(frozen=True)
+class Vector:
+    """Annotated marker: vector column for ANN similarity search.
+
+    Maps ``list[float]`` to the CQL ``vector<float, N>`` type::
+
+        embedding: Annotated[list[float], Vector(dimensions=384)]
+    """
+
+    dimensions: int
+
+
+_VALID_SIMILARITY_FUNCTIONS = frozenset({"COSINE", "DOT_PRODUCT", "EUCLIDEAN"})
+
+
+@dataclass(frozen=True)
+class VectorIndex:
+    """Annotated marker: create a SAI vector index on this column.
+
+    Emits ``CREATE CUSTOM INDEX … USING 'vector_index'`` with the
+    chosen similarity function (``COSINE``, ``DOT_PRODUCT``, or
+    ``EUCLIDEAN``)::
+
+        embedding: Annotated[list[float], Vector(dimensions=384), VectorIndex(similarity_function="COSINE")]
+    """
+
+    similarity_function: str = "COSINE"
+
+    def __post_init__(self) -> None:
+        if self.similarity_function not in _VALID_SIMILARITY_FUNCTIONS:
+            raise ValueError(
+                f"Invalid similarity_function {self.similarity_function!r}, "
+                f"must be one of {sorted(_VALID_SIMILARITY_FUNCTIONS)}"
+            )

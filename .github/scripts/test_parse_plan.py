@@ -424,7 +424,6 @@ def test_phase_content_is_extracted():
 @pytest.mark.parametrize(
     "plan_name,expected_all_complete",
     [
-        ("pr-comment-rebase-squash-action.md", True),
         ("documentation-plan.md", True),
         ("udt-support.md", False),
     ],
@@ -447,16 +446,6 @@ def test_real_plan_udt_support_has_incomplete_phases():
     assert data["next_phase"] is not None
     assert data["next_phase"]["number"] == 5
     assert len(data["phases"]) == 7
-
-
-def test_real_plan_rebase_squash_is_all_complete():
-    plan_file = PLANS_DIR / "pr-comment-rebase-squash-action.md"
-    if not plan_file.exists():
-        pytest.skip("pr-comment-rebase-squash-action.md not found")
-
-    data = run_parser(str(plan_file))
-    assert data["all_complete"] is True
-    assert data["next_phase"] is None
 
 
 def test_real_plan_documentation_all_phases_complete_via_checkboxes():

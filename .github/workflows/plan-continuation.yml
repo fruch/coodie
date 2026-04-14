@@ -236,7 +236,7 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           PHASE_CONTENT=$(cat /tmp/next-phase-content.md)
 
-          # Install Copilot CLI (same pattern as pr-rebase-squash.yml)
+          # Install Copilot CLI
           echo "::group::Install Copilot CLI"
           timeout 60 npm install -g @github/copilot || true
           echo "::endgroup::"

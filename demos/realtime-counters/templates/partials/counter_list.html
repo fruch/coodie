@@ -1,0 +1,50 @@
+{% if counters %}
+<!-- Aggregate totals banner -->
+<div style="display: flex; justify-content: space-around; padding: 0.8rem; margin-bottom: 0.8rem; background: #0d0221; border: 1px solid #2d1b69; border-radius: 6px;">
+    <div style="text-align: center;">
+        <div style="font-size: 1.4rem; font-weight: bold; color: #e040fb;">{{ total_views }}</div>
+        <div style="font-size: 0.7rem; color: #9b8bb4;">total views</div>
+    </div>
+    <div style="text-align: center;">
+        <div style="font-size: 1.4rem; font-weight: bold; color: #ffd740;">{{ total_visitors }}</div>
+        <div style="font-size: 0.7rem; color: #9b8bb4;">total visitors</div>
+    </div>
+    <div style="text-align: center;">
+        <div style="font-size: 1.4rem; font-weight: bold; color: #69f0ae;">{{ counters|length }}</div>
+        <div style="font-size: 0.7rem; color: #9b8bb4;">counter rows</div>
+    </div>
+</div>
+
+<table style="width:100%; border-collapse: collapse; font-size: 0.82rem;">
+    <thead>
+        <tr style="border-bottom: 1px solid #2d1b69; color: #9b8bb4;">
+            <th style="text-align:left; padding: 0.5rem;">URL</th>
+            <th style="text-align:left; padding: 0.5rem;">Date ▼</th>
+            <th style="text-align:right; padding: 0.5rem;">Views</th>
+            <th style="text-align:right; padding: 0.5rem;">Visitors</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in counters %}
+        <tr style="border-bottom: 1px solid #1a0a3e;{% if c.date == today %} background: rgba(105, 240, 174, 0.06);{% endif %}">
+            <td style="padding: 0.4rem 0.5rem; color: #69f0ae; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ c.url }}
+            </td>
+            <td style="padding: 0.4rem 0.5rem; color: {% if c.date == today %}#69f0ae{% else %}#9b8bb4{% endif %};">
+                {{ c.date }}{% if c.date == today %} <span style="font-size: 0.65rem; color: #69f0ae;">● today</span>{% endif %}
+            </td>
+            <td style="padding: 0.4rem 0.5rem; text-align: right; color: #e040fb; font-weight: bold;">
+                {{ c.view_count }}
+            </td>
+            <td style="padding: 0.4rem 0.5rem; text-align: right; color: #ffd740; font-weight: bold;">
+                {{ c.unique_visitors }}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color: #9b8bb4; text-align: center; padding: 2rem;">
+    📊 No counters yet — use the form or run <code>make seed</code> to generate traffic.
+</p>
+{% endif %}

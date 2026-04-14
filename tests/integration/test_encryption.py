@@ -155,7 +155,7 @@ def scylla_ssl_container(ssl_certs: dict[str, Path]) -> Any:
     )
 
     with (
-        DockerContainer("scylladb/scylla:latest")
+        DockerContainer("scylladb/scylla:2025.4.5")
         .with_command(
             "--smp 1 --memory 512M --developer-mode 1 "
             "--skip-wait-for-gossip-to-settle=0 "

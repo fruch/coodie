@@ -1,6 +1,7 @@
 import functools
 import re
 import typing
+from dataclasses import dataclass
 from datetime import date, datetime, time as dt_time
 from decimal import Decimal
 from ipaddress import IPv4Address, IPv6Address
@@ -12,14 +13,35 @@ from coodie.fields import (
     Ascii,
     BigInt,
     Double,
+    Duration,
     Frozen,
     SmallInt,
     Time,
     TimeUUID,
     TinyInt,
     VarInt,
+    Vector,
 )
 from coodie.schema import _cached_type_hints
+
+
+@dataclass(frozen=True, slots=True)
+class CqlDuration:
+    """Represents a CQL ``duration`` value.
+
+    CQL durations have three components that cannot be losslessly represented
+    by :class:`datetime.timedelta` because months have variable length.
+
+    Args:
+        months: Number of months.
+        days: Number of days.
+        nanoseconds: Number of nanoseconds.
+    """
+
+    months: int = 0
+    days: int = 0
+    nanoseconds: int = 0
+
 
 _SCALAR_CQL_TYPES: dict[type, str] = {
     str: "text",
@@ -34,6 +56,7 @@ _SCALAR_CQL_TYPES: dict[type, str] = {
     Decimal: "decimal",
     IPv4Address: "inet",
     IPv6Address: "inet",
+    CqlDuration: "duration",
 }
 
 # Annotation markers that override the CQL type of the base Python type.
@@ -46,6 +69,7 @@ _MARKER_CQL_OVERRIDES: dict[type, str] = {
     Ascii: "ascii",
     TimeUUID: "timeuuid",
     Time: "time",
+    Duration: "duration",
 }
 
 
@@ -58,12 +82,26 @@ def python_type_to_cql_type_str(annotation: Any) -> str:
     if origin is typing.Annotated:
         has_frozen = False
         cql_override = None
+        vec_dims: int | None = None
         for meta in args[1:]:
             if isinstance(meta, Frozen):
                 has_frozen = True
+            if isinstance(meta, Vector):
+                dims = meta.dimensions
+                if not isinstance(dims, int) or dims <= 0:
+                    raise InvalidQueryError(f"Vector dimensions must be a positive integer, got {dims!r}")
+                vec_dims = dims
             override = _MARKER_CQL_OVERRIDES.get(type(meta))
             if override is not None:
                 cql_override = override
+        if vec_dims is not None:
+            base = args[0]
+            base_origin = typing.get_origin(base)
+            base_args = typing.get_args(base)
+            is_float_list = base_origin is list and len(base_args) == 1 and base_args[0] is float
+            if not is_float_list:
+                raise InvalidQueryError(f"Vector annotation must wrap list[float], got {base!r}")
+            return f"vector<float, {vec_dims}>"
         if cql_override is not None:
             return f"frozen<{cql_override}>" if has_frozen else cql_override
         inner = python_type_to_cql_type_str(args[0])

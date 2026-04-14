@@ -13,6 +13,7 @@ from coodie.fields import (
     Ascii,
     BigInt,
     Double,
+    Duration,
     Frozen,
     PrimaryKey,
     SmallInt,
@@ -20,8 +21,10 @@ from coodie.fields import (
     TimeUUID,
     TinyInt,
     VarInt,
+    Vector,
+    VectorIndex,
 )
-from coodie.types import python_type_to_cql_type_str, coerce_row_none_collections
+from coodie.types import CqlDuration, python_type_to_cql_type_str, coerce_row_none_collections
 
 
 # ---- python_type_to_cql_type_str: basic types ----
@@ -255,3 +258,61 @@ def test_coerce_skips_absent_keys():
     assert "labels" not in result
     assert "meta" not in result
     assert result["tags"] == []  # present key with None is still coerced
+
+
+# ---- CqlDuration dataclass tests ----
+
+
+def test_cql_duration_defaults():
+    d = CqlDuration()
+    assert d.months == 0
+    assert d.days == 0
+    assert d.nanoseconds == 0
+
+
+def test_cql_duration_custom_values():
+    d = CqlDuration(months=1, days=2, nanoseconds=3_000_000_000)
+    assert d.months == 1
+    assert d.days == 2
+    assert d.nanoseconds == 3_000_000_000
+
+
+def test_cql_duration_immutable():
+    d = CqlDuration(months=1)
+    with pytest.raises(AttributeError):
+        d.months = 2  # type: ignore[misc]
+
+
+def test_cql_duration_scalar_mapping():
+    assert python_type_to_cql_type_str(CqlDuration) == "duration"
+
+
+def test_duration_marker():
+    assert python_type_to_cql_type_str(Annotated[CqlDuration, Duration()]) == "duration"
+
+
+def test_duration_marker_with_primary_key():
+    assert python_type_to_cql_type_str(Annotated[CqlDuration, PrimaryKey(), Duration()]) == "duration"
+
+
+# ---- Vector type mapping tests ----
+
+
+def test_vector_marker():
+    assert python_type_to_cql_type_str(Annotated[list[float], Vector(dimensions=5)]) == "vector<float, 5>"
+
+
+def test_vector_marker_different_dimensions():
+    assert python_type_to_cql_type_str(Annotated[list[float], Vector(dimensions=128)]) == "vector<float, 128>"
+
+
+def test_vector_marker_with_primary_key():
+    """Vector marker should work alongside PrimaryKey annotation."""
+    assert python_type_to_cql_type_str(Annotated[list[float], PrimaryKey(), Vector(dimensions=3)]) == "vector<float, 3>"
+
+
+def test_vector_marker_with_vector_index():
+    """VectorIndex annotation should not affect type mapping."""
+    assert (
+        python_type_to_cql_type_str(Annotated[list[float], Vector(dimensions=5), VectorIndex()]) == "vector<float, 5>"
+    )

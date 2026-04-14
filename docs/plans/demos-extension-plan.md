@@ -357,7 +357,7 @@ demos/
 | Task | Description |
 |---|---|
 | ✅ 4.1 | Create `demos/ttl-sessions/` — ephemeral session store with `ttl=` on save and `__default_ttl__` on model |
-| 4.2 | Create `demos/realtime-counters/` — page-view analytics with `CounterDocument`, `increment()`, and a live dashboard |
+| ✅ 4.2 | Create `demos/realtime-counters/` — page-view analytics with `CounterDocument`, `increment()`, and a live dashboard |
 | 4.3 | Create `demos/lwt-user-registry/` — user registration with `if_not_exists`, optimistic locking with `if_conditions` |
 | 4.4 | Each demo gets `seed.py`, colorful UI, and README |
 | 4.5 | Manual end-to-end test for each demo |
@@ -369,7 +369,7 @@ demos/
 | Task | Description |
 |---|---|
 | 5.1 | Create `demos/batch-importer/` — CSV bulk import using `BatchQuery` (logged and unlogged), `rich` progress |
-| 5.2 | Create `demos/collections-tags/` — article tagging with `set` fields, `add__`/`remove__` operations, `map` metadata |
+| 5.2 | ✅ Create `demos/collections-tags/` — article tagging with `set` fields, `add__`/`remove__` operations, `map` metadata |
 | 5.3 | Create `demos/materialized-views/` — product catalog with auto-maintained `MaterializedView` by category |
 | 5.4 | Each demo gets `seed.py`, colorful UI, and README |
 | 5.5 | Manual end-to-end test for each demo |

@@ -1,0 +1,43 @@
+{% from "macros.html" import temp_class %}
+{% for r in readings %}
+  <tr>
+    <td style="color: var(--accent);">{{ r.sensor_id }}</td>
+    <td>{{ r.ts.strftime('%Y-%m-%d %H:%M:%S') if r.ts else '—' }}</td>
+    <td style="color: var(--dim);">{{ r.date_bucket }}</td>
+    <td class="{{ temp_class(r.temperature) }}">{{ "%.2f"|format(r.temperature) }}</td>
+    <td>{{ "%.1f"|format(r.humidity) }}</td>
+    <td>{{ "%.1f"|format(r.pressure) }}</td>
+    <td>{{ r.battery_pct }}%</td>
+  </tr>
+{% endfor %}
+
+{% if next_cursor %}
+  {# Infinite scroll sentinel — triggers next page load when scrolled into view #}
+  <tr class="scroll-sentinel"
+      hx-get="/ui/paged?page_size={{ page_size }}&cursor={{ next_cursor }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if sensor_id %}&sensor_id={{ sensor_id }}{% endif %}"
+      hx-trigger="revealed"
+      hx-swap="outerHTML"
+      hx-indicator=".loading-indicator">
+    <td colspan="7">
+      <div class="loading-indicator">
+        <div class="loading-spinner"></div>
+        Loading more readings · paged_all() · fetch_size({{ page_size }})
+      </div>
+    </td>
+  </tr>
+{% elif readings %}
+  <tr>
+    <td colspan="7" style="text-align: center; padding: 1rem; color: var(--muted);">
+      ✓ All readings loaded — no more pages
+    </td>
+  </tr>
+{% else %}
+  <tr>
+    <td colspan="7">
+      <div class="empty">
+        <span class="empty-icon">📄</span>
+        <p>No readings found — seed data with <code style="color: var(--accent);">make seed</code> or wait for background device</p>
+      </div>
+    </td>
+  </tr>
+{% endif %}

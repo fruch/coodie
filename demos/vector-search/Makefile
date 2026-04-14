@@ -5,7 +5,7 @@ KEYSPACE := vector_demo
 
 db-up:                          ## Start ScyllaDB + vector-store and create keyspace
 	@echo ""
-	@echo "  🔍  VECTOR SEARCH — Neural Product Index"
+	@echo "  📡  SIGNAL GRAVEYARD — Dimension-10"
 	@echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "  Booting ScyllaDB + vector-store sidecar..."
 	@echo ""
@@ -21,7 +21,7 @@ db-up:                          ## Start ScyllaDB + vector-store and create keys
 	  "CREATE KEYSPACE IF NOT EXISTS $(KEYSPACE) \
 	   WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': '1'} \
 	   AND tablets = {'enabled': true};"
-	@echo "  ✓ Keyspace ready — neural index can be deployed"
+	@echo "  ✓ Keyspace ready — signal archive can be deployed"
 	@echo ""
 
 db-down:                        ## Stop ScyllaDB
@@ -29,18 +29,19 @@ db-down:                        ## Stop ScyllaDB
 	$(COMPOSE) down
 	@echo "  ✓ ScyllaDB stopped"
 
-seed: db-up                     ## Seed sample product embeddings
-	@echo "  🧠 Computing embeddings and seeding products..."
+seed: db-up                     ## Seed the distress signal archive (downloads model on first run)
+	@echo "  🤖 Computing embeddings and seeding signals..."
+	@echo "     (first run downloads sentence-transformers/all-MiniLM-L6-v2, ~80MB)"
 	@echo ""
-	uv run python seed.py --count 30
+	uv run python seed.py
 
 run: seed                       ## Install deps, seed, and start the app
 	@echo ""
-	@echo "  🔍 Launching Vector Search demo..."
-	@echo "  📡 http://127.0.0.1:8000 — search portal active"
+	@echo "  📡 Launching Signal Graveyard demo..."
+	@echo "  🔭 http://127.0.0.1:8000 — signal scanner active"
 	@echo ""
 	uv run uvicorn main:app --reload
 
 clean: db-down                  ## Stop DB and remove data volumes
 	$(COMPOSE) down -v
-	@echo "  ✓ All vector data purged"
+	@echo "  ✓ All signal data purged"

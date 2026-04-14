@@ -947,3 +947,101 @@ async def test_aggregate_uses_one_path(Item, queryset_cls, registered_mock_drive
     registered_mock_driver.set_return_rows([{"system.sum(rating)": 42}])
     result = await _maybe_await(lambda: queryset_cls(Item).sum("rating"))
     assert result == 42
+
+
+# ------------------------------------------------------------------
+# Phase 5: SELECT JSON — QuerySet.json()
+# ------------------------------------------------------------------
+
+
+async def test_json_generates_select_json_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).json)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "SELECT JSON * FROM test_ks.items" == stmt
+
+
+async def test_json_with_filter(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).filter(name="A").json)
+    stmt, params = registered_mock_driver.executed[0]
+    assert "SELECT JSON * FROM test_ks.items" in stmt
+    assert 'WHERE "name" = ?' in stmt
+    assert params == ["A"]
+
+
+async def test_json_with_limit(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([])
+    await _maybe_await(queryset_cls(Item).limit(5).json)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "LIMIT 5" in stmt
+
+
+async def test_json_returns_json_strings(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows(
+        [
+            {"[json]": '{"id": "abc", "name": "A"}'},
+            {"[json]": '{"id": "def", "name": "B"}'},
+        ]
+    )
+    result = await _maybe_await(queryset_cls(Item).json)
+    assert result == ['{"id": "abc", "name": "A"}', '{"id": "def", "name": "B"}']
+
+
+async def test_json_returns_empty_list_when_no_rows(Item, queryset_cls, registered_mock_driver):
+    result = await _maybe_await(queryset_cls(Item).json)
+    assert result == []
+
+
+# ------------------------------------------------------------------
+# Phase 5: WRITETIME — QuerySet.writetime()
+# ------------------------------------------------------------------
+
+
+async def test_writetime_generates_correct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"writetime(name)": 1234567890}])
+    result = await _maybe_await(queryset_cls(Item).writetime, "name")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT WRITETIME("name") FROM test_ks.items' == stmt
+    assert result == 1234567890
+
+
+async def test_writetime_with_filter(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"writetime(name)": 1234567890}])
+    result = await _maybe_await(queryset_cls(Item).filter(name="A").writetime, "name")
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'WHERE "name" = ?' in stmt
+    assert params == ["A"]
+    assert result == 1234567890
+
+
+async def test_writetime_returns_none_on_empty(Item, queryset_cls, registered_mock_driver):
+    result = await _maybe_await(queryset_cls(Item).writetime, "name")
+    assert result is None
+
+
+# ------------------------------------------------------------------
+# Phase 5: TTL — QuerySet.column_ttl()
+# ------------------------------------------------------------------
+
+
+async def test_column_ttl_generates_correct_cql(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"ttl(name)": 3600}])
+    result = await _maybe_await(queryset_cls(Item).column_ttl, "name")
+    stmt, _ = registered_mock_driver.executed[0]
+    assert 'SELECT TTL("name") FROM test_ks.items' == stmt
+    assert result == 3600
+
+
+async def test_column_ttl_with_filter(Item, queryset_cls, registered_mock_driver):
+    registered_mock_driver.set_return_rows([{"ttl(name)": 3600}])
+    result = await _maybe_await(queryset_cls(Item).filter(name="A").column_ttl, "name")
+    stmt, params = registered_mock_driver.executed[0]
+    assert 'WHERE "name" = ?' in stmt
+    assert params == ["A"]
+    assert result == 3600
+
+
+async def test_column_ttl_returns_none_on_empty(Item, queryset_cls, registered_mock_driver):
+    result = await _maybe_await(queryset_cls(Item).column_ttl, "name")
+    assert result is None

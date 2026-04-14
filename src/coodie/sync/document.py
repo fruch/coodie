@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from coodie.cql_builder import (
     build_insert_from_columns,
+    build_insert_json,
     build_delete,
     build_update,
     build_counter_update,
@@ -198,6 +199,27 @@ class Document(BaseModel):
             batch.add(cql, params)
         else:
             cls._get_driver().execute(cql, params, consistency=consistency, timeout=timeout)
+
+    def save_json(
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        """Insert (upsert) this document using ``INSERT INTO … JSON``."""
+        import json
+
+        cls = self.__class__
+        json_string = json.dumps(self.model_dump(mode="json"))
+        cql, params = build_insert_json(
+            cls._get_table(),
+            cls._get_keyspace(),
+            json_string,
+            ttl=ttl,
+            timestamp=timestamp,
+        )
+        cls._get_driver().execute(cql, params, consistency=consistency, timeout=timeout)
 
     def insert(
         self,

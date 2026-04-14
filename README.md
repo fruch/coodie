@@ -8,18 +8,19 @@
 
 *Cassandra + Beanie (hoodie) = **coodie** 🧥*
 
-[![CI Status](https://img.shields.io/github/actions/workflow/status/scylladb/coodie/ci.yml?branch=main&label=CI&logo=github&style=for-the-badge)](https://github.com/scylladb/coodie/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/github/actions/workflow/status/scylladb/coodie/docs.yml?branch=main&label=Docs&logo=github&style=for-the-badge)](https://scylladb.github.io/coodie/)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/scylladb/coodie/ci.yml?branch=master&label=CI&logo=github&style=for-the-badge)](https://github.com/scylladb/coodie/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/scylladb/coodie/docs.yml?branch=master&label=Docs&logo=github&style=for-the-badge)](https://scylladb.github.io/coodie/)
 [![Coverage](https://img.shields.io/codecov/c/github/scylladb/coodie.svg?logo=codecov&logoColor=fff&style=for-the-badge)](https://codecov.io/gh/scylladb/coodie)
 [![PyPI](https://img.shields.io/pypi/v/coodie.svg?logo=python&logoColor=fff&style=for-the-badge)](https://pypi.org/project/coodie/)
+[![Downloads](https://img.shields.io/pypi/dm/coodie.svg?logo=pypi&logoColor=fff&style=for-the-badge)](https://pypi.org/project/coodie/)
 [![Python](https://img.shields.io/pypi/pyversions/coodie.svg?style=for-the-badge&logo=python&logoColor=fff)](https://pypi.org/project/coodie/)
-[![License](https://img.shields.io/pypi/l/coodie.svg?style=for-the-badge)](https://github.com/scylladb/coodie/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/coodie.svg?style=for-the-badge)](https://github.com/scylladb/coodie/blob/master/LICENSE)
 
 <p>
 <a href="https://scylladb.github.io/coodie/">📖 Documentation</a> •
 <a href="#-quick-start">🚀 Quick Start</a> •
-<a href="https://github.com/scylladb/coodie/blob/main/CONTRIBUTING.md">🤝 Contributing</a> •
-<a href="https://github.com/scylladb/coodie/blob/main/CHANGELOG.md">📋 Changelog</a>
+<a href="https://github.com/scylladb/coodie/blob/master/CONTRIBUTING.md">🤝 Contributing</a> •
+<a href="https://github.com/scylladb/coodie/blob/master/CHANGELOG.md">📋 Changelog</a>
 </p>
 
 </div>

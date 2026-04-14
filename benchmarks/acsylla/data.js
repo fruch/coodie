@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776195115613,
+  "lastUpdate": 1776199638791,
   "repoUrl": "https://github.com/scylladb/coodie",
   "entries": {
     "coodie benchmarks (acsylla)": [
@@ -13959,6 +13959,93 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000010870841770014432",
             "extra": "mean: 5.504273619524351 usec\nrounds: 7642"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "fruch@scylladb.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "committer": {
+            "email": "israel.fruchter@gmail.com",
+            "name": "Israel Fruchter",
+            "username": "fruch"
+          },
+          "distinct": true,
+          "id": "e058e11871790f4c936fc92e37c21599bce6732f",
+          "message": "fix(cql_builder): remove duplicate param appends for collection ops and if_conditions in build_update\n\nDuring the rebase conflict resolution, build_update ended up appending\nparams in both the extraction block (which runs always) and the\nCQL-building loop (cache-miss only). This caused duplicate params for:\n- collection remove ops (params.append(value) in the loop)\n- put/setindex ops (params.extend([k, v]) in the loop)\n- if_conditions (params.extend(cond_params) in the cache-miss branch)\n\nRemove the stale param mutations from the CQL-building loop and the\ncache-miss if_conditions branch so params are only collected once in\nthe extraction block.\n\nAlso fix the extraction block to use _parse_if_conditions() instead of\nif_conditions.values() so that operator-bearing conditions (!=, >, <,\nIN) are expanded correctly.",
+          "timestamp": "2026-04-14T23:46:31+03:00",
+          "tree_id": "5be65fb82ddc5147701bb9c8e036f733863e0dcd",
+          "url": "https://github.com/scylladb/coodie/commit/e058e11871790f4c936fc92e37c21599bce6732f"
+        },
+        "date": 1776199637692,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "benchmarks/bench_argus.py::test_coodie_argus_model_instantiation",
+            "value": 63190.40523120995,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000016706267547148488",
+            "extra": "mean: 15.825187326162244 usec\nrounds: 8269"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_instantiation",
+            "value": 1619797.8454780723,
+            "unit": "iter/sec",
+            "range": "stddev: 2.777272690405953e-7",
+            "extra": "mean: 617.3609890837068 nsec\nrounds: 163908"
+          },
+          {
+            "name": "benchmarks/bench_raw_dc.py::test_raw_dc_model_serialization",
+            "value": 145837.8756327254,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000028900450017640568",
+            "extra": "mean: 6.856929283023677 usec\nrounds: 18567"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_instantiation",
+            "value": 549048.5497490538,
+            "unit": "iter/sec",
+            "range": "stddev: 7.561933283260436e-7",
+            "extra": "mean: 1.821332558763804 usec\nrounds: 44759"
+          },
+          {
+            "name": "benchmarks/bench_serialization.py::test_coodie_model_serialization",
+            "value": 623061.4922552971,
+            "unit": "iter/sec",
+            "range": "stddev: 4.2957754511643823e-7",
+            "extra": "mean: 1.6049780197140697 usec\nrounds: 53093"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_serialization",
+            "value": 859146.5901244977,
+            "unit": "iter/sec",
+            "range": "stddev: 3.60120539813348e-7",
+            "extra": "mean: 1.1639457241576103 usec\nrounds: 147211"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_instantiation",
+            "value": 857532.8458444831,
+            "unit": "iter/sec",
+            "range": "stddev: 3.690333285600449e-7",
+            "extra": "mean: 1.1661360901170121 usec\nrounds: 80432"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_nested_udt_serialization",
+            "value": 633707.8736163772,
+            "unit": "iter/sec",
+            "range": "stddev: 4.3574173199278385e-7",
+            "extra": "mean: 1.5780141633609592 usec\nrounds: 119675"
+          },
+          {
+            "name": "benchmarks/bench_udt.py::test_coodie_udt_ddl_generation",
+            "value": 184816.79785906532,
+            "unit": "iter/sec",
+            "range": "stddev: 8.217850688044204e-7",
+            "extra": "mean: 5.4107635863411305 usec\nrounds: 7673"
           }
         ]
       }

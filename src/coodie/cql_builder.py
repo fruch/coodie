@@ -511,7 +511,17 @@ def build_insert_from_columns(
 def parse_update_kwargs(
     kwargs: dict[str, Any],
 ) -> tuple[dict[str, Any], list[tuple[str, str, Any]]]:
-    collection_operators = {"add", "remove", "append", "prepend", "update"}
+    """Parse update kwargs into regular set data and collection operations.
+
+    Returns ``(set_data, collection_ops)`` where *collection_ops* is a list of
+    ``(column, operator, value)`` tuples.  Supported operators: ``add``,
+    ``remove``, ``append``, ``prepend``, ``update`` (alias for ``add``),
+    ``put`` (map element set), ``setindex`` (list element set by index).
+
+    For ``put`` and ``setindex`` the *value* must be a ``(key_or_index, val)``
+    tuple which generates ``"col"[?] = ?``.
+    """
+    collection_operators = {"add", "remove", "append", "prepend", "update", "put", "setindex"}
     set_data: dict[str, Any] = {}
     collection_ops: list[tuple[str, str, Any]] = []
     for key, value in kwargs.items():
@@ -526,6 +536,37 @@ def parse_update_kwargs(
 
 # Cache for UPDATE CQL templates keyed by query shape.
 _update_cql_cache: dict[tuple, str] = {}
+
+_IF_OPS: dict[str, str] = {"ne": "!=", "gt": ">", "lt": "<", "gte": ">=", "lte": "<=", "in": "IN"}
+
+
+def _parse_if_conditions(
+    conditions: dict[str, Any],
+) -> tuple[str, list[Any]]:
+    """Parse an ``if_conditions`` dict into a CQL ``IF`` clause and parameter list.
+
+    Keys may use Django-style operator suffixes: ``col__ne`` (``!=``),
+    ``col__gt`` (``>``), ``col__lt`` (``<``), ``col__gte`` (``>=``),
+    ``col__lte`` (``<=``), ``col__in`` (``IN``).  Plain keys default to ``=``.
+    """
+    parts: list[str] = []
+    params: list[Any] = []
+    for key, value in conditions.items():
+        pieces = key.rsplit("__", 1)
+        if len(pieces) == 2 and pieces[1] in _IF_OPS:
+            col, op_key = pieces
+            op = _IF_OPS[op_key]
+            if op == "IN":
+                placeholders = ", ".join("?" * len(value))
+                parts.append(f'"{col}" IN ({placeholders})')
+                params.extend(value)
+            else:
+                parts.append(f'"{col}" {op} ?')
+                params.append(value)
+        else:
+            parts.append(f'"{key}" = ?')
+            params.append(value)
+    return " IF " + " AND ".join(parts), params
 
 
 def build_update(
@@ -579,6 +620,11 @@ def build_update(
                 set_parts.append(f'"{col}" = ? + "{col}"')
             elif op == "remove":
                 set_parts.append(f'"{col}" = "{col}" - ?')
+                params.append(value)
+            elif op in ("put", "setindex"):
+                k, v = value
+                set_parts.append(f'"{col}"[?] = ?')
+                params.extend([k, v])
 
     cql = f"UPDATE {keyspace}.{table}"
     cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
@@ -590,8 +636,9 @@ def build_update(
     if if_exists:
         cql += " IF EXISTS"
     elif if_conditions:
-        cond_parts = [f'"{k}" = ?' for k in if_conditions]
-        cql += " IF " + " AND ".join(cond_parts)
+        cond_clause, cond_params = _parse_if_conditions(if_conditions)
+        cql += cond_clause
+        params.extend(cond_params)
 
     _update_cql_cache[cache_key] = cql
     return cql, params
@@ -608,33 +655,53 @@ def build_delete(
     columns: list[str] | None = None,
     if_exists: bool = False,
     timestamp: int | None = None,
+    if_conditions: dict[str, Any] | None = None,
+    collection_elements: list[tuple[str, Any]] | None = None,
 ) -> tuple[str, list[Any]]:
     where_shape = _where_to_shape(where) if where else ()
+    col_elem_shape = tuple((col, type(k).__name__) for col, k in collection_elements) if collection_elements else ()
     cache_key = (
         table,
         keyspace,
         tuple(columns) if columns else None,
         where_shape,
+        col_elem_shape,
         if_exists,
+        tuple(if_conditions.keys()) if if_conditions else (),
         timestamp,
     )
 
     params: list[Any] = []
-    _extract_where_params(where, params)
+    delete_parts: list[str] = []
+
+    if columns:
+        delete_parts.extend(f'"{c}"' for c in columns)
+    if collection_elements:
+        for col, key_or_idx in collection_elements:
+            delete_parts.append(f'"{col}"[?]')
+            params.append(key_or_idx)
 
     cached_cql = _delete_cql_cache.get(cache_key)
     if cached_cql is not None:
+        _extract_where_params(where, params)
+        if if_conditions and not if_exists:
+            params.extend(if_conditions.values())
         return cached_cql, params
 
-    cols_str = ", ".join(f'"{c}"' for c in columns) if columns else ""
+    cols_str = ", ".join(delete_parts) if delete_parts else ""
     cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace("DELETE  FROM", "DELETE FROM")
     cql += _build_using_clause(timestamp=timestamp)
 
-    clause, _wp = build_where_clause(where)
+    clause, where_params = build_where_clause(where)
     cql += " " + clause
+    params.extend(where_params)
 
     if if_exists:
         cql += " IF EXISTS"
+    elif if_conditions:
+        cond_clause, cond_params = _parse_if_conditions(if_conditions)
+        cql += cond_clause
+        params.extend(cond_params)
 
     _delete_cql_cache[cache_key] = cql
     return cql, params
@@ -686,6 +753,7 @@ def build_batch(
     statements: list[tuple[str, list[Any]]],
     logged: bool = True,
     batch_type: str | None = None,
+    timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
     if batch_type is not None:
         bt = batch_type.upper()
@@ -698,5 +766,7 @@ def build_batch(
         all_params.extend(p)
     inner = "\n  ".join(stmt_lines)
     prefix = f"BEGIN {bt} BATCH" if bt else "BEGIN BATCH"
+    if timestamp is not None:
+        prefix += f" USING TIMESTAMP {timestamp}"
     cql = f"{prefix}\n  {inner}\nAPPLY BATCH"
     return cql, all_params

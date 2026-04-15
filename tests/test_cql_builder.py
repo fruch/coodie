@@ -27,6 +27,16 @@ from coodie.cql_builder import (
     parse_update_kwargs,
     _insert_cql_cache,
     _select_cql_cache,
+    build_alter_keyspace,
+    build_alter_table_drop,
+    build_alter_table_rename,
+    build_alter_materialized_view,
+    build_alter_type_rename,
+    build_create_role,
+    build_drop_role,
+    build_grant,
+    build_revoke,
+    build_list_roles,
 )
 from coodie.schema import ColumnDefinition
 
@@ -1064,3 +1074,315 @@ def test_build_select_column_ttl_with_where():
 def test_build_select_column_ttl_allow_filtering():
     cql, _ = build_select_column_ttl("users", "ks", "name", allow_filtering=True)
     assert "ALLOW FILTERING" in cql
+
+
+# ==================================================================
+# Phase 3: DDL & Keyspace Gaps
+# ==================================================================
+
+
+class TestBuildCreateKeyspaceDurableWrites:
+    def test_durable_writes_false(self):
+        cql = build_create_keyspace("ks", durable_writes=False)
+        assert cql.endswith("AND durable_writes = false")
+
+    def test_durable_writes_true(self):
+        cql = build_create_keyspace("ks", durable_writes=True)
+        assert "AND durable_writes = true" in cql
+
+    def test_durable_writes_none_omitted(self):
+        cql = build_create_keyspace("ks")
+        assert "durable_writes" not in cql
+
+
+class TestBuildCreateKeyspaceTablets:
+    def test_tablets_enabled(self):
+        cql = build_create_keyspace("ks", tablets={"enabled": "true"})
+        assert "AND tablets = {'enabled': 'true'}" in cql
+
+    def test_tablets_with_initial(self):
+        cql = build_create_keyspace("ks", tablets={"enabled": "true", "initial": "8"})
+        assert "tablets = {'enabled': 'true', 'initial': '8'}" in cql
+
+    def test_tablets_none_omitted(self):
+        cql = build_create_keyspace("ks")
+        assert "tablets" not in cql
+
+    def test_durable_writes_and_tablets_combined(self):
+        cql = build_create_keyspace("ks", durable_writes=False, tablets={"enabled": "true"})
+        assert "AND durable_writes = false" in cql
+        assert "AND tablets = {'enabled': 'true'}" in cql
+
+
+class TestBuildAlterKeyspace:
+    def test_alter_replication_factor(self):
+        cql = build_alter_keyspace("ks", replication_factor=3)
+        assert cql == (
+            "ALTER KEYSPACE ks WITH replication = "
+            "{'class': 'SimpleStrategy', 'replication_factor': '3'}"
+        )
+
+    def test_alter_dc_replication(self):
+        cql = build_alter_keyspace("ks", dc_replication_map={"dc1": 3})
+        assert "ALTER KEYSPACE ks WITH" in cql
+        assert "NetworkTopologyStrategy" in cql
+        assert "'dc1': '3'" in cql
+
+    def test_alter_durable_writes(self):
+        cql = build_alter_keyspace("ks", durable_writes=False)
+        assert cql == "ALTER KEYSPACE ks WITH durable_writes = false"
+
+    def test_alter_tablets(self):
+        cql = build_alter_keyspace("ks", tablets={"enabled": "true"})
+        assert cql == "ALTER KEYSPACE ks WITH tablets = {'enabled': 'true'}"
+
+    def test_alter_multiple_options(self):
+        cql = build_alter_keyspace("ks", replication_factor=5, durable_writes=True)
+        assert "replication =" in cql
+        assert "AND durable_writes = true" in cql
+
+    def test_alter_no_options_raises(self):
+        with pytest.raises(ValueError, match="requires at least one option"):
+            build_alter_keyspace("ks")
+
+
+class TestBuildAlterTableDrop:
+    def test_drop_single_column(self):
+        cql = build_alter_table_drop("users", "ks", ["email"])
+        assert cql == 'ALTER TABLE ks.users DROP "email"'
+
+    def test_drop_multiple_columns(self):
+        cql = build_alter_table_drop("users", "ks", ["email", "phone"])
+        assert cql == 'ALTER TABLE ks.users DROP ("email", "phone")'
+
+
+class TestBuildAlterTableRename:
+    def test_rename_single(self):
+        cql = build_alter_table_rename("users", "ks", {"old_col": "new_col"})
+        assert cql == 'ALTER TABLE ks.users RENAME "old_col" TO "new_col"'
+
+    def test_rename_multiple(self):
+        cql = build_alter_table_rename("users", "ks", {"a": "b", "c": "d"})
+        assert 'ALTER TABLE ks.users RENAME "a" TO "b" AND "c" TO "d"' == cql
+
+
+class TestBuildCreateIndexExtended:
+    def test_custom_index_class(self):
+        col = make_col(name="tags", cql_type="set<text>", index=True)
+        cql = build_create_index(
+            "posts", "ks", col,
+            index_class="org.apache.cassandra.index.sai.StorageAttachedIndex",
+        )
+        assert "CREATE CUSTOM INDEX IF NOT EXISTS" in cql
+        assert "USING 'org.apache.cassandra.index.sai.StorageAttachedIndex'" in cql
+
+    def test_index_with_options(self):
+        col = make_col(name="val", cql_type="text", index=True)
+        cql = build_create_index(
+            "data", "ks", col,
+            index_class="org.apache.cassandra.index.sai.StorageAttachedIndex",
+            options={"case_sensitive": "false"},
+        )
+        assert "WITH OPTIONS = {'case_sensitive': 'false'}" in cql
+
+    def test_collection_index_keys(self):
+        col = make_col(name="tags", cql_type="map<text, text>", index=True)
+        cql = build_create_index("posts", "ks", col, index_target="KEYS")
+        assert 'ON ks.posts (KEYS("tags"))' in cql
+
+    def test_collection_index_values(self):
+        col = make_col(name="tags", cql_type="map<text, text>", index=True)
+        cql = build_create_index("posts", "ks", col, index_target="VALUES")
+        assert 'ON ks.posts (VALUES("tags"))' in cql
+
+    def test_collection_index_entries(self):
+        col = make_col(name="tags", cql_type="map<text, text>", index=True)
+        cql = build_create_index("posts", "ks", col, index_target="ENTRIES")
+        assert 'ON ks.posts (ENTRIES("tags"))' in cql
+
+    def test_collection_index_full(self):
+        col = make_col(name="tags", cql_type="frozen<set<text>>", index=True)
+        cql = build_create_index("posts", "ks", col, index_target="FULL")
+        assert 'ON ks.posts (FULL("tags"))' in cql
+
+    def test_no_index_target_default(self):
+        col = make_col(name="email", cql_type="text", index=True)
+        cql = build_create_index("users", "ks", col)
+        assert 'ON ks.users ("email")' in cql
+
+    def test_custom_class_with_target_and_options(self):
+        col = make_col(name="m", cql_type="map<text, text>", index=True)
+        cql = build_create_index(
+            "t", "ks", col,
+            index_class="org.apache.cassandra.index.sai.StorageAttachedIndex",
+            index_target="KEYS",
+            options={"normalize": "true"},
+        )
+        assert "CREATE CUSTOM INDEX" in cql
+        assert 'ON ks.t (KEYS("m"))' in cql
+        assert "WITH OPTIONS" in cql
+
+
+class TestBuildAlterMaterializedView:
+    def test_alter_single_option(self):
+        cql = build_alter_materialized_view("mv1", "ks", {"gc_grace_seconds": 86400})
+        assert cql == "ALTER MATERIALIZED VIEW ks.mv1 WITH gc_grace_seconds = 86400"
+
+    def test_alter_multiple_options(self):
+        cql = build_alter_materialized_view("mv1", "ks", {"gc_grace_seconds": 86400, "comment": "test"})
+        assert "gc_grace_seconds = 86400" in cql
+        assert "comment = 'test'" in cql
+        assert " AND " in cql
+
+    def test_alter_string_option(self):
+        cql = build_alter_materialized_view("mv1", "ks", {"comment": "updated"})
+        assert cql == "ALTER MATERIALIZED VIEW ks.mv1 WITH comment = 'updated'"
+
+
+class TestBuildAlterTypeRename:
+    def test_rename_single_field(self):
+        cql = build_alter_type_rename("address", "ks", {"street": "street_name"})
+        assert cql == 'ALTER TYPE ks.address RENAME "street" TO "street_name"'
+
+    def test_rename_multiple_fields(self):
+        cql = build_alter_type_rename("address", "ks", {"street": "road", "city": "town"})
+        assert 'ALTER TYPE ks.address RENAME "street" TO "road" AND "city" TO "town"' == cql
+
+
+# ==================================================================
+# Phase 6: ScyllaDB Extensions & Low-Priority Gaps
+# ==================================================================
+
+
+class TestBuildSelectBypassCache:
+    def test_bypass_cache(self):
+        cql, _ = build_select("users", "ks", bypass_cache=True)
+        assert cql.endswith("BYPASS CACHE")
+
+    def test_bypass_cache_with_allow_filtering(self):
+        cql, _ = build_select("users", "ks", allow_filtering=True, bypass_cache=True)
+        assert "ALLOW FILTERING BYPASS CACHE" in cql
+
+    def test_no_bypass_cache_by_default(self):
+        cql, _ = build_select("users", "ks")
+        assert "BYPASS CACHE" not in cql
+
+    def test_bypass_cache_with_where(self):
+        cql, params = build_select(
+            "users", "ks",
+            where=[("id", "=", 1)],
+            bypass_cache=True,
+        )
+        assert "BYPASS CACHE" in cql
+        assert params == [1]
+
+
+class TestUsingTimeout:
+    def test_insert_with_timeout(self):
+        cql, _ = build_insert("t", "ks", {"a": 1}, using_timeout="5s")
+        assert "USING TIMEOUT 5s" in cql
+
+    def test_insert_from_columns_with_timeout(self):
+        _insert_cql_cache.clear()
+        cql, _ = build_insert_from_columns(
+            "t", "ks", ("a",), [1], using_timeout="500ms",
+        )
+        assert "USING TIMEOUT 500ms" in cql
+
+    def test_insert_json_with_timeout(self):
+        cql, _ = build_insert_json("t", "ks", '{"a":1}', using_timeout="10s")
+        assert "USING TIMEOUT 10s" in cql
+
+    def test_update_with_timeout(self):
+        cql, _ = build_update(
+            "t", "ks",
+            set_data={"x": 1},
+            where=[("id", "=", 1)],
+            using_timeout="2s",
+        )
+        assert "USING TIMEOUT 2s" in cql
+
+    def test_delete_with_timeout(self):
+        cql, _ = build_delete(
+            "t", "ks",
+            where=[("id", "=", 1)],
+            using_timeout="3s",
+        )
+        assert "USING TIMEOUT 3s" in cql
+
+    def test_timeout_combined_with_ttl(self):
+        cql, _ = build_insert("t", "ks", {"a": 1}, ttl=60, using_timeout="5s")
+        assert "USING TTL 60 AND TIMEOUT 5s" in cql
+
+    def test_timeout_combined_with_timestamp(self):
+        cql, _ = build_insert("t", "ks", {"a": 1}, timestamp=12345, using_timeout="5s")
+        assert "USING TIMESTAMP 12345 AND TIMEOUT 5s" in cql
+
+    def test_no_timeout_by_default(self):
+        cql, _ = build_insert("t", "ks", {"a": 1})
+        assert "TIMEOUT" not in cql
+
+
+class TestBuildCreateRole:
+    def test_basic(self):
+        cql = build_create_role("app_user")
+        assert cql == "CREATE ROLE IF NOT EXISTS app_user WITH SUPERUSER = false AND LOGIN = false"
+
+    def test_with_password_and_login(self):
+        cql = build_create_role("app_user", password="secret", login=True)
+        assert "PASSWORD = 'secret'" in cql
+        assert "LOGIN = true" in cql
+
+    def test_superuser(self):
+        cql = build_create_role("admin", superuser=True, login=True)
+        assert "SUPERUSER = true" in cql
+        assert "LOGIN = true" in cql
+
+    def test_if_not_exists_false(self):
+        cql = build_create_role("r", if_not_exists=False)
+        assert "IF NOT EXISTS" not in cql
+        assert cql.startswith("CREATE ROLE r")
+
+
+class TestBuildDropRole:
+    def test_basic(self):
+        cql = build_drop_role("old_role")
+        assert cql == "DROP ROLE IF EXISTS old_role"
+
+    def test_if_exists_false(self):
+        cql = build_drop_role("old_role", if_exists=False)
+        assert cql == "DROP ROLE old_role"
+
+
+class TestBuildGrant:
+    def test_grant_select(self):
+        cql = build_grant("SELECT", "KEYSPACE ks", "app_user")
+        assert cql == "GRANT SELECT ON KEYSPACE ks TO app_user"
+
+    def test_grant_all(self):
+        cql = build_grant("ALL", "ALL KEYSPACES", "admin")
+        assert cql == "GRANT ALL ON ALL KEYSPACES TO admin"
+
+    def test_grant_table(self):
+        cql = build_grant("MODIFY", "TABLE ks.users", "writer")
+        assert cql == "GRANT MODIFY ON TABLE ks.users TO writer"
+
+
+class TestBuildRevoke:
+    def test_revoke_select(self):
+        cql = build_revoke("SELECT", "KEYSPACE ks", "app_user")
+        assert cql == "REVOKE SELECT ON KEYSPACE ks FROM app_user"
+
+    def test_revoke_all(self):
+        cql = build_revoke("ALL", "ALL KEYSPACES", "admin")
+        assert cql == "REVOKE ALL ON ALL KEYSPACES FROM admin"
+
+
+class TestBuildListRoles:
+    def test_list_all(self):
+        cql = build_list_roles()
+        assert cql == "LIST ROLES"
+
+    def test_list_of_role(self):
+        cql = build_list_roles(of_role="admin")
+        assert cql == "LIST ROLES OF admin"

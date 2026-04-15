@@ -442,3 +442,67 @@ def test_build_schema_vector_index():
     emb_col = next(c for c in cols if c.name == "embedding")
     assert emb_col.vector_index is True
     assert emb_col.vector_similarity_function == "EUCLIDEAN"
+
+
+# ------------------------------------------------------------------
+# Phase 3: Extended Indexed() field
+# ------------------------------------------------------------------
+
+
+class _IndexedWithClassDoc(BaseModel):
+    class Config:
+        table_name = "test"
+        keyspace = "ks"
+
+    id: Annotated[UUID, PrimaryKey()]
+    email: Annotated[str, Indexed(index_class="org.apache.cassandra.index.sai.StorageAttachedIndex")]
+
+
+class _IndexedWithOptionsDoc(BaseModel):
+    class Config:
+        table_name = "test"
+        keyspace = "ks"
+
+    id: Annotated[UUID, PrimaryKey()]
+    name: Annotated[
+        str,
+        Indexed(
+            index_class="org.apache.cassandra.index.sai.StorageAttachedIndex",
+            options={"case_sensitive": "false"},
+        ),
+    ]
+
+
+class _IndexedWithTargetDoc(BaseModel):
+    class Config:
+        table_name = "test"
+        keyspace = "ks"
+
+    id: Annotated[UUID, PrimaryKey()]
+    tags: Annotated[dict[str, str], Indexed(index_target="KEYS")]
+
+
+def test_indexed_with_class():
+    cols = build_schema(_IndexedWithClassDoc)
+    email_col = next(c for c in cols if c.name == "email")
+    assert email_col.index is True
+    assert email_col.index_class == "org.apache.cassandra.index.sai.StorageAttachedIndex"
+
+
+def test_indexed_with_options():
+    cols = build_schema(_IndexedWithOptionsDoc)
+    name_col = next(c for c in cols if c.name == "name")
+    assert name_col.index is True
+    assert name_col.index_options == {"case_sensitive": "false"}
+
+
+def test_indexed_with_target():
+    cols = build_schema(_IndexedWithTargetDoc)
+    tags_col = next(c for c in cols if c.name == "tags")
+    assert tags_col.index is True
+    assert tags_col.index_target == "KEYS"
+
+
+def test_indexed_invalid_target():
+    with pytest.raises(ValueError, match="Invalid index_target"):
+        Indexed(index_target="INVALID")

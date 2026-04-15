@@ -12,6 +12,10 @@ from coodie.drivers.base import AbstractDriver, _is_ddl
 class AcsyllaDriver(AbstractDriver):
     """Driver backed by the `acsylla <https://github.com/acsylla/acsylla>`_ async-native library.
 
+    .. note::
+       ``needs_row_validation`` is ``True`` because acsylla returns UUID
+       values as strings rather than ``uuid.UUID`` objects.
+
     ``acsylla`` is an **optional** dependency — install it separately::
 
         pip install acsylla
@@ -66,6 +70,8 @@ class AcsyllaDriver(AbstractDriver):
     ``__init__(session=...)`` form is intended for **pure async** usage where
     the sync bridge is not needed.
     """
+
+    needs_row_validation: bool = True
 
     __slots__ = (
         "_acsylla",

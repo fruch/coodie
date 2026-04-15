@@ -39,6 +39,8 @@ def driver_type(request: pytest.FixtureRequest) -> str:
 class MockDriver:
     """Records CQL statements and params; returns configured rows."""
 
+    needs_row_validation: bool = False
+
     def __init__(self) -> None:
         self.executed: list[tuple[str, list[Any]]] = []
         self._return_rows: list[list[dict[str, Any]]] = []
@@ -98,6 +100,36 @@ class MockDriver:
         self.last_paging_state = paging_state
         self._last_paging_state = self._pop_paging_state()
         return self._pop_rows()
+
+    def execute_one(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        self.executed.append((stmt, params))
+        self.last_consistency = consistency
+        self.last_timeout = timeout
+        rows = self._pop_rows()
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    async def execute_one_async(
+        self,
+        stmt: str,
+        params: list[Any],
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        self.executed.append((stmt, params))
+        self.last_consistency = consistency
+        self.last_timeout = timeout
+        rows = self._pop_rows()
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
 
     def sync_table(
         self,

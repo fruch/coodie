@@ -935,3 +935,41 @@ def Dog(variant):
     if variant == "sync":
         return SyncDog
     return AsyncDog
+
+
+# ---------------------------------------------------------------------------
+# TTL / Timestamp test models
+# ---------------------------------------------------------------------------
+
+
+class SyncTTLItem(SyncDocument):
+    """Sync document with __default_ttl__ for TTL integration tests."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    description: Optional[str] = None
+
+    class Settings:
+        name = "it_sync_ttl_items"
+        keyspace = "test_ks"
+        __default_ttl__ = 2
+
+
+class AsyncTTLItem(AsyncDocument):
+    """Async document with __default_ttl__ for TTL integration tests."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    description: Optional[str] = None
+
+    class Settings:
+        name = "it_async_ttl_items"
+        keyspace = "test_ks"
+        __default_ttl__ = 2
+
+
+@pytest.fixture
+def TTLItem(variant):
+    if variant == "sync":
+        return SyncTTLItem
+    return AsyncTTLItem

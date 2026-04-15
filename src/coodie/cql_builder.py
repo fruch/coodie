@@ -255,6 +255,35 @@ def build_where_clause(
     return "WHERE " + " AND ".join(parts), params
 
 
+# ---------------------------------------------------------------------------
+# Shared helpers for CQL template caching
+# ---------------------------------------------------------------------------
+
+
+def _where_to_shape(where: list[tuple[str, str, Any]]) -> tuple:
+    """Convert WHERE triples into a hashable shape tuple (excludes values)."""
+    parts = []
+    for col, op, value in where:
+        if op == "IN":
+            parts.append((col, op, len(value)))
+        elif op == "ISNULL":
+            parts.append((col, op, value))
+        else:
+            parts.append((col, op))
+    return tuple(parts)
+
+
+def _extract_where_params(where: list[tuple[str, str, Any]], params: list[Any]) -> None:
+    """Append bind-parameter values from WHERE triples into *params*."""
+    for _col, op, value in where:
+        if op == "ISNULL":
+            pass  # IS [NOT] NULL has no params
+        elif op == "IN":
+            params.extend(value)
+        else:
+            params.append(value)
+
+
 _select_cql_cache: dict[tuple, str] = {}
 
 
@@ -273,17 +302,8 @@ def build_select(
     cast: list[tuple[str, str]] | None = None,
     ann_of: tuple[str, list[float]] | None = None,
 ) -> tuple[str, list[Any]]:
-    where_shape: tuple = ()
-    if where:
-        shape_parts = []
-        for col, op, value in where:
-            if op == "IN":
-                shape_parts.append((col, op, len(value)))
-            elif op == "ISNULL":
-                shape_parts.append((col, op, value))
-            else:
-                shape_parts.append((col, op))
-        where_shape = tuple(shape_parts)
+    # Build the cache key from the query *shape* (excludes actual values).
+    where_shape = _where_to_shape(where) if where else ()
     cache_key = (
         table,
         keyspace,
@@ -302,13 +322,8 @@ def build_select(
 
     params: list[Any] = []
     if where:
-        for _col, op, value in where:
-            if op == "ISNULL":
-                pass
-            elif op == "IN":
-                params.extend(value)
-            else:
-                params.append(value)
+        _extract_where_params(where, params)
+
     # ANN vector param is appended after WHERE params.
     if ann_of is not None:
         params.append(ann_of[1])
@@ -363,25 +378,43 @@ def build_select(
     return cql, params
 
 
+# Cache for COUNT CQL templates keyed by query shape.
+_count_cql_cache: dict[tuple, str] = {}
+
+
 def build_count(
     table: str,
     keyspace: str,
     where: list[tuple[str, str, Any]] | None = None,
     allow_filtering: bool = False,
 ) -> tuple[str, list[Any]]:
-    cql = f"SELECT COUNT(*) FROM {keyspace}.{table}"
+    where_shape = _where_to_shape(where) if where else ()
+    cache_key = (table, keyspace, where_shape, allow_filtering)
+
     params: list[Any] = []
+    if where:
+        _extract_where_params(where, params)
+
+    cached_cql = _count_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
+    cql = f"SELECT COUNT(*) FROM {keyspace}.{table}"
 
     if where:
-        clause, where_params = build_where_clause(where)
+        clause, _wp = build_where_clause(where)
         if clause:
             cql += " " + clause
-            params.extend(where_params)
 
     if allow_filtering:
         cql += " ALLOW FILTERING"
 
+    _count_cql_cache[cache_key] = cql
     return cql, params
+
+
+# Cache for aggregate CQL templates keyed by query shape.
+_aggregate_cql_cache: dict[tuple, str] = {}
 
 
 def build_aggregate(
@@ -392,18 +425,28 @@ def build_aggregate(
     where: list[tuple[str, str, Any]] | None = None,
     allow_filtering: bool = False,
 ) -> tuple[str, list[Any]]:
-    cql = f'SELECT {func.upper()}("{column}") FROM {keyspace}.{table}'
+    where_shape = _where_to_shape(where) if where else ()
+    cache_key = (table, keyspace, func.upper(), column, where_shape, allow_filtering)
+
     params: list[Any] = []
+    if where:
+        _extract_where_params(where, params)
+
+    cached_cql = _aggregate_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
+    cql = f'SELECT {func.upper()}("{column}") FROM {keyspace}.{table}'
 
     if where:
-        clause, where_params = build_where_clause(where)
+        clause, _wp = build_where_clause(where)
         if clause:
             cql += " " + clause
-            params.extend(where_params)
 
     if allow_filtering:
         cql += " ALLOW FILTERING"
 
+    _aggregate_cql_cache[cache_key] = cql
     return cql, params
 
 
@@ -465,10 +508,116 @@ def build_insert_from_columns(
     return cql, values
 
 
+def build_insert_json(
+    table: str,
+    keyspace: str,
+    json_string: str,
+    ttl: int | None = None,
+    if_not_exists: bool = False,
+    timestamp: int | None = None,
+) -> tuple[str, list[Any]]:
+    """Build an ``INSERT INTO … JSON ?`` CQL statement.
+
+    The *json_string* is bound as a positional parameter so the driver
+    handles escaping.
+    """
+    cql = f"INSERT INTO {keyspace}.{table} JSON ?"
+    if if_not_exists:
+        cql += " IF NOT EXISTS"
+    cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
+    return cql, [json_string]
+
+
+def build_select_json(
+    table: str,
+    keyspace: str,
+    where: list[tuple[str, str, Any]] | None = None,
+    limit: int | None = None,
+    allow_filtering: bool = False,
+) -> tuple[str, list[Any]]:
+    """Build a ``SELECT JSON * FROM …`` CQL statement.
+
+    Returns rows where each row is a dict with a single ``"[json]"`` key
+    containing the JSON string representation of the row.
+    """
+    cql = f"SELECT JSON * FROM {keyspace}.{table}"
+    params: list[Any] = []
+
+    if where:
+        clause, where_params = build_where_clause(where)
+        if clause:
+            cql += " " + clause
+            params.extend(where_params)
+
+    if limit is not None:
+        cql += f" LIMIT {limit}"
+
+    if allow_filtering:
+        cql += " ALLOW FILTERING"
+
+    return cql, params
+
+
+def build_select_writetime(
+    table: str,
+    keyspace: str,
+    column: str,
+    where: list[tuple[str, str, Any]] | None = None,
+    allow_filtering: bool = False,
+) -> tuple[str, list[Any]]:
+    """Build a ``SELECT WRITETIME("col") FROM …`` CQL statement."""
+    cql = f'SELECT WRITETIME("{column}") FROM {keyspace}.{table}'
+    params: list[Any] = []
+
+    if where:
+        clause, where_params = build_where_clause(where)
+        if clause:
+            cql += " " + clause
+            params.extend(where_params)
+
+    if allow_filtering:
+        cql += " ALLOW FILTERING"
+
+    return cql, params
+
+
+def build_select_column_ttl(
+    table: str,
+    keyspace: str,
+    column: str,
+    where: list[tuple[str, str, Any]] | None = None,
+    allow_filtering: bool = False,
+) -> tuple[str, list[Any]]:
+    """Build a ``SELECT TTL("col") FROM …`` CQL statement."""
+    cql = f'SELECT TTL("{column}") FROM {keyspace}.{table}'
+    params: list[Any] = []
+
+    if where:
+        clause, where_params = build_where_clause(where)
+        if clause:
+            cql += " " + clause
+            params.extend(where_params)
+
+    if allow_filtering:
+        cql += " ALLOW FILTERING"
+
+    return cql, params
+
+
 def parse_update_kwargs(
     kwargs: dict[str, Any],
 ) -> tuple[dict[str, Any], list[tuple[str, str, Any]]]:
-    collection_operators = {"add", "remove", "append", "prepend", "update"}
+    """Parse update kwargs into regular set data and collection operations.
+
+    Returns ``(set_data, collection_ops)`` where *collection_ops* is a list of
+    ``(column, operator, value)`` tuples.  Supported operators: ``add``,
+    ``remove``, ``append``, ``prepend``, ``update`` (alias for ``add``),
+    ``put`` (map element set), ``setindex`` (list element set by index).
+
+    For ``put`` and ``setindex`` the *value* must be a ``(key_or_index, val)``
+    tuple which generates ``"col"[?] = ?``.
+    """
+    collection_operators = {"add", "remove", "append", "prepend", "update", "put", "setindex"}
     set_data: dict[str, Any] = {}
     collection_ops: list[tuple[str, str, Any]] = []
     for key, value in kwargs.items():
@@ -479,6 +628,41 @@ def parse_update_kwargs(
         else:
             set_data[key] = value
     return set_data, collection_ops
+
+
+# Cache for UPDATE CQL templates keyed by query shape.
+_update_cql_cache: dict[tuple, str] = {}
+
+_IF_OPS: dict[str, str] = {"ne": "!=", "gt": ">", "lt": "<", "gte": ">=", "lte": "<=", "in": "IN"}
+
+
+def _parse_if_conditions(
+    conditions: dict[str, Any],
+) -> tuple[str, list[Any]]:
+    """Parse an ``if_conditions`` dict into a CQL ``IF`` clause and parameter list.
+
+    Keys may use Django-style operator suffixes: ``col__ne`` (``!=``),
+    ``col__gt`` (``>``), ``col__lt`` (``<``), ``col__gte`` (``>=``),
+    ``col__lte`` (``<=``), ``col__in`` (``IN``).  Plain keys default to ``=``.
+    """
+    parts: list[str] = []
+    params: list[Any] = []
+    for key, value in conditions.items():
+        pieces = key.rsplit("__", 1)
+        if len(pieces) == 2 and pieces[1] in _IF_OPS:
+            col, op_key = pieces
+            op = _IF_OPS[op_key]
+            if op == "IN":
+                placeholders = ", ".join("?" * len(value))
+                parts.append(f'"{col}" IN ({placeholders})')
+                params.extend(value)
+            else:
+                parts.append(f'"{col}" {op} ?')
+                params.append(value)
+        else:
+            parts.append(f'"{key}" = ?')
+            params.append(value)
+    return " IF " + " AND ".join(parts), params
 
 
 def build_update(
@@ -492,37 +676,73 @@ def build_update(
     if_exists: bool = False,
     timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
-    set_parts = [f'"{k}" = ?' for k in set_data]
+    # Build cache key from query shape (column names + ops, not values).
+    set_cols = tuple(set_data.keys())
+    col_ops_shape = tuple((col, op) for col, op, _v in collection_ops) if collection_ops else ()
+    where_shape = _where_to_shape(where) if where else ()
+    if_cond_cols = tuple(if_conditions.keys()) if if_conditions else ()
+    cache_key = (
+        table,
+        keyspace,
+        set_cols,
+        col_ops_shape,
+        where_shape,
+        ttl,
+        if_cond_cols,
+        if_exists,
+        timestamp,
+    )
+
+    # Extract params (always needed regardless of cache hit).
     params: list[Any] = list(set_data.values())
+    if collection_ops:
+        for _col, _op, value in collection_ops:
+            if _op in ("put", "setindex"):
+                k, v = value
+                params.extend([k, v])
+            else:
+                params.append(value)
+    _extract_where_params(where, params)
+    if if_conditions and not if_exists:
+        _, cond_params_pre = _parse_if_conditions(if_conditions)
+        params.extend(cond_params_pre)
+
+    cached_cql = _update_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        return cached_cql, params
+
+    set_parts = [f'"{k}" = ?' for k in set_data]
 
     if collection_ops:
-        for col, op, value in collection_ops:
+        for col, op, _value in collection_ops:
             if op in ("add", "append", "update"):
                 set_parts.append(f'"{col}" = "{col}" + ?')
-                params.append(value)
             elif op == "prepend":
                 set_parts.append(f'"{col}" = ? + "{col}"')
-                params.append(value)
             elif op == "remove":
                 set_parts.append(f'"{col}" = "{col}" - ?')
-                params.append(value)
+            elif op in ("put", "setindex"):
+                set_parts.append(f'"{col}"[?] = ?')
 
     cql = f"UPDATE {keyspace}.{table}"
     cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
     cql += " SET " + ", ".join(set_parts)
 
-    clause, where_params = build_where_clause(where)
+    clause, _wp = build_where_clause(where)
     cql += " " + clause
-    params.extend(where_params)
 
     if if_exists:
         cql += " IF EXISTS"
     elif if_conditions:
-        cond_parts = [f'"{k}" = ?' for k in if_conditions]
-        cql += " IF " + " AND ".join(cond_parts)
-        params.extend(if_conditions.values())
+        cond_clause, _ = _parse_if_conditions(if_conditions)
+        cql += cond_clause
 
+    _update_cql_cache[cache_key] = cql
     return cql, params
+
+
+# Cache for DELETE CQL templates keyed by query shape.
+_delete_cql_cache: dict[tuple, str] = {}
 
 
 def build_delete(
@@ -532,17 +752,55 @@ def build_delete(
     columns: list[str] | None = None,
     if_exists: bool = False,
     timestamp: int | None = None,
+    if_conditions: dict[str, Any] | None = None,
+    collection_elements: list[tuple[str, Any]] | None = None,
 ) -> tuple[str, list[Any]]:
-    cols_str = ", ".join(f'"{c}"' for c in columns) if columns else ""
+    where_shape = _where_to_shape(where) if where else ()
+    col_elem_shape = tuple((col, type(k).__name__) for col, k in collection_elements) if collection_elements else ()
+    cache_key = (
+        table,
+        keyspace,
+        tuple(columns) if columns else None,
+        where_shape,
+        col_elem_shape,
+        if_exists,
+        tuple(if_conditions.keys()) if if_conditions else (),
+        timestamp,
+    )
+
+    params: list[Any] = []
+    delete_parts: list[str] = []
+
+    if columns:
+        delete_parts.extend(f'"{c}"' for c in columns)
+    if collection_elements:
+        for col, key_or_idx in collection_elements:
+            delete_parts.append(f'"{col}"[?]')
+            params.append(key_or_idx)
+
+    cached_cql = _delete_cql_cache.get(cache_key)
+    if cached_cql is not None:
+        _extract_where_params(where, params)
+        if if_conditions and not if_exists:
+            params.extend(if_conditions.values())
+        return cached_cql, params
+
+    cols_str = ", ".join(delete_parts) if delete_parts else ""
     cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace("DELETE  FROM", "DELETE FROM")
     cql += _build_using_clause(timestamp=timestamp)
 
-    clause, params = build_where_clause(where)
+    clause, where_params = build_where_clause(where)
     cql += " " + clause
+    params.extend(where_params)
 
     if if_exists:
         cql += " IF EXISTS"
+    elif if_conditions:
+        cond_clause, cond_params = _parse_if_conditions(if_conditions)
+        cql += cond_clause
+        params.extend(cond_params)
 
+    _delete_cql_cache[cache_key] = cql
     return cql, params
 
 
@@ -592,6 +850,7 @@ def build_batch(
     statements: list[tuple[str, list[Any]]],
     logged: bool = True,
     batch_type: str | None = None,
+    timestamp: int | None = None,
 ) -> tuple[str, list[Any]]:
     if batch_type is not None:
         bt = batch_type.upper()
@@ -604,5 +863,7 @@ def build_batch(
         all_params.extend(p)
     inner = "\n  ".join(stmt_lines)
     prefix = f"BEGIN {bt} BATCH" if bt else "BEGIN BATCH"
+    if timestamp is not None:
+        prefix += f" USING TIMESTAMP {timestamp}"
     cql = f"{prefix}\n  {inner}\nAPPLY BATCH"
     return cql, all_params

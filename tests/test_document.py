@@ -113,6 +113,39 @@ async def test_insert_if_not_exists(Product, registered_mock_driver):
     assert "IF NOT EXISTS" in stmt
 
 
+# -- Phase 5: Document.save_json() ----------------------------------------
+
+
+async def test_save_json(Product, registered_mock_driver):
+    p = Product(name="Widget", price=9.99)
+    await _maybe_await(p.save_json)
+    assert len(registered_mock_driver.executed) == 1
+    stmt, params = registered_mock_driver.executed[0]
+    assert "INSERT INTO test_ks.products JSON ?" in stmt
+    assert len(params) == 1
+    import json
+
+    data = json.loads(params[0])
+    assert data["name"] == "Widget"
+    assert data["price"] == 9.99
+
+
+async def test_save_json_with_ttl(Product, registered_mock_driver):
+    p = Product(name="Widget")
+    await _maybe_await(p.save_json, ttl=300)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "INSERT INTO test_ks.products JSON ?" in stmt
+    assert "USING TTL 300" in stmt
+
+
+async def test_save_json_with_timestamp(Product, registered_mock_driver):
+    p = Product(name="Widget")
+    await _maybe_await(p.save_json, timestamp=123456)
+    stmt, _ = registered_mock_driver.executed[0]
+    assert "INSERT INTO test_ks.products JSON ?" in stmt
+    assert "USING TIMESTAMP 123456" in stmt
+
+
 async def test_delete(Product, registered_mock_driver):
     p = Product(name="Widget")
     await _maybe_await(p.delete)

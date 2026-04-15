@@ -3,11 +3,16 @@
 Covers: ``Document.update(if_conditions={...})`` edge-cases (multiple
 conditions, LWT result existing-value completeness),
 ``Document.delete(if_exists=True)``, ``QuerySet.if_not_exists().create()``,
-and ``QuerySet.if_exists().delete()``.
+``QuerySet.if_exists().delete()``,
+``Document.delete(if_conditions={...})`` conditional deletes,
+``QuerySet.delete(if_conditions={...})``,
+extended IF operators (``!=``, ``IN``, ``>``, ``<``),
+map put (``col__put``), list set-by-index (``col__setindex``),
+and ``DELETE col[key] FROM`` via ``delete_columns(collection_elements=...)``.
 
 Basic ``Document.update(if_conditions={...})`` and
 ``Document.update(if_exists=True)`` integration tests live in
-``test_update.py``; this file adds the remaining §1.5 coverage.
+``test_update.py``; this file adds the remaining §1.5 + Phase 4 coverage.
 
 Every test runs twice (sync and async) via the ``variant`` fixture.
 """
@@ -214,3 +219,302 @@ class TestQuerySetConditionalDelete:
 
         assert isinstance(result, LWTResult)
         assert result.applied is False
+
+
+# ------------------------------------------------------------------
+# Phase 4: Conditional deletes with if_conditions
+# ------------------------------------------------------------------
+
+
+class TestConditionalDeleteWithConditions:
+    """Integration tests for Document.delete(if_conditions={...})."""
+
+    async def test_delete_if_conditions_applied(self, coodie_driver, Product) -> None:
+        """delete(if_conditions={col: val}) succeeds when the condition matches."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="CondDel", brand="BrandA", price=10.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(p.delete, if_conditions={"name": "CondDel"})
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is True
+
+        fetched = await _maybe_await(Product.find_one, id=pid)
+        assert fetched is None
+
+    async def test_delete_if_conditions_not_applied(self, coodie_driver, Product) -> None:
+        """delete(if_conditions={col: val}) is rejected when the condition fails."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="CondDel", brand="BrandB", price=20.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(p.delete, if_conditions={"name": "WrongName"})
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is False
+        assert result.existing is not None
+        assert result.existing.get("name") == "CondDel"
+
+        # Row should still exist
+        fetched = await _maybe_await(Product.get, id=pid)
+        assert fetched.name == "CondDel"
+
+        await _maybe_await(Product(id=pid, name="").delete)
+
+    async def test_delete_if_conditions_multiple(self, coodie_driver, Product) -> None:
+        """delete(if_conditions={k1: v1, k2: v2}) succeeds only when all match."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="Multi", brand="BrandC", price=30.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            p.delete,
+            if_conditions={"name": "Multi", "brand": "BrandC"},
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is True
+
+        fetched = await _maybe_await(Product.find_one, id=pid)
+        assert fetched is None
+
+
+class TestQuerySetConditionalDeleteWithConditions:
+    """Integration tests for QuerySet.delete(if_conditions={...})."""
+
+    async def test_queryset_delete_if_conditions_applied(self, coodie_driver, Product) -> None:
+        """QuerySet.delete(if_conditions=...) succeeds when the condition matches."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="QSDel", brand="BrandD", price=40.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            Product.find(id=pid).delete,
+            if_conditions={"name": "QSDel"},
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is True
+
+        fetched = await _maybe_await(Product.find_one, id=pid)
+        assert fetched is None
+
+    async def test_queryset_delete_if_conditions_not_applied(self, coodie_driver, Product) -> None:
+        """QuerySet.delete(if_conditions=...) is rejected when the condition fails."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="QSDel", brand="BrandE", price=50.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            Product.find(id=pid).delete,
+            if_conditions={"name": "Wrong"},
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is False
+        assert result.existing is not None
+
+        fetched = await _maybe_await(Product.get, id=pid)
+        assert fetched.name == "QSDel"
+
+        await _maybe_await(Product(id=pid, name="").delete)
+
+
+# ------------------------------------------------------------------
+# Phase 4: Extended IF operators in update conditions
+# ------------------------------------------------------------------
+
+
+class TestExtendedIfOperators:
+    """Integration tests for extended IF operators (!=, >, <) in update conditions."""
+
+    async def test_update_if_ne_applied(self, coodie_driver, Product) -> None:
+        """update(if_conditions={col__ne: val}) succeeds when col != val."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="NeTest", brand="BrandX", price=10.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            p.update,
+            if_conditions={"name__ne": "Other"},
+            price=20.0,
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is True
+
+        fetched = await _maybe_await(Product.get, id=pid)
+        assert fetched.price == 20.0
+
+        await _maybe_await(Product(id=pid, name="").delete)
+
+    async def test_update_if_ne_not_applied(self, coodie_driver, Product) -> None:
+        """update(if_conditions={col__ne: val}) fails when col == val."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="NeTest", brand="BrandX", price=10.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            p.update,
+            if_conditions={"name__ne": "NeTest"},
+            price=20.0,
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is False
+
+        fetched = await _maybe_await(Product.get, id=pid)
+        assert fetched.price == 10.0
+
+        await _maybe_await(Product(id=pid, name="").delete)
+
+    async def test_update_if_gt_applied(self, coodie_driver, Product) -> None:
+        """update(if_conditions={col__gt: val}) succeeds when col > val."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="GtTest", price=100.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            p.update,
+            if_conditions={"price__gt": 50.0},
+            price=200.0,
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is True
+
+        fetched = await _maybe_await(Product.get, id=pid)
+        assert fetched.price == 200.0
+
+        await _maybe_await(Product(id=pid, name="").delete)
+
+    async def test_update_if_lt_applied(self, coodie_driver, Product) -> None:
+        """update(if_conditions={col__lt: val}) succeeds when col < val."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="LtTest", price=10.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            p.update,
+            if_conditions={"price__lt": 50.0},
+            price=5.0,
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is True
+
+        fetched = await _maybe_await(Product.get, id=pid)
+        assert fetched.price == 5.0
+
+        await _maybe_await(Product(id=pid, name="").delete)
+
+    async def test_update_if_in_applied(self, coodie_driver, Product) -> None:
+        """update(if_conditions={col__in: [...]}) succeeds when col in list."""
+        await _maybe_await(Product.sync_table)
+        pid = uuid4()
+        p = Product(id=pid, name="InTest", brand="BrandA", price=10.0)
+        await _maybe_await(p.save)
+
+        result = await _maybe_await(
+            p.update,
+            if_conditions={"brand__in": ["BrandA", "BrandB"]},
+            price=99.0,
+        )
+
+        assert isinstance(result, LWTResult)
+        assert result.applied is True
+
+        fetched = await _maybe_await(Product.get, id=pid)
+        assert fetched.price == 99.0
+
+        await _maybe_await(Product(id=pid, name="").delete)
+
+
+# ------------------------------------------------------------------
+# Phase 4: Map put and list set-by-index
+# ------------------------------------------------------------------
+
+
+class TestMapPutAndListSetIndex:
+    """Integration tests for map put (col__put) and list set-by-index (col__setindex)."""
+
+    async def test_map_put_new_key(self, coodie_driver, ContainerDoc) -> None:
+        """doc.update(meta__put=('newkey', 'newval')) inserts a map entry."""
+        await _maybe_await(ContainerDoc.sync_table)
+        rid = uuid4()
+        row = ContainerDoc(id=rid, meta={"k1": "v1"})
+        await _maybe_await(row.save)
+
+        await _maybe_await(row.update, meta__put=("k2", "v2"))
+
+        fetched = await _maybe_await(ContainerDoc.find_one, id=rid)
+        assert fetched is not None
+        assert fetched.meta.get("k1") == "v1"
+        assert fetched.meta.get("k2") == "v2"
+
+        await _maybe_await(ContainerDoc(id=rid).delete)
+
+    async def test_map_put_overwrite_key(self, coodie_driver, ContainerDoc) -> None:
+        """doc.update(meta__put=('k1', 'updated')) overwrites an existing map entry."""
+        await _maybe_await(ContainerDoc.sync_table)
+        rid = uuid4()
+        row = ContainerDoc(id=rid, meta={"k1": "v1"})
+        await _maybe_await(row.save)
+
+        await _maybe_await(row.update, meta__put=("k1", "updated"))
+
+        fetched = await _maybe_await(ContainerDoc.find_one, id=rid)
+        assert fetched is not None
+        assert fetched.meta.get("k1") == "updated"
+
+        await _maybe_await(ContainerDoc(id=rid).delete)
+
+    async def test_list_setindex(self, coodie_driver, ContainerDoc) -> None:
+        """doc.update(items__setindex=(idx, val)) replaces a list element at a given index."""
+        await _maybe_await(ContainerDoc.sync_table)
+        rid = uuid4()
+        row = ContainerDoc(id=rid, items=["a", "b", "c"])
+        await _maybe_await(row.save)
+
+        await _maybe_await(row.update, items__setindex=(1, "B"))
+
+        fetched = await _maybe_await(ContainerDoc.find_one, id=rid)
+        assert fetched is not None
+        assert fetched.items == ["a", "B", "c"]
+
+        await _maybe_await(ContainerDoc(id=rid).delete)
+
+
+# ------------------------------------------------------------------
+# Phase 4: DELETE col[key] FROM / DELETE col[idx] FROM
+# ------------------------------------------------------------------
+
+
+class TestDeleteCollectionElements:
+    """Integration tests for deleting map entries and list elements via delete_columns."""
+
+    async def test_delete_map_element(self, coodie_driver, ContainerDoc) -> None:
+        """delete_columns(collection_elements=[('meta', 'k1')]) removes a map entry."""
+        await _maybe_await(ContainerDoc.sync_table)
+        rid = uuid4()
+        row = ContainerDoc(id=rid, meta={"k1": "v1", "k2": "v2"})
+        await _maybe_await(row.save)
+
+        await _maybe_await(row.delete_columns, collection_elements=[("meta", "k1")])
+
+        fetched = await _maybe_await(ContainerDoc.find_one, id=rid)
+        assert fetched is not None
+        assert "k1" not in fetched.meta
+        assert fetched.meta.get("k2") == "v2"
+
+        await _maybe_await(ContainerDoc(id=rid).delete)

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from coodie.cql_builder import (
     build_insert_from_columns,
+    build_insert_json,
     build_delete,
     build_update,
     build_counter_update,
@@ -199,6 +200,27 @@ class Document(BaseModel):
         else:
             cls._get_driver().execute(cql, params, consistency=consistency, timeout=timeout)
 
+    def save_json(
+        self,
+        ttl: int | None = None,
+        timestamp: int | None = None,
+        consistency: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        """Insert (upsert) this document using ``INSERT INTO … JSON``."""
+        import json
+
+        cls = self.__class__
+        json_string = json.dumps(self.model_dump(mode="json"))
+        cql, params = build_insert_json(
+            cls._get_table(),
+            cls._get_keyspace(),
+            json_string,
+            ttl=ttl,
+            timestamp=timestamp,
+        )
+        cls._get_driver().execute(cql, params, consistency=consistency, timeout=timeout)
+
     def insert(
         self,
         ttl: int | None = None,
@@ -240,10 +262,15 @@ class Document(BaseModel):
         consistency: str | None = None,
         timeout: float | None = None,
         batch: BatchQuery | None = None,
+        collection_elements: list[tuple[str, Any]] | None = None,
     ) -> None:
         """Set one or more non-primary-key columns to null for this document.
 
         Generates ``DELETE col1, col2 FROM table WHERE pk = ?``.
+
+        When *collection_elements* is provided, each ``(column, key_or_index)``
+        tuple generates ``DELETE "col"[?] FROM table WHERE pk = ?`` which removes
+        a single map entry or list element.
 
         .. warning::
             This operation nullifies column values in-place and bypasses the
@@ -266,8 +293,9 @@ class Document(BaseModel):
             self.__class__._get_table(),
             self.__class__._get_keyspace(),
             where,
-            columns=list(column_names),
+            columns=list(column_names) if column_names else None,
             timestamp=timestamp,
+            collection_elements=collection_elements,
         )
         if batch is not None:
             batch.add(cql, params)
@@ -277,6 +305,7 @@ class Document(BaseModel):
     def delete(
         self,
         if_exists: bool = False,
+        if_conditions: dict[str, Any] | None = None,
         timestamp: int | None = None,
         consistency: str | None = None,
         timeout: float | None = None,
@@ -286,6 +315,11 @@ class Document(BaseModel):
 
         When *if_exists* is ``True`` the generated CQL includes ``IF EXISTS``
         and a :class:`~coodie.results.LWTResult` is returned.
+
+        When *if_conditions* is supplied (e.g. ``{"name": "old"}``), the CQL
+        includes ``IF name = ?`` and a :class:`~coodie.results.LWTResult` is
+        returned.  Operator suffixes like ``col__ne``, ``col__gt``, ``col__in``
+        are supported.
         """
         pk_names = _pk_columns(self.__class__)
         where = [(c, "=", getattr(self, c)) for c in pk_names]
@@ -294,6 +328,7 @@ class Document(BaseModel):
             self.__class__._get_keyspace(),
             where,
             if_exists=if_exists,
+            if_conditions=if_conditions,
             timestamp=timestamp,
         )
 
@@ -302,7 +337,7 @@ class Document(BaseModel):
             return None
 
         rows = self.__class__._get_driver().execute(cql, params, consistency=consistency, timeout=timeout)
-        if if_exists:
+        if if_exists or if_conditions:
             return _parse_lwt_result(rows)
         return None
 

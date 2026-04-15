@@ -28,7 +28,7 @@ def _make_mock_driver(*, pk_columns: list[dict] | None = None, scan_rows: list[d
     driver = AsyncMock()
 
     if pk_columns is None:
-        pk_columns = [{"column_name": "id", "position": 0}]
+        pk_columns = [{"column_name": "id", "kind": "partition_key", "position": 0}]
     if scan_rows is None:
         scan_rows = []
 
@@ -85,8 +85,8 @@ class TestScanTable:
     async def test_scan_table_composite_pk(self):
         """scan_table handles composite partition keys."""
         pk_cols = [
-            {"column_name": "region", "position": 0},
-            {"column_name": "user_id", "position": 1},
+            {"column_name": "region", "kind": "partition_key", "position": 0},
+            {"column_name": "user_id", "kind": "partition_key", "position": 1},
         ]
         driver = _make_mock_driver(pk_columns=pk_cols)
         ctx = MigrationContext(driver, dry_run=False)

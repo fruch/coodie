@@ -19,17 +19,22 @@ Example::
 
 from __future__ import annotations
 
+import functools
 import re
 import typing
 from typing import Any
 
 from pydantic import BaseModel, model_validator
 
+_SNAKE_RE1 = re.compile(r"(.)([A-Z][a-z]+)")
+_SNAKE_RE2 = re.compile(r"([a-z0-9])([A-Z])")
 
+
+@functools.lru_cache(maxsize=128)
 def _snake_case(name: str) -> str:
     """Convert CamelCase class name to snake_case."""
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+    s1 = _SNAKE_RE1.sub(r"\1_\2", name)
+    return _SNAKE_RE2.sub(r"\1_\2", s1).lower()
 
 
 class UserType(BaseModel):

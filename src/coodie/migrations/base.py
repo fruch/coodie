@@ -49,17 +49,46 @@ class MigrationContext:
     # D.1–D.4 — Data migration helpers
     # ------------------------------------------------------------------
 
-    async def _get_partition_key_columns(self, keyspace: str, table: str) -> list[str]:
-        """Query ``system_schema.columns`` to discover partition key column names."""
-        rows = await self._driver.execute_async(
-            "SELECT column_name, position FROM system_schema.columns "
-            "WHERE keyspace_name = ? AND table_name = ? AND kind = 'partition_key'",
+    async def _get_all_columns(self, keyspace: str, table: str) -> list[dict[str, Any]]:
+        """Fetch all column metadata for *keyspace*.*table* from system_schema.
+
+        Uses only the primary-key columns of ``system_schema.columns``
+        (``keyspace_name`` + ``table_name``) so no ALLOW FILTERING is needed.
+        """
+        return await self._driver.execute_async(
+            "SELECT column_name, kind, position FROM system_schema.columns WHERE keyspace_name = ? AND table_name = ?",
             [keyspace, table],
         )
-        if not rows:
+
+    async def _get_partition_key_columns(self, keyspace: str, table: str) -> list[str]:
+        """Query ``system_schema.columns`` to discover partition key column names."""
+        rows = await self._get_all_columns(keyspace, table)
+        pk_rows = [r for r in rows if r.get("kind") == "partition_key"]
+        if not pk_rows:
             raise ValueError(f"No partition key columns found for {keyspace}.{table}")
-        rows.sort(key=lambda r: r.get("position", 0))
-        return [r["column_name"] for r in rows]
+        pk_rows.sort(key=lambda r: r.get("position", 0))
+        return [r["column_name"] for r in pk_rows]
+
+    async def column_exists(self, keyspace: str, table: str, column: str) -> bool:
+        if self._dry_run:
+            return False
+        rows = await self._get_all_columns(keyspace, table)
+        return any(r.get("column_name") == column for r in rows)
+
+    async def index_exists(self, keyspace: str, table: str, index_name: str) -> bool:
+        """Return ``True`` if a secondary index named *index_name* exists on *keyspace*.*table*.
+
+        Queries ``system_schema.indexes`` using only (keyspace_name, table_name)
+        to avoid ALLOW FILTERING, then matches by index_name in Python.
+        In dry-run mode always returns ``False``.
+        """
+        if self._dry_run:
+            return False
+        rows = await self._driver.execute_async(
+            "SELECT index_name FROM system_schema.indexes WHERE keyspace_name = ? AND table_name = ?",
+            [keyspace, table],
+        )
+        return any(r.get("index_name") == index_name for r in rows)
 
     async def scan_table(
         self,

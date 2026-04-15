@@ -1,0 +1,29 @@
+services:
+  scylladb:
+    image: scylladb/scylla:2025.4.5
+    ports:
+      - "9042:9042"
+    command: >
+      --smp 1
+      --memory 512M
+      --developer-mode 1
+      --vector-store-primary-uri=http://vector-store:6080
+    networks:
+      - vector-net
+
+  vector-store:
+    image: scylladb/vector-store:latest
+    environment:
+      VECTOR_STORE_SCYLLADB_URI: "scylladb:9042"
+      VECTOR_STORE_URI: "0.0.0.0:6080"
+    ports:
+      - "6080:6080"
+    depends_on:
+      - scylladb
+    networks:
+      - vector-net
+    restart: on-failure
+
+networks:
+  vector-net:
+    driver: bridge

@@ -19,15 +19,17 @@ class BatchQuery:
             Product(name="B").save(batch=batch)
     """
 
-    __slots__ = ("_logged", "_batch_type", "_statements")
+    __slots__ = ("_logged", "_batch_type", "_timestamp", "_statements")
 
     def __init__(
         self,
         logged: bool = True,
         batch_type: str | None = None,
+        timestamp: int | None = None,
     ) -> None:
         self._logged = logged
         self._batch_type = batch_type
+        self._timestamp = timestamp
         self._statements: list[tuple[str, list[Any]]] = []
 
     def add(self, stmt: str, params: list[Any]) -> None:
@@ -57,6 +59,7 @@ class BatchQuery:
             self._statements,
             logged=self._logged,
             batch_type=self._batch_type,
+            timestamp=self._timestamp,
         )
         get_driver().execute(cql, params)
         self._statements.clear()
@@ -80,9 +83,11 @@ class AsyncBatchQuery:
         self,
         logged: bool = True,
         batch_type: str | None = None,
+        timestamp: int | None = None,
     ) -> None:
         self._logged = logged
         self._batch_type = batch_type
+        self._timestamp = timestamp
         self._statements: list[tuple[str, list[Any]]] = []
 
     def add(self, stmt: str, params: list[Any]) -> None:
@@ -112,6 +117,7 @@ class AsyncBatchQuery:
             self._statements,
             logged=self._logged,
             batch_type=self._batch_type,
+            timestamp=self._timestamp,
         )
         await get_driver().execute_async(cql, params)
         self._statements.clear()

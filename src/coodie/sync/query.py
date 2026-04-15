@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import functools
+import re
 from typing import Any, Iterator, TYPE_CHECKING
 
 from coodie.cql_builder import (
     build_select,
+    build_select_json,
+    build_select_writetime,
+    build_select_column_ttl,
     build_count,
     build_delete,
     build_update,
@@ -52,6 +57,7 @@ class QuerySet:
         "_select_token_val",
         "_cast_val",
         "_ann_of_val",
+        "_validate_val",
     )
 
     def __init__(
@@ -79,6 +85,7 @@ class QuerySet:
         select_token_val: list[str] | None = None,
         cast_val: list[tuple[str, str]] | None = None,
         ann_of_val: tuple[str, list[float]] | None = None,
+        validate_val: bool | None = None,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -102,6 +109,7 @@ class QuerySet:
         self._select_token_val = select_token_val
         self._cast_val = cast_val
         self._ann_of_val: tuple[str, list[float]] | None = ann_of_val
+        self._validate_val = validate_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -131,6 +139,7 @@ class QuerySet:
         new._select_token_val = self._select_token_val
         new._cast_val = self._cast_val
         new._ann_of_val = self._ann_of_val
+        new._validate_val = self._validate_val
         for key, val in overrides.items():
             setattr(new, f"_{key}", val)
         return new
@@ -238,6 +247,17 @@ class QuerySet:
     def is_null(self, column: str) -> QuerySet:
         return self._clone(where=self._where + [(column, "ISNULL", True)])
 
+    def validate(self, enabled: bool = True) -> QuerySet:
+        """Enable or disable Pydantic validation when hydrating rows.
+
+        By default, rows from the database are hydrated using
+        ``model_construct()`` which skips validation for speed.
+        Call ``.validate()`` to switch to ``model_validate()`` which
+        performs full type coercion and runs custom validators — useful
+        when driver-returned types may not match model field types exactly.
+        """
+        return self._clone(validate_val=enabled)
+
     # ------------------------------------------------------------------
     # Terminal methods
     # ------------------------------------------------------------------
@@ -306,6 +326,33 @@ class QuerySet:
             return result
         # Fast non-polymorphic path
         coll = _collection_fields(doc_cls)
+        # Determine whether to use model_construct (fast) or model_validate
+        # (safe).  When validate_val is None (the default), auto-detect
+        # based on the driver's needs_row_validation flag.
+        if self._validate_val is None:
+            use_construct = not getattr(self._get_driver(), "needs_row_validation", False)
+        else:
+            use_construct = not self._validate_val
+        if use_construct:
+            # model_construct() fast path — skip Pydantic validation
+            construct = doc_cls.model_construct
+            if not rows:
+                return []
+            # All rows from the same CQL query share identical column sets,
+            # so we compute _fields_set once and reuse across the batch.
+            fields = set(rows[0].keys())
+            if not coll:
+                return [construct(_fields_set=fields, **row) for row in rows]
+            # Collection factories replace None→empty container in-place;
+            # they do not add/remove keys, so _fields_set stays correct.
+            result = []
+            for row in rows:
+                for key, factory in coll.items():
+                    if key in row and row[key] is None:
+                        row[key] = factory()
+                result.append(construct(_fields_set=fields, **row))
+            return result
+        # Default path — model_validate() with full type coercion
         validate = doc_cls.model_validate
         if not coll:
             return [validate(row) for row in rows]
@@ -356,11 +403,8 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
-        if rows:
-            row = rows[0]
-            return int(next(iter(row.values())))
-        return 0
+        val = self._get_driver().execute_one(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
+        return int(val) if val is not None else 0
 
     def _aggregate(self, func: str, column: str) -> Any:
         """Execute an aggregate function and return the scalar result."""
@@ -372,10 +416,7 @@ class QuerySet:
             where=self._where or None,
             allow_filtering=self._allow_filtering_val,
         )
-        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
-        if rows:
-            return next(iter(rows[0].values()))
-        return None
+        return self._get_driver().execute_one(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
 
     def aggregate(self, **funcs: str) -> dict[str, Any]:
         """Execute one or more aggregate functions.
@@ -405,16 +446,57 @@ class QuerySet:
     def max(self, column: str) -> Any:
         return self._aggregate("MAX", column)
 
-    def delete(self) -> LWTResult | None:
+    def json(self) -> list[str]:
+        """Execute ``SELECT JSON * FROM …`` and return a list of JSON strings."""
+        cql, params = build_select_json(
+            self._table(),
+            self._keyspace(),
+            where=self._where or None,
+            limit=self._limit_val,
+            allow_filtering=self._allow_filtering_val,
+        )
+        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
+        return [row.get("[json]", "") for row in rows]
+
+    def writetime(self, column: str) -> Any:
+        """Execute ``SELECT WRITETIME("col") FROM …`` and return the scalar result."""
+        cql, params = build_select_writetime(
+            self._table(),
+            self._keyspace(),
+            column,
+            where=self._where or None,
+            allow_filtering=self._allow_filtering_val,
+        )
+        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    def column_ttl(self, column: str) -> Any:
+        """Execute ``SELECT TTL("col") FROM …`` and return the scalar result."""
+        cql, params = build_select_column_ttl(
+            self._table(),
+            self._keyspace(),
+            column,
+            where=self._where or None,
+            allow_filtering=self._allow_filtering_val,
+        )
+        rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
+        if rows:
+            return next(iter(rows[0].values()))
+        return None
+
+    def delete(self, if_conditions: dict[str, Any] | None = None) -> LWTResult | None:
         cql, params = build_delete(
             self._table(),
             self._keyspace(),
             self._where,
             timestamp=self._timestamp_val,
             if_exists=self._if_exists_val,
+            if_conditions=if_conditions,
         )
         rows = self._get_driver().execute(cql, params, consistency=self._consistency_val, timeout=self._timeout_val)
-        if self._if_exists_val:
+        if self._if_exists_val or if_conditions:
             return _parse_lwt_result(rows)
         return None
 
@@ -472,8 +554,11 @@ def _parse_lwt_result(rows: list[dict[str, Any]]) -> LWTResult:
     return LWTResult(applied=applied, existing=existing)
 
 
-def _snake_case(name: str) -> str:
-    import re
+_SNAKE_RE1 = re.compile(r"(.)([A-Z][a-z]+)")
+_SNAKE_RE2 = re.compile(r"([a-z0-9])([A-Z])")
 
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+@functools.lru_cache(maxsize=128)
+def _snake_case(name: str) -> str:
+    s1 = _SNAKE_RE1.sub(r"\1_\2", name)
+    return _SNAKE_RE2.sub(r"\1_\2", s1).lower()

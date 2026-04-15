@@ -985,7 +985,7 @@ class SyncCustomIdxProduct(SyncDocument):
 
     id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
     name: str = ""
-    brand: Annotated[str, Indexed(index_name="my_custom_idx")] = "Unknown"
+    brand: Annotated[str, Indexed(index_name="my_sync_custom_idx")] = "Unknown"
 
     class Settings:
         name = "it_sync_custom_idx"
@@ -997,7 +997,7 @@ class AsyncCustomIdxProduct(AsyncDocument):
 
     id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
     name: str = ""
-    brand: Annotated[str, Indexed(index_name="my_custom_idx")] = "Unknown"
+    brand: Annotated[str, Indexed(index_name="my_async_custom_idx")] = "Unknown"
 
     class Settings:
         name = "it_async_custom_idx"

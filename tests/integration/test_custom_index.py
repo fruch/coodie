@@ -20,7 +20,7 @@ pytestmark = [
 
 
 class TestCustomIndexName:
-    """Verify ``Indexed(index_name="my_custom_idx")`` behaviour."""
+    """Verify ``Indexed(index_name=...)`` behaviour."""
 
     @pytest.fixture(autouse=True)
     def _clear_known_tables_cache(self, coodie_driver) -> None:
@@ -30,8 +30,9 @@ class TestCustomIndexName:
     async def test_custom_index_created_in_schema(
         self, coodie_driver, execute_raw_fn, CustomIdxProduct, variant
     ) -> None:
-        """``sync_table()`` must create an index named ``my_custom_idx``."""
+        """``sync_table()`` must create a custom-named index."""
         table_name = CustomIdxProduct.Settings.name
+        expected_idx = "my_sync_custom_idx" if variant == "sync" else "my_async_custom_idx"
 
         # Drop table first so the index is created fresh
         await _maybe_await(execute_raw_fn, f"DROP TABLE IF EXISTS test_ks.{table_name}", [])
@@ -46,10 +47,10 @@ class TestCustomIndexName:
                 ["test_ks", table_name],
             )
             names = {r["index_name"] for r in rows}
-            return "my_custom_idx" in names or None
+            return expected_idx in names or None
 
         result = await _retry(_index_visible)
-        assert result, "Expected index 'my_custom_idx' in system_schema.indexes"
+        assert result, f"Expected index {expected_idx!r} in system_schema.indexes"
 
     async def test_custom_index_queryable(self, coodie_driver, CustomIdxProduct) -> None:
         """Rows inserted into the table are queryable via the custom-indexed column."""

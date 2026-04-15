@@ -55,7 +55,7 @@ jobs:
       - name: Run integration tests
         run: uv run pytest -m integration -v --timeout=120 --driver-type=${{ matrix.driver-type }}
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: integration

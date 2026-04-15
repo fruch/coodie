@@ -13,6 +13,7 @@ against a real ScyllaDB instance.
 | `sync_table()` — CREATE TABLE IF NOT EXISTS | `TestSyncIntegration.test_sync_table_creates_table`, `TestAsyncIntegration.test_sync_table_creates_table` |
 | `sync_table()` idempotency (call twice) | `TestSyncIntegration.test_sync_table_idempotent`, `TestAsyncIntegration.test_sync_table_idempotent` |
 | Secondary index creation (`Indexed` field) | implicit in all `SyncProduct` / `AsyncProduct` tests (`brand`, `category` columns) |
+| Secondary index with custom `index_name` | `TestCustomIndexName.test_custom_index_created_in_schema`, `test_custom_index_queryable` |
 | Schema migration — `ALTER TABLE ADD column` | `TestSyncExtended.test_schema_migration_add_column` |
 | Composite partition key (`PrimaryKey(partition_key_index=N)`) | `TestSyncExtended.test_composite_pk_and_clustering`, `TestAsyncExtended.test_composite_pk_and_clustering` |
 | Multiple clustering columns (`ClusteringKey(clustering_key_index=N)`) | `SyncEvent` / `AsyncEvent` models used in extended tests |
@@ -134,14 +135,15 @@ Once exposed on `QuerySet` this should be tested with a multi-row-per-partition
 model to assert that exactly N rows are returned per partition key.
 
 ### Secondary index with custom `index_name`
-**Status: `Indexed(index_name="my_idx")` is handled by `build_create_index` and
-`schema.py`, but the existing tests only use the default auto-generated name.**
-A targeted test verifying that a named index is created and queryable is a low
-priority but straightforward addition.
+**Status: covered.**
+`TestCustomIndexName` in `tests/integration/test_custom_index.py` defines models
+with `Indexed(index_name="my_custom_idx")`, verifies the named index appears in
+`system_schema.indexes` after `sync_table()`, and confirms the column is queryable.
 
 ### AcsyllaDriver (async native driver)
-**Status: `src/coodie/drivers/acsylla.py` exists but requires the `acsylla`
-native C extension which is not installed in the CI image.**
-All async integration tests run through the `CassandraDriver` asyncio bridge.
-A separate workflow targeting the `acsylla` driver can be added when that
-dependency is available.
+**Status: covered.**
+The `test-integration.yml` CI workflow already includes `acsylla` as a matrix
+entry (`--driver-type=acsylla`).  When the `acsylla` package is installed, all
+integration tests (including the custom index tests) run against `AcsyllaDriver`.
+The `conftest.py` fixture `coodie_driver` creates an `AcsyllaDriver.connect()`
+session when `--driver-type=acsylla` is selected.

@@ -12,11 +12,10 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    # Skip bot-authored PRs – the OIDC app-token exchange used by
+    # claude-code-action fails for bot actors ("User does not have write
+    # access on this repository").
+    if: github.event.pull_request.user.type != 'Bot'
 
     runs-on: ubuntu-latest
     permissions:

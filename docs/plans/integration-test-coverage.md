@@ -13,7 +13,7 @@ against a real ScyllaDB instance.
 | `sync_table()` — CREATE TABLE IF NOT EXISTS | `TestSyncIntegration.test_sync_table_creates_table`, `TestAsyncIntegration.test_sync_table_creates_table` |
 | `sync_table()` idempotency (call twice) | `TestSyncIntegration.test_sync_table_idempotent`, `TestAsyncIntegration.test_sync_table_idempotent` |
 | Secondary index creation (`Indexed` field) | implicit in all `SyncProduct` / `AsyncProduct` tests (`brand`, `category` columns) |
-| Secondary index with custom `index_name` | `TestCustomIndexName.test_custom_index_created_in_schema`, `test_custom_index_queryable` |
+| Secondary index with custom `index_name` | `TestCustomIndexName.test_custom_index_created_in_schema`, `TestCustomIndexName.test_custom_index_queryable` |
 | Schema migration — `ALTER TABLE ADD column` | `TestSyncExtended.test_schema_migration_add_column` |
 | Composite partition key (`PrimaryKey(partition_key_index=N)`) | `TestSyncExtended.test_composite_pk_and_clustering`, `TestAsyncExtended.test_composite_pk_and_clustering` |
 | Multiple clustering columns (`ClusteringKey(clustering_key_index=N)`) | `SyncEvent` / `AsyncEvent` models used in extended tests |

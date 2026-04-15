@@ -973,3 +973,39 @@ def TTLItem(variant):
     if variant == "sync":
         return SyncTTLItem
     return AsyncTTLItem
+
+
+# ---------------------------------------------------------------------------
+# Custom index name models
+# ---------------------------------------------------------------------------
+
+
+class SyncCustomIdxProduct(SyncDocument):
+    """Document with a custom-named secondary index."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    brand: Annotated[str, Indexed(index_name="my_sync_custom_idx")] = "Unknown"
+
+    class Settings:
+        name = "it_sync_custom_idx"
+        keyspace = "test_ks"
+
+
+class AsyncCustomIdxProduct(AsyncDocument):
+    """Async counterpart with a custom-named secondary index."""
+
+    id: Annotated[UUID, PrimaryKey()] = Field(default_factory=uuid4)
+    name: str = ""
+    brand: Annotated[str, Indexed(index_name="my_async_custom_idx")] = "Unknown"
+
+    class Settings:
+        name = "it_async_custom_idx"
+        keyspace = "test_ks"
+
+
+@pytest.fixture
+def CustomIdxProduct(variant):
+    if variant == "sync":
+        return SyncCustomIdxProduct
+    return AsyncCustomIdxProduct

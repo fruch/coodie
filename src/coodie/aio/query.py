@@ -56,6 +56,7 @@ class QuerySet:
         "_cast_val",
         "_ann_of_val",
         "_validate_val",
+        "_bypass_cache_val",
     )
 
     def __init__(
@@ -84,6 +85,7 @@ class QuerySet:
         cast_val: list[tuple[str, str]] | None = None,
         ann_of_val: tuple[str, list[float]] | None = None,
         validate_val: bool | None = None,
+        bypass_cache_val: bool = False,
     ) -> None:
         self._doc_cls = doc_cls
         self._where: list[tuple[str, str, Any]] = where or []
@@ -108,6 +110,7 @@ class QuerySet:
         self._cast_val = cast_val
         self._ann_of_val: tuple[str, list[float]] | None = ann_of_val
         self._validate_val = validate_val
+        self._bypass_cache_val = bypass_cache_val
 
     # ------------------------------------------------------------------
     # Internal: clone with overrides
@@ -138,6 +141,7 @@ class QuerySet:
         new._cast_val = self._cast_val
         new._ann_of_val = self._ann_of_val
         new._validate_val = self._validate_val
+        new._bypass_cache_val = self._bypass_cache_val
         for key, val in overrides.items():
             setattr(new, f"_{key}", val)
         return new
@@ -169,6 +173,10 @@ class QuerySet:
 
     def allow_filtering(self) -> QuerySet:
         return self._clone(allow_filtering_val=True)
+
+    def bypass_cache(self) -> QuerySet:
+        """Append ``BYPASS CACHE`` to SELECT queries (ScyllaDB extension)."""
+        return self._clone(bypass_cache_val=True)
 
     def if_not_exists(self) -> QuerySet:
         return self._clone(if_not_exists_val=True)
@@ -293,6 +301,7 @@ class QuerySet:
             select_token=self._select_token_val,
             cast=self._cast_val,
             ann_of=self._ann_of_val,
+            bypass_cache=self._bypass_cache_val,
         )
         rows = await self._get_driver().execute_async(
             cql, params, consistency=self._consistency_val, timeout=self._timeout_val
@@ -379,6 +388,7 @@ class QuerySet:
             order_by=self._order_by_val or None,
             allow_filtering=self._allow_filtering_val,
             ann_of=self._ann_of_val,
+            bypass_cache=self._bypass_cache_val,
         )
         driver = self._get_driver()
         rows = await driver.execute_async(

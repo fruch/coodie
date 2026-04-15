@@ -29,6 +29,8 @@ def create_keyspace(
     replication_factor: int = 1,
     strategy: str = "SimpleStrategy",
     dc_replication_map: dict[str, int] | None = None,
+    durable_writes: bool | None = None,
+    tablets: dict[str, Any] | None = None,
     connection: str | None = None,
 ) -> None:
     """Create a keyspace if it does not exist (synchronous).
@@ -42,6 +44,8 @@ def create_keyspace(
 
         create_keyspace("my_ks", replication_factor=3)
 
+    Use *durable_writes* to set ``AND durable_writes = true/false``.
+    Use *tablets* for ScyllaDB tablet options (e.g. ``{"enabled": "true"}``).
     Use *connection* to target a named driver registered via
     ``init_coodie(name=...)``.  Defaults to the default driver.
     """
@@ -53,6 +57,8 @@ def create_keyspace(
         replication_factor=replication_factor,
         strategy=strategy,
         dc_replication_map=dc_replication_map,
+        durable_writes=durable_writes,
+        tablets=tablets,
     )
     get_driver(name=connection).execute(cql, [])
 
@@ -77,6 +83,36 @@ def drop_keyspace(
     get_driver(name=connection).execute(cql, [])
 
 
+def alter_keyspace(
+    keyspace: str,
+    replication_factor: int | None = None,
+    strategy: str | None = None,
+    dc_replication_map: dict[str, int] | None = None,
+    durable_writes: bool | None = None,
+    tablets: dict[str, Any] | None = None,
+    connection: str | None = None,
+) -> None:
+    """Alter a keyspace's options (synchronous).
+
+    Example::
+
+        alter_keyspace("my_ks", replication_factor=5)
+        alter_keyspace("my_ks", durable_writes=False)
+    """
+    from coodie.cql_builder import build_alter_keyspace
+    from coodie.drivers import get_driver
+
+    cql = build_alter_keyspace(
+        keyspace,
+        replication_factor=replication_factor,
+        strategy=strategy,
+        dc_replication_map=dc_replication_map,
+        durable_writes=durable_writes,
+        tablets=tablets,
+    )
+    get_driver(name=connection).execute(cql, [])
+
+
 __all__ = [
     "Document",
     "CounterDocument",
@@ -87,4 +123,5 @@ __all__ = [
     "execute_raw",
     "create_keyspace",
     "drop_keyspace",
+    "alter_keyspace",
 ]

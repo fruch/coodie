@@ -29,9 +29,31 @@ class ClusteringKey:
 
 @dataclass(frozen=True)
 class Indexed:
-    """Annotated marker: create a secondary index on this column."""
+    """Annotated marker: create a secondary index on this column.
+
+    Args:
+        index_name: Custom index name (auto-generated if ``None``).
+        index_class: Custom index class (e.g. ``StorageAttachedIndex``).
+            When set, emits ``CREATE CUSTOM INDEX … USING 'class'``.
+        options: Index options dict, emits ``WITH OPTIONS = {…}``.
+        index_target: Collection index target — one of ``KEYS``,
+            ``VALUES``, ``ENTRIES``, or ``FULL`` — wraps the column
+            reference accordingly.
+    """
 
     index_name: str | None = None
+    index_class: str | None = None
+    options: dict[str, str] | None = None
+    index_target: str | None = None
+
+    _VALID_TARGETS = frozenset({"KEYS", "VALUES", "ENTRIES", "FULL"})
+
+    def __post_init__(self) -> None:
+        if self.index_target is not None and self.index_target not in self._VALID_TARGETS:
+            raise ValueError(
+                f"Invalid index_target {self.index_target!r}, "
+                f"must be one of {sorted(self._VALID_TARGETS)}"
+            )
 
 
 @dataclass(frozen=True)

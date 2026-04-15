@@ -33,6 +33,9 @@ class ColumnDefinition:
     clustering_order: str = "ASC"
     index: bool = False
     index_name: str | None = None
+    index_class: str | None = None
+    index_options: dict[str, str] | None = None
+    index_target: str | None = None
     required: bool = True
     static: bool = False
     vector_index: bool = False
@@ -97,6 +100,9 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
         clustering_order = "ASC"
         is_indexed = False
         index_name: str | None = None
+        index_class: str | None = None
+        index_options: dict[str, str] | None = None
+        index_target: str | None = None
         is_static = False
         is_vector_index = False
         vector_index_name: str | None = None
@@ -114,6 +120,9 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
             elif isinstance(meta, Indexed):
                 is_indexed = True
                 index_name = meta.index_name
+                index_class = meta.index_class
+                index_options = meta.options
+                index_target = meta.index_target
             elif isinstance(meta, Counter):
                 cql_type = "counter"
             elif isinstance(meta, Static):
@@ -142,6 +151,9 @@ def build_schema(doc_cls: type) -> list[ColumnDefinition]:
                 clustering_order=clustering_order,
                 index=is_indexed,
                 index_name=index_name,
+                index_class=index_class,
+                index_options=index_options,
+                index_target=index_target,
                 required=required,
                 static=is_static,
                 vector_index=is_vector_index,

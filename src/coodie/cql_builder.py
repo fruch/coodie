@@ -10,20 +10,62 @@ def build_create_keyspace(
     replication_factor: int = 1,
     strategy: str = "SimpleStrategy",
     dc_replication_map: dict[str, int] | None = None,
+    durable_writes: bool | None = None,
+    tablets: dict[str, Any] | None = None,
 ) -> str:
     if dc_replication_map is not None:
         strategy = "NetworkTopologyStrategy"
         dc_parts = ", ".join(f"'{dc}': '{rf}'" for dc, rf in dc_replication_map.items())
-        return f"CREATE KEYSPACE IF NOT EXISTS {keyspace} WITH replication = {{'class': '{strategy}', {dc_parts}}}"
-    return (
-        f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
-        f"WITH replication = {{'class': '{strategy}', "
-        f"'replication_factor': '{replication_factor}'}}"
-    )
+        cql = f"CREATE KEYSPACE IF NOT EXISTS {keyspace} WITH replication = {{'class': '{strategy}', {dc_parts}}}"
+    else:
+        cql = (
+            f"CREATE KEYSPACE IF NOT EXISTS {keyspace} "
+            f"WITH replication = {{'class': '{strategy}', "
+            f"'replication_factor': '{replication_factor}'}}"
+        )
+    if durable_writes is not None:
+        cql += f" AND durable_writes = {str(durable_writes).lower()}"
+    if tablets is not None:
+        tablet_parts = ", ".join(f"'{k}': '{v}'" for k, v in tablets.items())
+        cql += f" AND tablets = {{{tablet_parts}}}"
+    return cql
 
 
 def build_drop_keyspace(keyspace: str) -> str:
     return f"DROP KEYSPACE IF EXISTS {keyspace}"
+
+
+def build_alter_keyspace(
+    keyspace: str,
+    replication_factor: int | None = None,
+    strategy: str | None = None,
+    dc_replication_map: dict[str, int] | None = None,
+    durable_writes: bool | None = None,
+    tablets: dict[str, Any] | None = None,
+) -> str:
+    """Build an ``ALTER KEYSPACE`` CQL statement.
+
+    At least one option must be provided.
+    """
+    with_parts: list[str] = []
+    if dc_replication_map is not None:
+        eff_strategy = strategy or "NetworkTopologyStrategy"
+        dc_parts = ", ".join(f"'{dc}': '{rf}'" for dc, rf in dc_replication_map.items())
+        with_parts.append(f"replication = {{'class': '{eff_strategy}', {dc_parts}}}")
+    elif replication_factor is not None or strategy is not None:
+        eff_strategy = strategy or "SimpleStrategy"
+        eff_rf = replication_factor if replication_factor is not None else 1
+        with_parts.append(
+            f"replication = {{'class': '{eff_strategy}', 'replication_factor': '{eff_rf}'}}"
+        )
+    if durable_writes is not None:
+        with_parts.append(f"durable_writes = {str(durable_writes).lower()}")
+    if tablets is not None:
+        tablet_parts = ", ".join(f"'{k}': '{v}'" for k, v in tablets.items())
+        with_parts.append(f"tablets = {{{tablet_parts}}}")
+    if not with_parts:
+        raise ValueError("build_alter_keyspace() requires at least one option")
+    return f"ALTER KEYSPACE {keyspace} WITH " + " AND ".join(with_parts)
 
 
 def build_create_table(
@@ -87,9 +129,34 @@ def build_create_index(
     table: str,
     keyspace: str,
     col: ColumnDefinition,
+    index_class: str | None = None,
+    options: dict[str, str] | None = None,
+    index_target: str | None = None,
 ) -> str:
+    """Build a ``CREATE INDEX`` CQL statement.
+
+    When *index_class* is provided, emits ``CREATE CUSTOM INDEX … USING 'class'``.
+    When *options* is provided, emits ``WITH OPTIONS = {…}``.
+    When *index_target* is provided (``KEYS``, ``VALUES``, ``ENTRIES``, or
+    ``FULL``), wraps the column reference accordingly.
+    """
     index_name = col.index_name or f"{table}_{col.name}_idx"
-    return f'CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ("{col.name}")'
+
+    if index_target:
+        col_ref = f'{index_target}("{col.name}")'
+    else:
+        col_ref = f'"{col.name}"'
+
+    if index_class:
+        cql = f"CREATE CUSTOM INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ({col_ref}) USING '{index_class}'"
+    else:
+        cql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {keyspace}.{table} ({col_ref})"
+
+    if options:
+        opts_str = ", ".join(f"'{k}': '{v}'" for k, v in options.items())
+        cql += f" WITH OPTIONS = {{{opts_str}}}"
+
+    return cql
 
 
 def build_create_custom_index(
@@ -136,6 +203,30 @@ def build_alter_table_options(
 
 def build_truncate(table: str, keyspace: str) -> str:
     return f"TRUNCATE TABLE {keyspace}.{table}"
+
+
+def build_alter_table_drop(
+    table: str,
+    keyspace: str,
+    columns: list[str],
+) -> str:
+    """Build an ``ALTER TABLE … DROP`` CQL statement to remove columns."""
+    cols_str = ", ".join(f'"{c}"' for c in columns)
+    return f"ALTER TABLE {keyspace}.{table} DROP ({cols_str})" if len(columns) > 1 else f'ALTER TABLE {keyspace}.{table} DROP "{columns[0]}"'
+
+
+def build_alter_table_rename(
+    table: str,
+    keyspace: str,
+    renames: dict[str, str],
+) -> str:
+    """Build an ``ALTER TABLE … RENAME`` CQL statement.
+
+    *renames* maps old column names to new column names.
+    Only primary key columns may be renamed in CQL.
+    """
+    rename_parts = [f'"{old}" TO "{new}"' for old, new in renames.items()]
+    return f"ALTER TABLE {keyspace}.{table} RENAME " + " AND ".join(rename_parts)
 
 
 def build_drop_table(table: str, keyspace: str) -> str:
@@ -187,6 +278,25 @@ def build_create_materialized_view(
 
 def build_drop_materialized_view(view_name: str, keyspace: str) -> str:
     return f"DROP MATERIALIZED VIEW IF EXISTS {keyspace}.{view_name}"
+
+
+def build_alter_materialized_view(
+    view_name: str,
+    keyspace: str,
+    options: dict[str, Any],
+) -> str:
+    """Build an ``ALTER MATERIALIZED VIEW`` CQL statement.
+
+    Used to change table properties (e.g. compaction, gc_grace_seconds) on an
+    existing materialized view.
+    """
+    parts = []
+    for k, v in options.items():
+        if isinstance(v, str):
+            parts.append(f"{k} = '{v}'")
+        else:
+            parts.append(f"{k} = {v}")
+    return f"ALTER MATERIALIZED VIEW {keyspace}.{view_name} WITH " + " AND ".join(parts)
 
 
 def parse_filter_kwargs(
@@ -301,6 +411,7 @@ def build_select(
     select_token: list[str] | None = None,
     cast: list[tuple[str, str]] | None = None,
     ann_of: tuple[str, list[float]] | None = None,
+    bypass_cache: bool = False,
 ) -> tuple[str, list[Any]]:
     # Build the cache key from the query *shape* (excludes actual values).
     where_shape = _where_to_shape(where) if where else ()
@@ -318,6 +429,7 @@ def build_select(
         tuple(select_token) if select_token else None,
         tuple(cast) if cast else None,
         ann_of[0] if ann_of else None,
+        bypass_cache,
     )
 
     params: list[Any] = []
@@ -373,6 +485,9 @@ def build_select(
 
     if allow_filtering:
         cql += " ALLOW FILTERING"
+
+    if bypass_cache:
+        cql += " BYPASS CACHE"
 
     _select_cql_cache[cache_key] = cql
     return cql, params
@@ -453,12 +568,20 @@ def build_aggregate(
 def _build_using_clause(
     ttl: int | None = None,
     timestamp: int | None = None,
+    timeout: str | None = None,
 ) -> str:
+    """Build a ``USING …`` clause for DML statements.
+
+    *timeout* is a CQL duration string (e.g. ``"500ms"``, ``"5s"``) and
+    generates ``USING TIMEOUT <value>`` — a ScyllaDB-specific extension.
+    """
     parts: list[str] = []
     if ttl is not None:
         parts.append(f"TTL {ttl}")
     if timestamp is not None:
         parts.append(f"TIMESTAMP {timestamp}")
+    if timeout is not None:
+        parts.append(f"TIMEOUT {timeout}")
     if not parts:
         return ""
     return " USING " + " AND ".join(parts)
@@ -471,6 +594,7 @@ def build_insert(
     ttl: int | None = None,
     if_not_exists: bool = False,
     timestamp: int | None = None,
+    using_timeout: str | None = None,
 ) -> tuple[str, list[Any]]:
     cols = list(data.keys())
     vals = list(data.values())
@@ -479,7 +603,7 @@ def build_insert(
     cql = f"INSERT INTO {keyspace}.{table} ({cols_str}) VALUES ({placeholders})"
     if if_not_exists:
         cql += " IF NOT EXISTS"
-    cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
+    cql += _build_using_clause(ttl=ttl, timestamp=timestamp, timeout=using_timeout)
     return cql, vals
 
 
@@ -494,6 +618,7 @@ def build_insert_from_columns(
     ttl: int | None = None,
     if_not_exists: bool = False,
     timestamp: int | None = None,
+    using_timeout: str | None = None,
 ) -> tuple[str, list[Any]]:
     cache_key = (table, keyspace, columns, if_not_exists)
     base_cql = _insert_cql_cache.get(cache_key)
@@ -504,7 +629,7 @@ def build_insert_from_columns(
         if if_not_exists:
             base_cql += " IF NOT EXISTS"
         _insert_cql_cache[cache_key] = base_cql
-    cql = base_cql + _build_using_clause(ttl=ttl, timestamp=timestamp)
+    cql = base_cql + _build_using_clause(ttl=ttl, timestamp=timestamp, timeout=using_timeout)
     return cql, values
 
 
@@ -515,6 +640,7 @@ def build_insert_json(
     ttl: int | None = None,
     if_not_exists: bool = False,
     timestamp: int | None = None,
+    using_timeout: str | None = None,
 ) -> tuple[str, list[Any]]:
     """Build an ``INSERT INTO … JSON ?`` CQL statement.
 
@@ -524,7 +650,7 @@ def build_insert_json(
     cql = f"INSERT INTO {keyspace}.{table} JSON ?"
     if if_not_exists:
         cql += " IF NOT EXISTS"
-    cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
+    cql += _build_using_clause(ttl=ttl, timestamp=timestamp, timeout=using_timeout)
     return cql, [json_string]
 
 
@@ -675,6 +801,7 @@ def build_update(
     collection_ops: list[tuple[str, str, Any]] | None = None,
     if_exists: bool = False,
     timestamp: int | None = None,
+    using_timeout: str | None = None,
 ) -> tuple[str, list[Any]]:
     # Build cache key from query shape (column names + ops, not values).
     set_cols = tuple(set_data.keys())
@@ -691,6 +818,7 @@ def build_update(
         if_cond_cols,
         if_exists,
         timestamp,
+        using_timeout,
     )
 
     # Extract params (always needed regardless of cache hit).
@@ -725,7 +853,7 @@ def build_update(
                 set_parts.append(f'"{col}"[?] = ?')
 
     cql = f"UPDATE {keyspace}.{table}"
-    cql += _build_using_clause(ttl=ttl, timestamp=timestamp)
+    cql += _build_using_clause(ttl=ttl, timestamp=timestamp, timeout=using_timeout)
     cql += " SET " + ", ".join(set_parts)
 
     clause, _wp = build_where_clause(where)
@@ -754,6 +882,7 @@ def build_delete(
     timestamp: int | None = None,
     if_conditions: dict[str, Any] | None = None,
     collection_elements: list[tuple[str, Any]] | None = None,
+    using_timeout: str | None = None,
 ) -> tuple[str, list[Any]]:
     where_shape = _where_to_shape(where) if where else ()
     col_elem_shape = tuple((col, type(k).__name__) for col, k in collection_elements) if collection_elements else ()
@@ -766,6 +895,7 @@ def build_delete(
         if_exists,
         tuple(if_conditions.keys()) if if_conditions else (),
         timestamp,
+        using_timeout,
     )
 
     params: list[Any] = []
@@ -787,7 +917,7 @@ def build_delete(
 
     cols_str = ", ".join(delete_parts) if delete_parts else ""
     cql = f"DELETE {cols_str} FROM {keyspace}.{table}".replace("DELETE  FROM", "DELETE FROM")
-    cql += _build_using_clause(timestamp=timestamp)
+    cql += _build_using_clause(timestamp=timestamp, timeout=using_timeout)
 
     clause, where_params = build_where_clause(where)
     cql += " " + clause
@@ -846,6 +976,19 @@ def build_alter_type_add(
     return f'ALTER TYPE {keyspace}.{type_name} ADD "{field_name}" {cql_type}'
 
 
+def build_alter_type_rename(
+    type_name: str,
+    keyspace: str,
+    renames: dict[str, str],
+) -> str:
+    """Build an ``ALTER TYPE … RENAME`` CQL statement.
+
+    *renames* maps old field names to new field names.
+    """
+    rename_parts = [f'"{old}" TO "{new}"' for old, new in renames.items()]
+    return f"ALTER TYPE {keyspace}.{type_name} RENAME " + " AND ".join(rename_parts)
+
+
 def build_batch(
     statements: list[tuple[str, list[Any]]],
     logged: bool = True,
@@ -867,3 +1010,76 @@ def build_batch(
         prefix += f" USING TIMESTAMP {timestamp}"
     cql = f"{prefix}\n  {inner}\nAPPLY BATCH"
     return cql, all_params
+
+
+# ------------------------------------------------------------------
+# Role / User Management DDL
+# ------------------------------------------------------------------
+
+
+def build_create_role(
+    role: str,
+    *,
+    password: str | None = None,
+    superuser: bool = False,
+    login: bool = False,
+    if_not_exists: bool = True,
+) -> str:
+    """Build a ``CREATE ROLE`` CQL statement."""
+    cql = "CREATE ROLE"
+    if if_not_exists:
+        cql += " IF NOT EXISTS"
+    cql += f" {role}"
+    options: list[str] = []
+    if password is not None:
+        options.append(f"PASSWORD = '{password}'")
+    options.append(f"SUPERUSER = {str(superuser).lower()}")
+    options.append(f"LOGIN = {str(login).lower()}")
+    if options:
+        cql += " WITH " + " AND ".join(options)
+    return cql
+
+
+def build_drop_role(
+    role: str,
+    if_exists: bool = True,
+) -> str:
+    """Build a ``DROP ROLE`` CQL statement."""
+    cql = "DROP ROLE"
+    if if_exists:
+        cql += " IF EXISTS"
+    cql += f" {role}"
+    return cql
+
+
+def build_grant(
+    permission: str,
+    resource: str,
+    role: str,
+) -> str:
+    """Build a ``GRANT`` CQL statement.
+
+    *permission* is a CQL permission (``SELECT``, ``MODIFY``, ``ALL``, etc.).
+    *resource* is the CQL resource (e.g. ``ALL KEYSPACES``, ``KEYSPACE ks``,
+    ``TABLE ks.tbl``).
+    """
+    return f"GRANT {permission} ON {resource} TO {role}"
+
+
+def build_revoke(
+    permission: str,
+    resource: str,
+    role: str,
+) -> str:
+    """Build a ``REVOKE`` CQL statement."""
+    return f"REVOKE {permission} ON {resource} FROM {role}"
+
+
+def build_list_roles(
+    of_role: str | None = None,
+) -> str:
+    """Build a ``LIST ROLES`` CQL statement."""
+    cql = "LIST ROLES"
+    if of_role is not None:
+        cql += f" OF {of_role}"
+    return cql

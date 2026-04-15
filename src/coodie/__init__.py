@@ -20,6 +20,7 @@ from coodie.aio import (
     execute_raw,
     create_keyspace,
     drop_keyspace,
+    alter_keyspace,
 )
 from coodie.batch import BatchQuery, AsyncBatchQuery
 from coodie.exceptions import (
@@ -65,6 +66,7 @@ __all__ = [
     "execute_raw",
     "create_keyspace",
     "drop_keyspace",
+    "alter_keyspace",
     "BatchQuery",
     "AsyncBatchQuery",
     "CoodieError",

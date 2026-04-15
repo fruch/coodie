@@ -1163,7 +1163,7 @@ class TestBuildAlterTableRename:
 
     def test_rename_multiple(self):
         cql = build_alter_table_rename("users", "ks", {"a": "b", "c": "d"})
-        assert 'ALTER TABLE ks.users RENAME "a" TO "b" AND "c" TO "d"' == cql
+        assert cql == 'ALTER TABLE ks.users RENAME "a" TO "b" AND "c" TO "d"'
 
 
 class TestBuildCreateIndexExtended:
@@ -1246,7 +1246,7 @@ class TestBuildAlterTypeRename:
 
     def test_rename_multiple_fields(self):
         cql = build_alter_type_rename("address", "ks", {"street": "road", "city": "town"})
-        assert 'ALTER TYPE ks.address RENAME "street" TO "road" AND "city" TO "town"' == cql
+        assert cql == 'ALTER TYPE ks.address RENAME "street" TO "road" AND "city" TO "town"'
 
 
 # ==================================================================
